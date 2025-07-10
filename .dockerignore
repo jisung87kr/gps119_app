@@ -1,0 +1,7 @@
+docker/
+!docker/php/entrypoint.sh
+docker-compose.yml
+.dockerignore
+.git/
+.gitignore
+README.md 

@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    ports:
+      - "9050:80"
+      - "9051:443"
+      - "9093:9093"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=password
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/apache/apache.conf:/etc/apache2/sites-available/000-default.conf
+    networks:
+      - gps-network
+
+  db:
+    image: mysql:8.3
+    ports:
+      - "9052:3306"
+    environment:
+      - MYSQL_DATABASE=laravel
+      - MYSQL_USER=laravel
+      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=root
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - gps-network
+
+volumes:
+  mysql_data:
+
+networks:
+  gps-network:
+    driver: bridge 
