@@ -57,6 +57,7 @@ class RolePermissionSeeder extends Seeder
             $adminUser = User::create([
                 'name' => 'admin',
                 'email' => 'admin@admin.com',
+                'phone' => '00000000000',
                 'password' => Hash::make('password'),
             ]);
         }

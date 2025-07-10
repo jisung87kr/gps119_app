@@ -43,6 +43,7 @@
                         @enderror
                     </div>
 
+
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-700">비밀번호</label>
                         <input type="password"

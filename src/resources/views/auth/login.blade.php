@@ -3,20 +3,6 @@
         <div class="max-w-md w-full space-y-8">
             <div>
                 <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">GPS119 로그인</h2>
-                <div class="mt-2 text-center text-sm text-gray-600 space-y-1">
-                    <p>
-                        일반 사용자:
-                        <a href="{{ route('register') }}" class="font-medium text-blue-600 hover:text-blue-500">
-                            회원가입
-                        </a>
-                    </p>
-                    <p>
-                        관리자:
-                        <a href="{{ route('admin.register') }}" class="font-medium text-green-600 hover:text-green-500">
-                            관리자 계정 생성
-                        </a>
-                    </p>
-                </div>
             </div>
 
             <form class="mt-8 space-y-6" method="POST" action="{{ route('login') }}">
