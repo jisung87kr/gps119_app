@@ -52,7 +52,7 @@
                     <path d="M12 3a9 9 0 1 0 9 9" />
                 </svg>
             </div>
-            
+
             <!-- 요청 위치 정보 -->
             <div class="bg-red-50 rounded-xl p-4 mb-4 border border-red-200">
                 <div class="flex items-center gap-2 mb-2">
@@ -175,6 +175,8 @@
                 // 줌
                 let zoomControl = new kakao.maps.ZoomControl();
                 this.mapObject.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+                this.setBounds();
             },
             getMyLocation() {
                 this.loading = true;
@@ -186,6 +188,7 @@
                         this.myMarker.setMap(this.mapObject);
                         this.getAddressFromCoords(this.myLong, this.myLat, 'my');
                         this.loading = false;
+                        this.setBounds();
                     }, (error) => {
                         this.showError(error);
                         this.loading = false;
@@ -199,7 +202,7 @@
                 let geocoder = new daum.maps.services.Geocoder();
                 geocoder.coord2Address(long, lat, (result, status) => {
                     if (status === kakao.maps.services.Status.OK) {
-                        const address = result[0].road_address && result[0].road_address.address_name ? 
+                        const address = result[0].road_address && result[0].road_address.address_name ?
                             result[0].road_address.address_name : result[0].address.address_name;
                         if (type === 'my') {
                             this.myAddress = address;
@@ -234,7 +237,15 @@
                         break;
                 }
                 alert(message);
-            }
+            },
+            setBounds() {
+                let markers = [this.requestMarker, this.myMarker];
+                let bounds = new kakao.maps.LatLngBounds();
+                for (let i = 0; i < markers.length; i++) {
+                    bounds.extend(markers[i].getPosition());
+                }
+                this.mapObject.setBounds(bounds);
+            },
         }
     </script>
 </x-layouts.app>

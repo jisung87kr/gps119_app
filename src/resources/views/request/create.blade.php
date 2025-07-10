@@ -1,70 +1,18 @@
 <x-layouts.app>
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=509c2656c00fa9af4782197a888763f6&libraries=services,clusterer,drawing?autoload=false"></script>
-    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <div class="w-full h-screen" x-data="mydata" style="padding-bottom: 200px">
-        <div class="bg-blue-800 fixed left-0 top-0 right-0 bottom-0 z-[9999] flex items-center justify-center"
-             id="intro"
-             x-show="showIntro"
-             x-transition:enter="transition ease-out duration-500"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             x-transition:leave="transition ease-in duration-300"
-             x-transition:leave-start="opacity-100 scale-100"
-             x-transition:leave-end="opacity-0 scale-105"
-        >
-            <div class="w-full text-center text-white px-8">
-                <div class="mb-6">
-                    <div class="w-20 h-20 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="text-3xl md:text-4xl font-bold mb-2 tracking-tight">GPS119</div>
-                <div class="text-xl md:text-2xl font-light mb-4 opacity-90">(주)바른인명구조단</div>
-                <div class="text-sm md:text-base opacity-75">응급상황 위치공유 서비스</div>
-                <div class="mt-8">
-                    <div class="w-8 h-8 mx-auto border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                </div>
-            </div>
-        </div>
-        <div id="map"
-             x-ref="map"
-             class="w-full h-full"></div>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <div id="app" class="w-full h-screen" style="padding-bottom: 200px">
+        <map-loader @scripts-loaded="initMap"></map-loader>
+        <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
+        <map-container ref="mapContainer"></map-container>
         <div class="bg-white fixed left-0 bottom-0 right-0 p-4 md:p-6 z-[99] shadow-2xl border-t border-gray-200">
-            <div class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 absolute right-4 top-[-60px] rounded-2xl cursor-pointer p-3 shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl" @click.prevent="getLocation">
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="icon icon-tabler icon-tabler-focus-2" width="28" height="28" viewBox="0 0 24 24" stroke-width="2" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round"
-                     x-show="loading == false">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <circle cx="12" cy="12" r=".5" fill="currentColor" />
-                    <path d="M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-                    <path d="M12 3l0 2" />
-                    <path d="M3 12l2 0" />
-                    <path d="M12 19l0 2" />
-                    <path d="M19 12l2 0" />
-                </svg>
-
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     class="icon icon-tabler icon-tabler-loader-2 animate-spin" width="28" height="28" viewBox="0 0 24 24" stroke-width="2" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round"
-                     x-show="loading == true">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <path d="M12 3a9 9 0 1 0 9 9" />
-                </svg>
-            </div>
-            <div class="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-200">
-                <div class="flex gap-4 text-sm text-gray-600">
-                    <div class="flex items-center gap-1">
-                        <span class="font-medium">위도:</span>
-                        <span x-text="lat" class="font-mono text-gray-800"></span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                        <span class="font-medium">경도:</span>
-                        <span x-text="long" class="font-mono text-gray-800"></span>
-                    </div>
-                </div>
-            </div>
+            <location-button :loading="loading" @get-location="getLocation"></location-button>
+            <location-info
+                :latitude="lat"
+                :longitude="long"
+                :address="address"
+                title="현재 위치"
+                bg-color="gray"
+            ></location-info>
             <div>
                 <div class="mb-4">
                     <input type="text" placeholder="📍 위치검색 (클릭하여 주소 찾기)"
@@ -72,10 +20,10 @@
                            id="address"
                            name="address"
                            readonly
-                           x-model="address"
+                           v-model="address"
                            @click="execDaumPostcode">
-                    <div class="col-span-12 relative border-2 border-gray-200 pt-6 bg-white overflow-auto max-h-[400px] rounded-xl shadow-lg" x-show="findAddress">
-                        <div x-ref="search_address_element">
+                    <div class="col-span-12 relative border-2 border-gray-200 pt-6 bg-white overflow-auto max-h-[400px] rounded-xl shadow-lg" v-show="findAddress">
+                        <div ref="search_address_element">
                             <img src="//t1.daumcdn.net/postcode/resource/images/close.png" id="btnFoldWrap" style="cursor:pointer;position:absolute;right:0px;top:-1px;z-index:1" @click="findAddress=false" alt="접기 버튼">
                         </div>
                     </div>
@@ -128,35 +76,55 @@
             </div>
         </div>
     </div>
-    <script>
-        const mydata = {
-            lat: '33.450701',
-            long: '126.570667',
-            mapObject: null,
-            marker: null,
-            addressPostcode: '',
-            address: '',
-            addressExtra: '',
-            findAddress: false,
-            infowindow: null,
-            showIntro: true,
-            loading: false,
-            init(){
-                this.initMap();
+    <script type="module">
+        import MapLoader from '/js/components/MapLoader.js';
+        import IntroScreen from '/js/components/IntroScreen.js';
+        import LocationButton from '/js/components/LocationButton.js';
+        import LocationInfo from '/js/components/LocationInfo.js';
+        import MapContainer from '/js/components/MapContainer.js';
+
+        const { createApp } = Vue;
+
+        createApp({
+            components: {
+                MapLoader,
+                IntroScreen,
+                LocationButton,
+                LocationInfo,
+                MapContainer
+            },
+            data() {
+                return {
+                    lat: '33.450701',
+                    long: '126.570667',
+                    mapObject: null,
+                    marker: null,
+                    addressPostcode: '',
+                    address: '',
+                    addressExtra: '',
+                    findAddress: false,
+                    infowindow: null,
+                    showIntro: true,
+                    loading: false
+                }
+            },
+            mounted() {
                 this.getLocation();
                 setTimeout(() => {
                     this.showIntro = false;
                 }, 1000);
             },
+            methods: {
             initMap(){
-                this.mapObject = new daum.maps.Map(this.$refs.map, {
-                    center: new daum.maps.LatLng(this.lat, this.long),
+                const mapElement = document.getElementById('map');
+                this.mapObject = new kakao.maps.Map(mapElement, {
+                    center: new kakao.maps.LatLng(this.lat, this.long),
                     level: 5,
                 });
 
                 //마커를 미리 생성
-                this.marker = new daum.maps.Marker({
-                    position: new daum.maps.LatLng(this.lat, this.long),
+                this.marker = new kakao.maps.Marker({
+                    position: new kakao.maps.LatLng(this.lat, this.long),
                     map: this.mapObject
                 });
 
@@ -180,7 +148,7 @@
                 this.latLongToAddress(this.long, this.lat);
             },
             latLongToAddress(long, lat){
-                let geocoder = new daum.maps.services.Geocoder();
+                let geocoder = new kakao.maps.services.Geocoder();
                 geocoder.coord2Address(long, lat, (result, status) => {
                     if (status === kakao.maps.services.Status.OK) {
                         this.address = result[0].road_address && result[0].road_address.address_name ? result[0].road_address.address_name : result[0].address.address_name;
@@ -201,15 +169,15 @@
             },
             setMap(address){
                 this.initMap();
-                let geocoder = new daum.maps.services.Geocoder();
+                let geocoder = new kakao.maps.services.Geocoder();
                 geocoder.addressSearch(address, (results, status) => {
                     // 정상적으로 검색이 완료됐으면
-                    if (status === daum.maps.services.Status.OK) {
+                    if (status === kakao.maps.services.Status.OK) {
                         let result = results[0]; //첫번째 결과의 값을 활용
                         this.lat = result.y;
                         this.long = result.x;
                         // 해당 주소에 대한 좌표를 받아서
-                        let coords = new daum.maps.LatLng(this.lat, this.long);
+                        let coords = new kakao.maps.LatLng(this.lat, this.long);
                         // 지도를 보여준다.
                         this.mapObject.relayout();
                         // 지도 중심을 변경한다.
@@ -349,14 +317,16 @@
                 }
             },
             showPosition(position) {
+                console.log(position);
                 this.lat = position.coords.latitude;
                 this.long = position.coords.longitude;
-                this.addMarker(new daum.maps.LatLng(this.lat, this.long));
+                this.addMarker(new kakao.maps.LatLng(this.lat, this.long));
                 this.latLongToAddress(this.long, this.lat);
                 this.setCenter(this.lat, this.long);
                 this.loading = false;
             },
             showError(error) {
+                let message = '';
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
                         message = "사용자가 위치 정보 요청을 거부했습니다.";
@@ -373,6 +343,7 @@
                 }
                 alert(message);
             }
-        }
+            }
+        }).mount('#app');
     </script>
 </x-layouts.app>
