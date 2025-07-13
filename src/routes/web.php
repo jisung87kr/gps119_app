@@ -10,6 +10,11 @@ Route::get('/', function () {
 });
 
 Route::get('/requests/create', function () {
+    if(!Auth::user()->phone){
+        // 회원정보 변경 페이지 리다이렉트
+        return view('errors.require-phone');
+    }
+
     return view('request.create');
 })->middleware(['auth'])->name('request.create');
 
