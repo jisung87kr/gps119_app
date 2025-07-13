@@ -34,5 +34,14 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+    'naver' => [
+        'client_id' => env('NAVER_CLIENT_ID'),
+        'client_secret' => env('NAVER_CLIENT_SECRET'),
+        'redirect' => env('NAVER_REDIRECT_URI'),
+    ],
+    'kakao' => [
+        'client_id' => env('KAKAO_CLIENT_ID'),
+        'client_secret' => env('KAKAO_CLIENT_SECRET'),
+        'redirect' => env('KAKAO_REDIRECT_URI')
+    ],
 ];

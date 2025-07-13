@@ -1,9 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\SocialController;
 
 Route::get('/', function () {
     return redirect()->route('request.create');
@@ -55,3 +55,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile/delete', [ProfileController::class, 'deleteAccount'])->name('profile.delete');
     Route::delete('/profile', [ProfileController::class, 'destroyAccount'])->name('profile.destroy');
 });
+
+// Social login routes
+Route::get('/login/{driver}', [SocialController::class, 'redirect'])->name('login.social');
+Route::get('/auth/{driver}/callback', [SocialController::class, 'callback']);

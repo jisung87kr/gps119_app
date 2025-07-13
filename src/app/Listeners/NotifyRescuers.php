@@ -50,7 +50,7 @@ class NotifyRescuers
 
         // 디스코드 알림
         $url = env('DISCORD_WEBHOOK_URL');
-        $requestUrl = config('app.url') . '/requests/' . $request->id;
+        $requestUrl = config('app.url') . 'requests/' . $request->id;
         $message = "[{$request->description}] 공유됨\n" .
             "요청자: {$request->user->formatted_phone}\n" .
             "위치정보: {$request->latitude}/{$request->longitude}\n" .
