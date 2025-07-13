@@ -17,6 +17,51 @@
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-2xl font-semibold text-gray-900 mb-6">개인 정보</h2>
 
+                    <!-- 소셜로그인 정보 표시 -->
+                    @if(auth()->user()->provider)
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-center">
+                                @if(auth()->user()->provider === 'naver')
+                                    <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mr-4">
+                                        <span class="text-white font-bold text-lg">N</span>
+                                    </div>
+                                @elseif(auth()->user()->provider === 'kakao')
+                                    <div class="w-12 h-12 bg-yellow-400 rounded-lg flex items-center justify-center mr-4">
+                                        <span class="text-gray-800 font-bold text-lg">K</span>
+                                    </div>
+                                @else
+                                    <div class="w-12 h-12 bg-gray-500 rounded-lg flex items-center justify-center mr-4">
+                                        <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                @endif
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-1">
+                                        <h3 class="text-base font-semibold text-gray-900">
+                                            {{ ucfirst(auth()->user()->provider) }} 소셜 계정
+                                        </h3>
+                                        <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            연동됨
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">
+                                        소셜 계정으로 간편하게 로그인할 수 있습니다.
+                                    </p>
+                                    @if(auth()->user()->avatar)
+                                        <div class="mt-2 flex items-center">
+                                            <img src="{{ auth()->user()->avatar }}" alt="프로필 이미지" class="w-8 h-8 rounded-full border-2 border-white shadow-sm">
+                                            <span class="ml-2 text-xs text-gray-500">프로필 이미지 동기화됨</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="space-y-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">이름</label>
@@ -70,9 +115,20 @@
                             프로필 수정
                         </a>
 
-                        <a href="{{ route('profile.password.edit') }}" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 block text-center">
-                            비밀번호 변경
-                        </a>
+                        @if(!auth()->user()->provider)
+                            <a href="{{ route('profile.password.edit') }}" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 block text-center">
+                                비밀번호 변경
+                            </a>
+                        @else
+                            <div class="w-full bg-gray-200 text-gray-500 font-semibold py-3 px-4 rounded-lg text-center cursor-not-allowed">
+                                <div class="flex items-center justify-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                    </svg>
+                                    소셜 계정 (비밀번호 불필요)
+                                </div>
+                            </div>
+                        @endif
 
                         <a href="{{ route('profile.delete') }}" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 block text-center">
                             회원 탈퇴
