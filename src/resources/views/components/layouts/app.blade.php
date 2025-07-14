@@ -88,6 +88,8 @@
 
         <footer class="bg-gray-800 text-white py-4">
             <div class="max-w-7xl mx-auto px-4 text-center">
+                <p>업체명: 세이브미</p>
+                <p>사업자번호: 852-08-02915</p>
                 <p>&copy; {{ date('Y') }} GPS119. All rights reserved.</p>
                 <p>Made with ❤️ by <a href="" class="text-blue-400 hover:underline">indigo404.com</a></p>
             </div>
