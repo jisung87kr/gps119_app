@@ -32,7 +32,7 @@
              x-ref="map"
              class="w-full h-full"></div>
         <div class="bg-white fixed left-0 bottom-0 right-0 p-4 md:p-6 z-[99] shadow-2xl border-t border-gray-200">
-            <div class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 absolute right-4 top-[-60px] rounded-2xl cursor-pointer p-3 shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl" @click.prevent="getMyLocation">
+            <div class="bg-blue-600 hover:bg-blue-600 absolute right-4 top-[-60px] rounded-2xl cursor-pointer p-3 shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl" @click.prevent="getMyLocation">
                 <svg xmlns="http://www.w3.org/2000/svg"
                      class="icon icon-tabler icon-tabler-focus-2" width="28" height="28" viewBox="0 0 24 24" stroke-width="2" stroke="#ffffff" fill="none" stroke-linecap="round" stroke-linejoin="round"
                      x-show="loading == false">
@@ -53,45 +53,47 @@
                 </svg>
             </div>
 
-            <!-- 요청 위치 정보 -->
-            <div class="bg-red-50 rounded-xl p-4 mb-4 border border-red-200">
-                <div class="flex items-center gap-2 mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <h3 class="text-sm font-bold text-red-800">요청 위치</h3>
-                </div>
-                <div class="text-sm text-red-700 mb-2" x-text="requestAddress"></div>
-                <div class="flex gap-4 text-xs text-red-600">
-                    <div class="flex items-center gap-1">
-                        <span class="font-medium">위도:</span>
-                        <span x-text="requestLat" class="font-mono"></span>
+            <div class="grid grid-cols-2 gap-3">
+                <!-- 요청 위치 정보 -->
+                <div class="bg-red-50 rounded-xl p-4 mb-4 border border-red-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <h3 class="text-sm font-bold text-red-800">요청 위치</h3>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <span class="font-medium">경도:</span>
-                        <span x-text="requestLong" class="font-mono"></span>
+                    <div class="text-sm text-red-700 mb-2" x-text="requestAddress"></div>
+                    <div class="flex gap-4 text-xs text-red-600">
+                        <div class="flex items-center gap-1">
+                            <span class="font-medium">위도:</span>
+                            <span x-text="requestLat" class="font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="font-medium">경도:</span>
+                            <span x-text="requestLong" class="font-mono"></span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 내 위치 정보 -->
-            <div class="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-200">
-                <div class="flex items-center gap-2 mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h3 class="text-sm font-bold text-blue-800">내 위치</h3>
-                </div>
-                <div class="text-sm text-blue-700 mb-2" x-text="myAddress"></div>
-                <div class="flex gap-4 text-xs text-blue-600">
-                    <div class="flex items-center gap-1">
-                        <span class="font-medium">위도:</span>
-                        <span x-text="myLat" class="font-mono"></span>
+                <!-- 내 위치 정보 -->
+                <div class="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 class="text-sm font-bold text-blue-800">내 위치</h3>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <span class="font-medium">경도:</span>
-                        <span x-text="myLong" class="font-mono"></span>
+                    <div class="text-sm text-blue-700 mb-2" x-text="myAddress"></div>
+                    <div class="flex gap-4 text-xs text-blue-600">
+                        <div class="flex items-center gap-1">
+                            <span class="font-medium">위도:</span>
+                            <span x-text="myLat" class="font-mono"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="font-medium">경도:</span>
+                            <span x-text="myLong" class="font-mono"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -154,6 +156,113 @@
                     )
                 });
 
+                let infowindow = new kakao.maps.InfoWindow({
+                    position : this.requestMarker.position,
+                    content : `
+                    <div style="
+                        padding: 15px;
+                        min-width: 240px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    ">
+                        <div style="
+                            display: flex;
+                            align-items: center;
+                            margin-bottom: 12px;
+                            padding-bottom: 8px;
+                            border-bottom: 2px solid #fee2e2;
+                        ">
+                            <div style="
+                                width: 24px;
+                                height: 24px;
+                                background: #dc2626;
+                                border-radius: 50%;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                margin-right: 8px;
+                            ">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
+                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                </svg>
+                            </div>
+                            <span style="
+                                font-weight: 600;
+                                font-size: 16px;
+                                color: #dc2626;
+                                letter-spacing: -0.02em;
+                            ">요청자 위치</span>
+                        </div>
+                        <div style="
+                            display: flex;
+                            gap: 8px;
+                            flex-wrap: wrap;
+                        ">
+                            <a href="https://map.kakao.com/link/map/요청자,${this.requestLat},${this.requestLong}"
+                               style="
+                                   display: inline-flex;
+                                   align-items: center;
+                                   padding: 8px 12px;
+                                   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                                   color: white;
+                                   text-decoration: none;
+                                   border-radius: 8px;
+                                   font-size: 13px;
+                                   font-weight: 500;
+                                   transition: all 0.2s ease;
+                                   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+                                   border: none;
+                               "
+                               target="_blank"
+                               onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.4)'"
+                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(59, 130, 246, 0.3)'"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                                큰지도보기
+                            </a>
+                            <a href="https://map.kakao.com/link/to/요청자,${this.requestLat},${this.requestLong}"
+                               style="
+                                   display: inline-flex;
+                                   align-items: center;
+                                   padding: 8px 12px;
+                                   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                                   color: white;
+                                   text-decoration: none;
+                                   border-radius: 8px;
+                                   font-size: 13px;
+                                   font-weight: 500;
+                                   transition: all 0.2s ease;
+                                   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+                                   border: none;
+                               "
+                               target="_blank"
+                               onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.4)'"
+                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(16, 185, 129, 0.3)'"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                </svg>
+                                길찾기
+                            </a>
+                        </div>
+                        <div style="
+                            margin-top: 12px;
+                            padding-top: 8px;
+                            border-top: 1px solid #e2e8f0;
+                            font-size: 11px;
+                            color: #64748b;
+                            text-align: center;
+                        ">
+                            클릭하여 카카오맵으로 이동
+                        </div>
+                    </div>
+                `,
+                });
+
+                infowindow.open(this.mapObject, this.requestMarker);
+                //let marker = this.addMarker(new daum.maps.LatLng(this.lat, this.long), infowindow);
+
                 // 내 위치 마커 (파란색) - 초기에는 표시하지 않음
                 this.myMarker = new daum.maps.Marker({
                     position: new daum.maps.LatLng(this.myLat, this.myLong),
@@ -178,8 +287,28 @@
 
                 this.setBounds();
             },
+            addMarker(position, infowindow){
+                var marker = new kakao.maps.Marker({
+                    position: position,
+                });
+
+                marker.setMap(this.mapObject);
+
+                console.log(infowindow);
+                if(infowindow != undefined){
+                    console.log(infowindow);
+                    infowindow.open(this.mapObject, marker);
+                }
+
+                return marker;
+            },
             getMyLocation() {
                 this.loading = true;
+                var options = {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                };
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition((position) => {
                         this.myLat = position.coords.latitude;
@@ -192,7 +321,7 @@
                     }, (error) => {
                         this.showError(error);
                         this.loading = false;
-                    });
+                    }, options);
                 } else {
                     alert("지원하지 않는 브라우저 입니다.");
                     this.loading = false;

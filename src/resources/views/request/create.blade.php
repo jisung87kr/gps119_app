@@ -109,8 +109,8 @@
                 }
             },
             mounted() {
-                this.getLocation();
                 setTimeout(() => {
+                    this.getLocation();
                     this.showIntro = false;
                 }, 1000);
             },
@@ -305,19 +305,24 @@
             },
             getLocation() {
                 this.loading = true;
+                var options = {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                };
+
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition((position) => {
                         this.showPosition(position);
                     }, (error) => {
                         this.showError(error);
                         this.loading = false;
-                    });
+                    }, options);
                 } else {
                     alert("지원하지 않는 브라우저 입니다.");
                 }
             },
             showPosition(position) {
-                console.log(position);
                 this.lat = position.coords.latitude;
                 this.long = position.coords.longitude;
                 this.addMarker(new kakao.maps.LatLng(this.lat, this.long));

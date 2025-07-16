@@ -12,21 +12,21 @@ export default {
         }
     },
     template: `
-        <div 
+        <div
             @click="handleClick"
-            class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 absolute right-4 top-[-60px] rounded-2xl cursor-pointer p-3 shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl"
+            class="bg-blue-600 hover:bg-blue-700 absolute right-4 top-[-60px] rounded-2xl cursor-pointer p-3 shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl"
         >
-            <svg 
+            <svg
                 v-show="!loading"
                 xmlns="http://www.w3.org/2000/svg"
-                class="icon icon-tabler icon-tabler-focus-2" 
-                width="28" 
-                height="28" 
-                viewBox="0 0 24 24" 
-                stroke-width="2" 
-                stroke="#ffffff" 
-                fill="none" 
-                stroke-linecap="round" 
+                class="icon icon-tabler icon-tabler-focus-2"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="#ffffff"
+                fill="none"
+                stroke-linecap="round"
                 stroke-linejoin="round"
             >
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -38,17 +38,17 @@ export default {
                 <path d="M19 12l2 0" />
             </svg>
 
-            <svg 
+            <svg
                 v-show="loading"
                 xmlns="http://www.w3.org/2000/svg"
-                class="icon icon-tabler icon-tabler-loader-2 animate-spin" 
-                width="28" 
-                height="28" 
-                viewBox="0 0 24 24" 
-                stroke-width="2" 
-                stroke="#ffffff" 
-                fill="none" 
-                stroke-linecap="round" 
+                class="icon icon-tabler icon-tabler-loader-2 animate-spin"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                stroke-width="2"
+                stroke="#ffffff"
+                fill="none"
+                stroke-linecap="round"
                 stroke-linejoin="round"
             >
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
