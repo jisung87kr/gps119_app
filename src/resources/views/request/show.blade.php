@@ -116,6 +116,23 @@
         </div>
     </div>
     <script>
+        function wgs84ToWCONGNAMUL(lat, lng) {
+            return new Promise((resolve, reject) => {
+                const geocoder = new kakao.maps.services.Geocoder();
+                geocoder.transCoord(lng, lat, (result, status) => {
+                    if (status === kakao.maps.services.Status.OK) {
+                        resolve({ x: result[0].x, y: result[0].y });
+                    } else {
+                        // 변환 실패시 기본값으로 fallback
+                        throw new Error("좌표 변환 실패");
+                    }
+                }, {
+                    input_coord: kakao.maps.services.Coords.WGS84,
+                    output_coord: kakao.maps.services.Coords.WCONGNAMUL
+                });
+            });
+        }
+
         const showData = {
             requestLat: '{{ $request->latitude ?? "33.450701" }}',
             requestLong: '{{ $request->longitude ?? "126.570667" }}',
@@ -128,17 +145,17 @@
             myMarker: null,
             showIntro: true,
             loading: false,
-            init(){
-                this.initMap();
+            async init(){
+                await this.initMap();
                 this.getMyLocation();
                 setTimeout(() => {
                     this.showIntro = false;
                 }, 1000);
             },
-            initMap(){
+            async initMap(){
                 this.mapObject = new daum.maps.Map(this.$refs.map, {
                     center: new daum.maps.LatLng(this.requestLat, this.requestLong),
-                    level: 5,
+                    level: 8,
                 });
 
                 // 요청 위치 마커 (빨간색)
@@ -155,6 +172,10 @@
                         { offset: new daum.maps.Point(16, 32) }
                     )
                 });
+
+                // https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=1217272.0&urlX=666028.0
+                // https://m.map.kakao.com/scheme/route?sp=&sn=&ep=37.87963614410788%2C127.75487468836948&en=요청자&by=car
+                let WCONGNAMUL = await wgs84ToWCONGNAMUL(this.requestLat, this.requestLong);
 
                 let infowindow = new kakao.maps.InfoWindow({
                     position : this.requestMarker.position,
@@ -197,8 +218,8 @@
                             gap: 8px;
                             flex-wrap: wrap;
                         ">
-                            <a href="#"
-                               onclick="window.open('https://map.kakao.com/link/map/요청자,${this.requestLat},${this.requestLong}', '_blank'); return false;"
+                            <a href="https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=${WCONGNAMUL.y}&urlX=${WCONGNAMUL.x}"
+                               target="_blank"
                                style="
                                    display: inline-flex;
                                    align-items: center;
@@ -221,8 +242,8 @@
                                 </svg>
                                 큰지도보기
                             </a>
-                            <a href="#"
-                               onclick="window.open('https://map.kakao.com/link/to/요청자,${this.requestLat},${this.requestLong}', '_blank'); return false;"
+                            <a href="https://m.map.kakao.com/scheme/route?sp=&sn=&ep=${this.requestLat},${this.requestLong}&en=요청자&by=car"
+                               target="_blank"
                                style="
                                    display: inline-flex;
                                    align-items: center;
@@ -374,6 +395,7 @@
                     bounds.extend(markers[i].getPosition());
                 }
                 this.mapObject.setBounds(bounds);
+                this.mapObject.setLevel(7); // 줌 레벨 설정
             },
         }
     </script>
