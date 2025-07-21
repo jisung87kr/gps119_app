@@ -197,7 +197,8 @@
                             gap: 8px;
                             flex-wrap: wrap;
                         ">
-                            <a href="https://map.kakao.com/link/map/요청자,${this.requestLat},${this.requestLong}"
+                            <a href="#"
+                               onclick="window.open('https://map.kakao.com/link/map/요청자,${this.requestLat},${this.requestLong}', '_blank'); return false;"
                                style="
                                    display: inline-flex;
                                    align-items: center;
@@ -220,7 +221,8 @@
                                 </svg>
                                 큰지도보기
                             </a>
-                            <a href="https://map.kakao.com/link/to/요청자,${this.requestLat},${this.requestLong}"
+                            <a href="#"
+                               onclick="window.open('https://map.kakao.com/link/to/요청자,${this.requestLat},${this.requestLong}', '_blank'); return false;"
                                style="
                                    display: inline-flex;
                                    align-items: center;
