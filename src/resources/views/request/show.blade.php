@@ -212,7 +212,6 @@
                                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
                                    border: none;
                                "
-                               target="_blank"
                                onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.4)'"
                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(59, 130, 246, 0.3)'"
                             >
@@ -236,7 +235,6 @@
                                    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
                                    border: none;
                                "
-                               target="_blank"
                                onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.4)'"
                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(16, 185, 129, 0.3)'"
                             >
