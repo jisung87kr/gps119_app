@@ -52,7 +52,8 @@ class NotifyRescuers
         $url = env('DISCORD_WEBHOOK_URL');
         $requestUrl = config('app.url') . '/requests/' . $request->id;
         $message = "[{$request->description}] 공유됨\n" .
-            "요청자: {$request->user->formatted_phone}\n" .
+            "요청자: {$request->user->name}\n" .
+            "연락처: {$request->user->formatted_phone}\n" .
             "위치정보: {$request->latitude}/{$request->longitude}\n" .
             "주소: {$request->address}\n" .
             "{$requestUrl}";

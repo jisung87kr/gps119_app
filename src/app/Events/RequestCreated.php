@@ -49,6 +49,7 @@ class RequestCreated implements ShouldBroadcast
             'id' => $this->request->id,
             'user' => [
                 'id' => $this->request->user->id,
+                'name' => $this->request->user->name,
                 'phone' => $this->request->user->phone,
             ],
             'latitude' => $this->request->latitude,
