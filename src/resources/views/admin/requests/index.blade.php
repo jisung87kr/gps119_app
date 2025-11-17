@@ -198,10 +198,20 @@
                                     <p class="mt-1 text-sm text-gray-900">#@{{ selectedRequest.id }}</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">상태</label>
-                                    <span class="mt-1 inline-flex px-3 py-1 text-sm font-semibold rounded-full" :class="getStatusClass(selectedRequest.status)">
-                                        @{{ getStatusText(selectedRequest.status) }}
-                                    </span>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                                    <select @change="updateRequestFromModal(selectedRequest.id, 'status', $event.target.value)"
+                                            v-model="selectedRequest.status"
+                                            :disabled="updatingRequests[selectedRequest.id]"
+                                            class="w-full text-sm font-medium rounded-md px-3 py-2 border-2 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            :class="[
+                                                getStatusSelectClass(selectedRequest.status),
+                                                updatingRequests[selectedRequest.id] ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                            ]">
+                                        <option value="pending">대기중</option>
+                                        <option value="in_progress">진행중</option>
+                                        <option value="completed">완료</option>
+                                        <option value="cancelled">취소됨</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -220,9 +230,18 @@
                                 <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">@{{ selectedRequest.description }}</p>
                             </div>
 
-                            <div v-if="selectedRequest.assigned_rescuer">
-                                <label class="block text-sm font-medium text-gray-700">담당 구조대원</label>
-                                <p class="mt-1 text-sm text-gray-900">@{{ selectedRequest.assigned_rescuer.name }}</p>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">담당 구조대원</label>
+                                <select @change="updateRequestFromModal(selectedRequest.id, 'assigned_rescuer_id', $event.target.value || null)"
+                                        v-model="selectedRequest.assigned_rescuer_id"
+                                        :disabled="updatingRequests[selectedRequest.id]"
+                                        class="w-full text-sm text-gray-900 rounded-md px-3 py-2 border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        :class="updatingRequests[selectedRequest.id] ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'">
+                                    <option value="">미배정</option>
+                                    <option v-for="rescuer in rescuers" :key="rescuer.id" :value="rescuer.id">
+                                        @{{ rescuer.name }}
+                                    </option>
+                                </select>
                             </div>
 
                             <div>
@@ -393,6 +412,17 @@
                     return classMap[status] || 'bg-gray-100 text-gray-800';
                 },
 
+                // 상태 select 색상 클래스
+                getStatusSelectClass(status) {
+                    const classMap = {
+                        'pending': 'bg-yellow-50 text-yellow-800 border-yellow-300',
+                        'in_progress': 'bg-blue-50 text-blue-800 border-blue-300',
+                        'completed': 'bg-green-50 text-green-800 border-green-300',
+                        'cancelled': 'bg-red-50 text-red-800 border-red-300'
+                    };
+                    return classMap[status] || 'bg-gray-50 text-gray-800 border-gray-300';
+                },
+
                 // 날짜 포맷
                 formatDate(dateString) {
                     const date = new Date(dateString);
@@ -484,6 +514,22 @@
                         const data = {};
                         data[field] = value;
 
+                        // 담당자 변경 시 상태 자동 변경
+                        if (field === 'assigned_rescuer_id') {
+                            const request = this.requests.find(r => r.id === requestId);
+                            if (request) {
+                                if (value) {
+                                    // 담당자를 배정하고 현재 상태가 pending인 경우 자동으로 in_progress로 변경
+                                    if (request.status === 'pending') {
+                                        data['status'] = 'in_progress';
+                                    }
+                                } else {
+                                    // 담당자를 미배정으로 변경하면 자동으로 pending으로 변경
+                                    data['status'] = 'pending';
+                                }
+                            }
+                        }
+
                         const response = await axios.patch(`/admin/requests/${requestId}/quick-update`, data, {
                             headers: {
                                 'Accept': 'application/json',
@@ -552,15 +598,21 @@
                     });
                 },
 
-                // 마커 색상 반환
+                // 마커 색상 반환 (SVG용)
                 getMarkerColor(status) {
                     const colorMap = {
-                        'pending': 'yellow',
-                        'in_progress': 'blue',
-                        'completed': 'green',
-                        'cancelled': 'red'
+                        'pending': '#eab308',      // yellow-500
+                        'in_progress': '#3b82f6',  // blue-500
+                        'completed': '#22c55e',    // green-500
+                        'cancelled': '#ef4444'     // red-500
                     };
-                    return colorMap[status] || 'gray';
+                    return colorMap[status] || '#6b7280';
+                },
+
+                // SVG 마커 이미지 생성
+                createMarkerSvg(color) {
+                    const svg = `<svg width="36" height="46" viewBox="0 0 36 46" xmlns="http://www.w3.org/2000/svg"><path d="M18 0C8.059 0 0 8.059 0 18c0 13.5 18 28 18 28s18-14.5 18-28C36 8.059 27.941 0 18 0z" fill="${color}" stroke="white" stroke-width="2"/><circle cx="18" cy="18" r="6" fill="white" opacity="0.9"/></svg>`;
+                    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
                 },
 
                 // 마커 업데이트
@@ -585,14 +637,16 @@
                     validRequests.forEach(request => {
                         const position = new kakao.maps.LatLng(request.latitude, request.longitude);
 
-                        // 마커 이미지 설정 (상태별 색상)
-                        // const imageSrc = `https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_${this.getMarkerColor(request.status)}.png`;
-                        const imageSize = new kakao.maps.Size(36, 37);
-                        // const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
+                        // SVG 마커 이미지 생성 (상태별 색상)
+                        const markerColor = this.getMarkerColor(request.status);
+                        const imageSrc = this.createMarkerSvg(markerColor);
+                        const imageSize = new kakao.maps.Size(36, 46);
+                        const imageOption = { offset: new kakao.maps.Point(18, 46) }; // 마커의 기준점을 하단 중앙으로 설정
+                        const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
 
                         const marker = new kakao.maps.Marker({
                             position: position,
-                            // image: markerImage,
+                            image: markerImage,
                             map: this.map
                         });
 
@@ -686,6 +740,11 @@
 
                         if (response.data) {
                             this.selectedRequest = response.data;
+
+                            // assigned_rescuer_id가 명시적으로 없으면 assigned_rescuer에서 가져오기
+                            if (this.selectedRequest.assigned_rescuer_id === undefined) {
+                                this.selectedRequest.assigned_rescuer_id = this.selectedRequest.assigned_rescuer ? this.selectedRequest.assigned_rescuer.id : null;
+                            }
                         }
                     } catch (error) {
                         console.error('Failed to fetch request details:', error);
@@ -705,6 +764,89 @@
                     if (this.infowindow) {
                         this.infowindow.close();
                     }
+                },
+
+                // 모달에서 요청 업데이트
+                async updateRequestFromModal(requestId, field, value) {
+                    // 이미 업데이트 중인 경우 무시
+                    if (this.updatingRequests[requestId]) {
+                        return;
+                    }
+
+                    // 업데이트 상태 설정
+                    this.updatingRequests[requestId] = true;
+
+                    try {
+                        const data = {};
+
+                        // 빈 문자열을 null로 변환 (미배정 처리)
+                        if (field === 'assigned_rescuer_id') {
+                            data[field] = value === '' || value === null || value === undefined ? null : value;
+                        } else {
+                            data[field] = value;
+                        }
+
+                        // 담당자 변경 시 상태 자동 변경
+                        if (field === 'assigned_rescuer_id') {
+                            if (this.selectedRequest) {
+                                if (data[field]) {
+                                    // 담당자를 배정하고 현재 상태가 pending인 경우 자동으로 in_progress로 변경
+                                    if (this.selectedRequest.status === 'pending') {
+                                        data['status'] = 'in_progress';
+                                    }
+                                } else {
+                                    // 담당자를 미배정으로 변경하면 자동으로 pending으로 변경
+                                    data['status'] = 'pending';
+                                }
+                            }
+                        }
+
+                        const response = await axios.patch(`/admin/requests/${requestId}/quick-update`, data, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        if (response.data.success) {
+                            // 모달의 selectedRequest 업데이트
+                            this.selectedRequest = response.data.data;
+
+                            // 테이블의 요청 객체 갱신
+                            const index = this.requests.findIndex(r => r.id === requestId);
+                            if (index !== -1) {
+                                this.requests[index] = response.data.data;
+                            }
+
+                            // 통계 업데이트를 위해 데이터 다시 가져오기
+                            await this.fetchRequests();
+                        }
+                    } catch (error) {
+                        console.error('Failed to update request:', error);
+                        alert('업데이트에 실패했습니다.');
+                        // 에러 발생 시 데이터 다시 가져오기
+                        await this.fetchRequests();
+
+                        // 모달 데이터도 다시 로드
+                        if (this.showModal && requestId) {
+                            try {
+                                const response = await axios.get(`/admin/requests/${requestId}`, {
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest'
+                                    }
+                                });
+                                if (response.data) {
+                                    this.selectedRequest = response.data;
+                                }
+                            } catch (reloadError) {
+                                console.error('Failed to reload request details:', reloadError);
+                            }
+                        }
+                    } finally {
+                        // 업데이트 상태 해제
+                        delete this.updatingRequests[requestId];
+                    }
                 }
             },
             watch: {
@@ -719,13 +861,10 @@
                     handler(newVal, oldVal) {
                         // 지도 모드이고 지도가 로드되었을 때만
                         if (this.viewMode === 'map' && this.map) {
-                            // 요청 배열의 길이가 변경되었을 때만 마커 업데이트
-                            // (자동 갱신으로 인한 불필요한 업데이트 방지)
-                            if (!oldVal || newVal.length !== oldVal.length) {
-                                this.$nextTick(() => {
-                                    this.updateMarkers();
-                                });
-                            }
+                            // 요청 배열이 변경되면 마커 업데이트 (상태 변경 포함)
+                            this.$nextTick(() => {
+                                this.updateMarkers();
+                            });
                         }
                     },
                     deep: true
