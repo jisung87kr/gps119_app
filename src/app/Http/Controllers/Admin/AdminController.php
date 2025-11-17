@@ -189,10 +189,15 @@ class AdminController extends Controller
         ]);
     }
 
-    public function requestShow($id)
+    public function requestShow(Request $request, $id)
     {
         $rescueRequest = RescueRequest::with(['user', 'assignedRescuer'])
             ->findOrFail($id);
+
+        // AJAX 또는 JSON 요청인 경우 JSON 반환
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json($rescueRequest);
+        }
 
         $rescuers = User::role('rescuer')->get();
 

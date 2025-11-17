@@ -3,6 +3,8 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- Axios CDN -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Kakao Map API -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=509c2656c00fa9af4782197a888763f6&libraries=services,clusterer,drawing&autoload=false"></script>
 
     <div id="requestsApp" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Page Header -->
@@ -12,6 +14,34 @@
                 <p class="mt-2 text-gray-600">모든 구조 요청을 관리하세요.</p>
             </div>
             <div class="flex items-center gap-3">
+                <!-- View Toggle -->
+                <div class="flex bg-gray-100 rounded-md p-1">
+                    <button @click="viewMode = 'table'" type="button"
+                            :class="[
+                                'px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-2',
+                                viewMode === 'table'
+                                    ? 'bg-white text-gray-900 shadow'
+                                    : 'text-gray-600 hover:text-gray-900'
+                            ]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <span>테이블</span>
+                    </button>
+                    <button @click="viewMode = 'map'" type="button"
+                            :class="[
+                                'px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-2',
+                                viewMode === 'map'
+                                    ? 'bg-white text-gray-900 shadow'
+                                    : 'text-gray-600 hover:text-gray-900'
+                            ]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                        </svg>
+                        <span>지도</span>
+                    </button>
+                </div>
+
                 <button @click="toggleAutoRefresh" type="button"
                         :class="[
                             'px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2',
@@ -138,8 +168,96 @@
             </div>
         </div>
 
+        <!-- Map View -->
+        <div v-show="viewMode === 'map'" class="bg-white rounded-lg shadow overflow-hidden">
+            <div id="map" class="w-full" style="height: 700px;"></div>
+        </div>
+
+        <!-- Detail Modal -->
+        <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto" @click.self="closeModal">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <!-- Background overlay -->
+                <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="closeModal"></div>
+
+                <!-- Modal panel -->
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-xl font-bold text-gray-900">구조요청 상세 정보</h3>
+                            <button @click="closeModal" class="text-gray-400 hover:text-gray-500">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div v-if="selectedRequest" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">요청 ID</label>
+                                    <p class="mt-1 text-sm text-gray-900">#@{{ selectedRequest.id }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">상태</label>
+                                    <span class="mt-1 inline-flex px-3 py-1 text-sm font-semibold rounded-full" :class="getStatusClass(selectedRequest.status)">
+                                        @{{ getStatusText(selectedRequest.status) }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">요청자</label>
+                                <p class="mt-1 text-sm text-gray-900">@{{ selectedRequest.user?.name || '알 수 없음' }}</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">연락처</label>
+                                <p class="mt-1 text-sm text-gray-900">@{{ selectedRequest.user?.formatted_phone || '-' }}</p>
+                            </div>
+
+                            <div v-if="selectedRequest.description">
+                                <label class="block text-sm font-medium text-gray-700">상세 설명</label>
+                                <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">@{{ selectedRequest.description }}</p>
+                            </div>
+
+                            <div v-if="selectedRequest.assigned_rescuer">
+                                <label class="block text-sm font-medium text-gray-700">담당 구조대원</label>
+                                <p class="mt-1 text-sm text-gray-900">@{{ selectedRequest.assigned_rescuer.name }}</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">요청 일시</label>
+                                <p class="mt-1 text-sm text-gray-900">@{{ formatDate(selectedRequest.created_at) }} @{{ formatTime(selectedRequest.created_at) }}</p>
+                            </div>
+
+                            <div v-if="selectedRequest.latitude && selectedRequest.longitude">
+                                <label class="block text-sm font-medium text-gray-700">위치</label>
+                                <p class="mt-1 text-sm text-gray-900">위도: @{{ selectedRequest.latitude }}, 경도: @{{ selectedRequest.longitude }}</p>
+                            </div>
+                        </div>
+
+                        <div v-else class="text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                            <p class="mt-2 text-sm text-gray-500">로딩 중...</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                        <a v-if="selectedRequest" :href="`/admin/requests/${selectedRequest.id}`"
+                           class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm">
+                            전체 상세보기
+                        </a>
+                        <button @click="closeModal" type="button"
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm">
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Requests Table -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div v-show="viewMode === 'table'" class="bg-white rounded-lg shadow overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -227,7 +345,7 @@
     <script>
         const { createApp } = Vue;
 
-        createApp({
+        const vueInstance = createApp({
             data() {
                 return {
                     requests: @json($requests->items()),
@@ -242,7 +360,14 @@
                     refreshInterval: 10000, // 10초
                     refreshTimer: null,
                     isLoading: false,
-                    updatingRequests: {} // 업데이트 중인 요청 추적
+                    updatingRequests: {}, // 업데이트 중인 요청 추적
+                    viewMode: 'table', // 'table' or 'map'
+                    map: null,
+                    markers: [],
+                    infowindow: null,
+                    initialBoundsSet: false, // 최초 지도 범위 설정 여부
+                    showModal: false,
+                    selectedRequest: null
                 }
             },
             methods: {
@@ -385,6 +510,210 @@
                         // 업데이트 상태 해제
                         delete this.updatingRequests[requestId];
                     }
+                },
+
+                // 지도 초기화
+                initMap() {
+                    if (this.map) return;
+
+                    kakao.maps.load(() => {
+                        const container = document.getElementById('map');
+                        if (!container) {
+                            console.error('Map container not found');
+                            return;
+                        }
+
+                        const options = {
+                            center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울 중심
+                            level: 20
+                        };
+
+                        this.map = new kakao.maps.Map(container, options);
+                        this.infowindow = new kakao.maps.InfoWindow({ zIndex: 1 });
+
+                        // 지도 컨트롤 추가
+                        // 일반 지도와 스카이뷰로 지도 타입을 전환할 수 있는 컨트롤
+                        const mapTypeControl = new kakao.maps.MapTypeControl();
+                        this.map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+
+                        // 지도 확대 축소를 제어할 수 있는 줌 컨트롤
+                        const zoomControl = new kakao.maps.ZoomControl();
+                        this.map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+                        // 마커 표시
+                        this.$nextTick(() => {
+                            this.updateMarkers();
+                        });
+                    });
+                },
+
+                // 마커 색상 반환
+                getMarkerColor(status) {
+                    const colorMap = {
+                        'pending': 'yellow',
+                        'in_progress': 'blue',
+                        'completed': 'green',
+                        'cancelled': 'red'
+                    };
+                    return colorMap[status] || 'gray';
+                },
+
+                // 마커 업데이트
+                updateMarkers() {
+                    if (!this.map) return;
+
+                    try {
+                        // 기존 마커들 제거
+                        this.markers.forEach(marker => {
+                            marker.setMap(null);
+                        });
+                        this.markers = [];
+
+                        // 위치 정보가 있는 요청만 필터링
+                        const validRequests = this.requests.filter(req => req.latitude && req.longitude);
+
+                        if (validRequests.length === 0) return;
+
+                        // 새 마커 생성
+                        const bounds = new kakao.maps.LatLngBounds();
+
+                    validRequests.forEach(request => {
+                        const position = new kakao.maps.LatLng(request.latitude, request.longitude);
+
+                        // 마커 이미지 설정 (상태별 색상)
+                        // const imageSrc = `https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_${this.getMarkerColor(request.status)}.png`;
+                        const imageSize = new kakao.maps.Size(36, 37);
+                        // const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
+
+                        const marker = new kakao.maps.Marker({
+                            position: position,
+                            // image: markerImage,
+                            map: this.map
+                        });
+
+                        // 마커 클릭 이벤트
+                        kakao.maps.event.addListener(marker, 'click', () => {
+                            const content = `
+                                <div style="padding: 15px; min-width: 280px;">
+                                    <div style="font-weight: bold; font-size: 16px; margin-bottom: 10px;">
+                                        #${request.id} - ${request.user?.name || '알 수 없음'}
+                                    </div>
+                                    <div style="margin-bottom: 8px; color: #666;">
+                                        <strong>연락처:</strong> ${request.user?.formatted_phone || '-'}
+                                    </div>
+                                    <div style="margin-bottom: 8px;">
+                                        <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; background-color: ${this.getStatusBgColor(request.status)}; color: ${this.getStatusTextColor(request.status)};">
+                                            ${this.getStatusText(request.status)}
+                                        </span>
+                                    </div>
+                                    ${request.description ? `
+                                        <div style="margin-bottom: 8px; color: #666;">
+                                            <strong>상세:</strong> ${request.description.substring(0, 50)}${request.description.length > 50 ? '...' : ''}
+                                        </div>
+                                    ` : ''}
+                                    ${request.assigned_rescuer ? `
+                                        <div style="margin-bottom: 8px; color: #666;">
+                                            <strong>담당자:</strong> ${request.assigned_rescuer.name}
+                                        </div>
+                                    ` : ''}
+                                    <div style="margin-top: 12px;">
+                                        <button onclick="window.vueApp.openModal(${request.id})" style="color: #2563eb; background: none; border: none; cursor: pointer; font-weight: 500; text-decoration: none; padding: 0;">
+                                            상세보기 →
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                            this.infowindow.setContent(content);
+                            this.infowindow.open(this.map, marker);
+                        });
+
+                        this.markers.push(marker);
+                        bounds.extend(position);
+                    });
+
+                        // 최초 로드 시에만 모든 마커가 보이도록 지도 범위 조정
+                        if (validRequests.length > 0 && !this.initialBoundsSet) {
+                            this.map.setBounds(bounds);
+                            this.initialBoundsSet = true;
+                        }
+                    } catch (error) {
+                        console.error('Failed to update markers:', error);
+                    }
+                },
+
+                // 상태 배경색
+                getStatusBgColor(status) {
+                    const colorMap = {
+                        'pending': '#fef3c7',
+                        'in_progress': '#dbeafe',
+                        'completed': '#d1fae5',
+                        'cancelled': '#fee2e2'
+                    };
+                    return colorMap[status] || '#f3f4f6';
+                },
+
+                // 상태 텍스트 색상
+                getStatusTextColor(status) {
+                    const colorMap = {
+                        'pending': '#92400e',
+                        'in_progress': '#1e40af',
+                        'completed': '#065f46',
+                        'cancelled': '#991b1b'
+                    };
+                    return colorMap[status] || '#374151';
+                },
+
+                // 모달 열기
+                async openModal(requestId) {
+                    this.showModal = true;
+                    this.selectedRequest = null;
+
+                    try {
+                        const response = await axios.get(`/admin/requests/${requestId}`, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        if (response.data) {
+                            this.selectedRequest = response.data;
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch request details:', error);
+                        alert('상세 정보를 불러오는데 실패했습니다.');
+                        this.closeModal();
+                    }
+                },
+
+                // 모달 닫기
+                closeModal() {
+                    this.showModal = false;
+                    this.selectedRequest = null;
+                }
+            },
+            watch: {
+                viewMode(newMode) {
+                    if (newMode === 'map') {
+                        this.$nextTick(() => {
+                            this.initMap();
+                        });
+                    }
+                },
+                requests: {
+                    handler(newVal, oldVal) {
+                        // 지도 모드이고 지도가 로드되었을 때만
+                        if (this.viewMode === 'map' && this.map) {
+                            // 요청 배열의 길이가 변경되었을 때만 마커 업데이트
+                            // (자동 갱신으로 인한 불필요한 업데이트 방지)
+                            if (!oldVal || newVal.length !== oldVal.length) {
+                                this.$nextTick(() => {
+                                    this.updateMarkers();
+                                });
+                            }
+                        }
+                    },
+                    deep: true
                 }
             },
             mounted() {
@@ -395,6 +724,18 @@
                 // 컴포넌트 제거 전 자동 갱신 중지
                 this.stopAutoRefresh();
             }
-        }).mount('#requestsApp');
+        });
+
+        const app = vueInstance.mount('#requestsApp');
+
+        // 전역 함수로 노출 (인포윈도우에서 사용)
+        window.vueApp = {
+            openModal: (requestId) => {
+                const instance = app;
+                if (instance && instance.openModal) {
+                    instance.openModal(requestId);
+                }
+            }
+        };
     </script>
 </x-layouts.admin>
