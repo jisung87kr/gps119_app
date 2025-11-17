@@ -134,7 +134,59 @@ class AdminController extends Controller
 
         $requests = $query->latest()->paginate(20);
 
-        return view('admin.requests.index', compact('requests'));
+        // AJAX 또는 JSON 요청인 경우 JSON 반환
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'data' => $requests->items(),
+                'pagination' => [
+                    'total' => $requests->total(),
+                    'per_page' => $requests->perPage(),
+                    'current_page' => $requests->currentPage(),
+                    'last_page' => $requests->lastPage(),
+                ],
+                'stats' => [
+                    'pending' => RescueRequest::where('status', 'pending')->count(),
+                    'in_progress' => RescueRequest::where('status', 'in_progress')->count(),
+                    'completed' => RescueRequest::where('status', 'completed')->count(),
+                    'cancelled' => RescueRequest::where('status', 'cancelled')->count(),
+                ],
+                'rescuers' => User::role('rescuer')->get(['id', 'name'])
+            ]);
+        }
+
+        // 일반 웹 요청인 경우 뷰 반환
+        $rescuers = User::role('rescuer')->get();
+        return view('admin.requests.index', compact('requests', 'rescuers'));
+    }
+
+    public function requestQuickUpdate(Request $request, $id)
+    {
+        $rescueRequest = RescueRequest::findOrFail($id);
+
+        $validated = $request->validate([
+            'status' => ['nullable', 'in:pending,in_progress,completed,cancelled'],
+            'assigned_rescuer_id' => ['nullable', 'exists:users,id'],
+        ]);
+
+        $updateData = [];
+
+        if ($request->has('status')) {
+            $updateData['status'] = $validated['status'];
+        }
+
+        if ($request->has('assigned_rescuer_id')) {
+            // null 또는 빈 문자열인 경우 명시적으로 null로 설정
+            $updateData['assigned_rescuer_id'] = $validated['assigned_rescuer_id'] ?: null;
+        }
+
+        $rescueRequest->update($updateData);
+
+        return response()->json([
+            'success' => true,
+            'message' => '업데이트되었습니다.',
+            'data' => $rescueRequest->load(['user', 'assignedRescuer'])
+        ]);
     }
 
     public function requestShow($id)
