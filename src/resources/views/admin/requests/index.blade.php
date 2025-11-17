@@ -525,11 +525,16 @@
 
                         const options = {
                             center: new kakao.maps.LatLng(37.5665, 126.9780), // 서울 중심
-                            level: 20
+                            level: 10
                         };
 
                         this.map = new kakao.maps.Map(container, options);
                         this.infowindow = new kakao.maps.InfoWindow({ zIndex: 1 });
+
+                        // 지도 클릭 시 인포윈도우 닫기
+                        kakao.maps.event.addListener(this.map, 'click', () => {
+                            this.infowindow.close();
+                        });
 
                         // 지도 컨트롤 추가
                         // 일반 지도와 스카이뷰로 지도 타입을 전환할 수 있는 컨트롤
@@ -594,8 +599,11 @@
                         // 마커 클릭 이벤트
                         kakao.maps.event.addListener(marker, 'click', () => {
                             const content = `
-                                <div style="padding: 15px; min-width: 280px;">
-                                    <div style="font-weight: bold; font-size: 16px; margin-bottom: 10px;">
+                                <div style="padding: 15px; min-width: 280px; position: relative;">
+                                    <button onclick="window.vueApp.closeInfowindow()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: #999; font-size: 18px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.backgroundColor='#f3f4f6'; this.style.color='#374151';" onmouseout="this.style.backgroundColor='transparent'; this.style.color='#999';">
+                                        ✕
+                                    </button>
+                                    <div style="font-weight: bold; font-size: 16px; margin-bottom: 10px; padding-right: 30px;">
                                         #${request.id} - ${request.user?.name || '알 수 없음'}
                                     </div>
                                     <div style="margin-bottom: 8px; color: #666;">
@@ -690,6 +698,13 @@
                 closeModal() {
                     this.showModal = false;
                     this.selectedRequest = null;
+                },
+
+                // 인포윈도우 닫기
+                closeInfowindow() {
+                    if (this.infowindow) {
+                        this.infowindow.close();
+                    }
                 }
             },
             watch: {
@@ -717,8 +732,10 @@
                 }
             },
             mounted() {
-                // 자동 갱신 시작
-                this.startAutoRefresh();
+                // autoRefresh가 true일 때만 자동 갱신 시작
+                if (this.autoRefresh) {
+                    this.startAutoRefresh();
+                }
             },
             beforeUnmount() {
                 // 컴포넌트 제거 전 자동 갱신 중지
@@ -734,6 +751,12 @@
                 const instance = app;
                 if (instance && instance.openModal) {
                     instance.openModal(requestId);
+                }
+            },
+            closeInfowindow: () => {
+                const instance = app;
+                if (instance && instance.closeInfowindow) {
+                    instance.closeInfowindow();
                 }
             }
         };
