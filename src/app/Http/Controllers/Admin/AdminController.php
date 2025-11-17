@@ -87,13 +87,21 @@ class AdminController extends Controller
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email,' . $id],
             'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone,' . $id],
             'roles' => ['array'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $member->update([
+        $updateData = [
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
-        ]);
+        ];
+
+        // 비밀번호가 입력된 경우에만 업데이트
+        if ($request->filled('password')) {
+            $updateData['password'] = Hash::make($request->password);
+        }
+
+        $member->update($updateData);
 
         // Update roles
         if ($request->has('roles')) {

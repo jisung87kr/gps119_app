@@ -56,8 +56,8 @@
                         <div class="space-y-2">
                             @foreach($roles as $role)
                                 <label class="flex items-center">
-                                    <input type="checkbox" 
-                                           name="roles[]" 
+                                    <input type="checkbox"
+                                           name="roles[]"
                                            value="{{ $role }}"
                                            {{ $member->hasRole($role) ? 'checked' : '' }}
                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
@@ -75,6 +75,55 @@
                         @enderror
                     </div>
                 </div>
+
+                <!-- 비밀번호 변경 섹션 (소셜 로그인이 아닌 경우에만) -->
+                @if(!$member->provider)
+                    <div class="pt-6 border-t border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">비밀번호 변경</h3>
+                        <p class="text-sm text-gray-600 mb-4">비밀번호를 변경하려면 아래 필드를 입력하세요. 변경하지 않으려면 비워두세요.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 (선택사항)</label>
+                                <input type="password"
+                                       id="password"
+                                       name="password"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('password') border-red-500 @enderror"
+                                       placeholder="최소 8자 이상">
+                                @error('password')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</label>
+                                <input type="password"
+                                       id="password_confirmation"
+                                       name="password_confirmation"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="비밀번호를 다시 입력하세요">
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="pt-6 border-t border-gray-200">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-yellow-800">소셜 로그인 계정</h3>
+                                    <p class="mt-1 text-sm text-yellow-700">
+                                        이 회원은 {{ ucfirst($member->provider) }} 계정으로 가입했습니다. 소셜 로그인 계정은 비밀번호를 변경할 수 없습니다.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
                     <div class="flex">
