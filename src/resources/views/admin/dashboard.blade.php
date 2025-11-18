@@ -7,7 +7,7 @@
         </div>
 
         <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <!-- Total Users -->
             <div class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center">
@@ -59,19 +59,36 @@
                 </div>
             </div>
 
-            <!-- Rescuers -->
+            <!-- Total Projects -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">전체 프로젝트</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['total_projects']) }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Projects -->
             <div class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                             <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                         </div>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">구조대원</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['total_rescuers']) }}</p>
+                        <p class="text-sm font-medium text-gray-600">활성 프로젝트</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['active_projects']) }}</p>
                     </div>
                 </div>
             </div>
@@ -121,6 +138,9 @@
             <div class="bg-white rounded-lg shadow p-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">빠른 작업</h3>
                 <div class="space-y-3">
+                    <a href="{{ route('admin.projects.index') }}" class="block w-full bg-purple-600 text-white text-center py-2 px-4 rounded-md hover:bg-purple-700 transition duration-200">
+                        프로젝트 관리
+                    </a>
                     <a href="{{ route('admin.members') }}" class="block w-full bg-blue-600 text-white text-center py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200">
                         회원 관리
                     </a>
@@ -130,6 +150,62 @@
                     <a href="{{ route('admin.requests', ['status' => 'pending']) }}" class="block w-full bg-yellow-600 text-white text-center py-2 px-4 rounded-md hover:bg-yellow-700 transition duration-200">
                         대기중 요청 확인
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Projects Section -->
+        <div class="mb-8">
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">프로젝트별 구조요청 현황 (상위 5개)</h3>
+                    <a href="{{ route('admin.projects.index') }}" class="text-sm text-purple-600 hover:text-purple-800">전체 보기 →</a>
+                </div>
+                <div class="p-6">
+                    @if($project_stats->isEmpty())
+                        <p class="text-gray-500 text-center py-4">등록된 프로젝트가 없습니다.</p>
+                    @else
+                        <div class="space-y-4">
+                            @foreach($project_stats as $project)
+                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-3">
+                                            <a href="{{ route('admin.projects.show', $project->id) }}" class="font-medium text-gray-900 hover:text-purple-600">
+                                                {{ $project->name }}
+                                            </a>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                @if($project->status === 'pending') bg-gray-100 text-gray-800
+                                                @elseif($project->status === 'active') bg-green-100 text-green-800
+                                                @elseif($project->status === 'completed') bg-blue-100 text-blue-800
+                                                @else bg-gray-100 text-gray-800
+                                                @endif">
+                                                @if($project->status === 'pending') 시작 대기
+                                                @elseif($project->status === 'active') 진행중
+                                                @elseif($project->status === 'completed') 완료
+                                                @else {{ $project->status }}
+                                                @endif
+                                            </span>
+                                        </div>
+                                        @if($project->description)
+                                            <p class="text-sm text-gray-600 mt-1">{{ Str::limit($project->description, 60) }}</p>
+                                        @endif
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            {{ $project->start_date->format('Y.m.d') }} - {{ $project->end_date->format('Y.m.d') }}
+                                        </p>
+                                    </div>
+                                    <div class="ml-4 flex items-center gap-4">
+                                        <div class="text-right">
+                                            <p class="text-2xl font-bold text-purple-600">{{ number_format($project->requests_count) }}</p>
+                                            <p class="text-xs text-gray-500">구조요청</p>
+                                        </div>
+                                        <a href="{{ route('admin.requests', ['project_id' => $project->id]) }}" class="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200">
+                                            요청 보기
+                                        </a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

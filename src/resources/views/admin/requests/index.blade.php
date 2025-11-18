@@ -81,6 +81,17 @@
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     <div>
+                        <select name="project_id" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">모든 프로젝트</option>
+                            <option value="none" {{ request('project_id') === 'none' ? 'selected' : '' }}>프로젝트 없음</option>
+                            @foreach($projects as $project)
+                                <option value="{{ $project->id }}" {{ request('project_id') == $project->id ? 'selected' : '' }}>
+                                    {{ $project->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
                         <select name="status" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">모든 상태</option>
                             <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>대기중</option>
@@ -283,6 +294,7 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">요청자</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">프로젝트</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">담당자</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">요청일시</th>
@@ -291,7 +303,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <tr v-if="requests.length === 0">
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">
                                 검색된 구조 요청이 없습니다.
                             </td>
                         </tr>
@@ -312,6 +324,12 @@
                                         </span>
                                     </div>
                                 </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span v-if="request.project" class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                    @{{ request.project.name }}
+                                </span>
+                                <span v-else class="text-sm text-gray-400">-</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <select @change="updateRequest(request.id, 'status', $event.target.value)"
@@ -442,6 +460,7 @@
                         const params = {
                             status: urlParams.get('status') || '',
                             search: urlParams.get('search') || '',
+                            project_id: urlParams.get('project_id') || '',
                         };
 
                         const queryString = new URLSearchParams(params).toString();
@@ -455,6 +474,11 @@
                         if (response.data.success) {
                             this.requests = response.data.data;
                             this.stats = response.data.stats;
+
+                            // 지도 모드일 경우 마커 업데이트
+                            if (this.viewMode === 'map' && this.map) {
+                                this.updateMapMarkers();
+                            }
                         }
                     } catch (error) {
                         console.error('Failed to fetch requests:', error);

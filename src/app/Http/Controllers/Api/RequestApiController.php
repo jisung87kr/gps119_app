@@ -42,6 +42,7 @@ class RequestApiController extends Controller
             'description' => 'nullable|string|max:1000',
             'priority' => ['nullable', Rule::enum(RequestPriority::class)],
             'contact_phone' => 'nullable|string|max:20',
+            'project_id' => 'nullable|exists:projects,id',
         ]);
 
         try {

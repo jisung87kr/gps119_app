@@ -16,6 +16,7 @@ class Request extends Model
 
     protected $fillable = [
         'user_id',
+        'project_id',
         'latitude',
         'longitude',
         'address',
@@ -55,6 +56,11 @@ class Request extends Model
     public function assignedRescuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_rescuer_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function scopePending($query)

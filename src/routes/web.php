@@ -18,6 +18,21 @@ Route::get('/requests/create', function () {
     return view('request.create');
 })->middleware(['auth'])->name('request.create');
 
+Route::get('/requests/create/{slug}', function ($slug) {
+    $project = \App\Models\Project::where('slug', $slug)->firstOrFail();
+
+    // 프로젝트가 활성화되어 있는지 확인
+    if (!$project->isActive()) {
+        return view('errors.project-inactive', compact('project'));
+    }
+
+    if(!Auth::user()->phone){
+        return view('errors.require-phone', compact('project'));
+    }
+
+    return view('request.create-project', compact('project'));
+})->middleware(['auth'])->name('request.create.project');
+
 Route::get('/requests/{request}', function (\App\Models\Request $request) {
     return view('request.show', [
         'request' => $request,
@@ -49,6 +64,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestShow'])->name('requests.show');
     Route::patch('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestUpdate'])->name('requests.update');
     Route::patch('/requests/{id}/quick-update', [\App\Http\Controllers\Admin\AdminController::class, 'requestQuickUpdate'])->name('requests.quick-update');
+
+    // Project management
+    Route::resource('projects', \App\Http\Controllers\Admin\ProjectController::class);
+    Route::get('/projects/{id}/qrcode', [\App\Http\Controllers\Admin\ProjectController::class, 'qrcode'])->name('projects.qrcode');
+    Route::post('/projects/{id}/clone', [\App\Http\Controllers\Admin\ProjectController::class, 'clone'])->name('projects.clone');
+    Route::get('/projects/{id}/export-csv', [\App\Http\Controllers\Admin\ProjectController::class, 'exportCsv'])->name('projects.export-csv');
 });
 
 // Profile routes

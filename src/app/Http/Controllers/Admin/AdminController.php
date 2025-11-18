@@ -21,6 +21,8 @@ class AdminController extends Controller
             'pending_requests' => RescueRequest::where('status', 'pending')->count(),
             'in_progress_requests' => RescueRequest::where('status', 'in_progress')->count(),
             'completed_requests' => RescueRequest::where('status', 'completed')->count(),
+            'total_projects' => \App\Models\Project::count(),
+            'active_projects' => \App\Models\Project::where('status', 'active')->where('is_active', true)->count(),
         ];
 
         $recent_requests = RescueRequest::with('user')
@@ -32,7 +34,13 @@ class AdminController extends Controller
             ->limit(10)
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'recent_requests', 'recent_users'));
+        // 프로젝트별 요청 통계 (상위 5개 프로젝트)
+        $project_stats = \App\Models\Project::withCount('requests')
+            ->orderByDesc('requests_count')
+            ->limit(5)
+            ->get();
+
+        return view('admin.dashboard', compact('stats', 'recent_requests', 'recent_users', 'project_stats'));
     }
 
     public function members(Request $request)
@@ -116,7 +124,19 @@ class AdminController extends Controller
 
     public function requests(Request $request)
     {
-        $query = RescueRequest::with(['user', 'assignedRescuer']);
+        $query = RescueRequest::with(['user', 'assignedRescuer', 'project']);
+
+        // Project filter
+        if ($request->has('project_id')) {
+            if ($request->project_id === 'none') {
+                // 프로젝트가 없는 요청만
+                $query->whereNull('project_id');
+            } elseif ($request->project_id) {
+                // 특정 프로젝트의 요청만
+                $query->where('project_id', $request->project_id);
+            }
+            // 'all' 또는 빈 값이면 모든 요청
+        }
 
         // Status filter
         if ($request->has('status') && $request->status) {
@@ -134,6 +154,23 @@ class AdminController extends Controller
 
         $requests = $query->latest()->paginate(20);
 
+        // 프로젝트 필터에 따른 통계 계산
+        $statsQuery = RescueRequest::query();
+        if ($request->has('project_id')) {
+            if ($request->project_id === 'none') {
+                $statsQuery->whereNull('project_id');
+            } elseif ($request->project_id) {
+                $statsQuery->where('project_id', $request->project_id);
+            }
+        }
+
+        $stats = [
+            'pending' => (clone $statsQuery)->where('status', 'pending')->count(),
+            'in_progress' => (clone $statsQuery)->where('status', 'in_progress')->count(),
+            'completed' => (clone $statsQuery)->where('status', 'completed')->count(),
+            'cancelled' => (clone $statsQuery)->where('status', 'cancelled')->count(),
+        ];
+
         // AJAX 또는 JSON 요청인 경우 JSON 반환
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -145,19 +182,15 @@ class AdminController extends Controller
                     'current_page' => $requests->currentPage(),
                     'last_page' => $requests->lastPage(),
                 ],
-                'stats' => [
-                    'pending' => RescueRequest::where('status', 'pending')->count(),
-                    'in_progress' => RescueRequest::where('status', 'in_progress')->count(),
-                    'completed' => RescueRequest::where('status', 'completed')->count(),
-                    'cancelled' => RescueRequest::where('status', 'cancelled')->count(),
-                ],
+                'stats' => $stats,
                 'rescuers' => User::role('rescuer')->get(['id', 'name'])
             ]);
         }
 
         // 일반 웹 요청인 경우 뷰 반환
         $rescuers = User::role('rescuer')->get();
-        return view('admin.requests.index', compact('requests', 'rescuers'));
+        $projects = \App\Models\Project::orderBy('name')->get();
+        return view('admin.requests.index', compact('requests', 'rescuers', 'projects'));
     }
 
     public function requestQuickUpdate(Request $request, $id)
