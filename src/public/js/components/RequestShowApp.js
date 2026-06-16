@@ -198,6 +198,7 @@ export default function createRequestShowApp(options = {}) {
             showRequestLocation() {
                 this.mapObject.setCenter(new kakao.maps.LatLng(this.requestLat, this.requestLong));
                 this.mapObject.setLevel(3);
+                this.applySheetOffset();
                 // 요청지로 이동하면 정보 카드를 다시 보여준다.
                 this.openOverlay();
             },
@@ -223,6 +224,16 @@ export default function createRequestShowApp(options = {}) {
                     this.openOverlay();
                 }
             },
+            // 바텀시트가 지도 하단을 가리는 만큼 중심을 위로 올려 마커가 보이게 한다.
+            // setBounds/포커스처럼 중심을 절대값으로 새로 잡은 직후에만 호출(반복 호출 시 누적 방지).
+            applySheetOffset() {
+                if (!this.mapObject) return;
+                const sheet = document.getElementById('bottom-sheet');
+                const covered = this.sheetExpanded && sheet ? sheet.offsetHeight : 0;
+                if (covered > 0) {
+                    this.mapObject.panBy(0, covered / 2);
+                }
+            },
             // 바텀시트 펼치기/접기. 슬라이드 후 카카오 지도 타일을 다시 그린다.
             toggleSheet() {
                 this.sheetExpanded = !this.sheetExpanded;
@@ -238,6 +249,7 @@ export default function createRequestShowApp(options = {}) {
                 if (this.myLat && this.myLong) {
                     this.mapObject.setCenter(new kakao.maps.LatLng(this.myLat, this.myLong));
                     this.mapObject.setLevel(3);
+                    this.applySheetOffset();
                 }
             },
             setBounds() {
@@ -248,6 +260,7 @@ export default function createRequestShowApp(options = {}) {
                 }
                 this.mapObject.setBounds(bounds);
                 this.mapObject.setLevel(7); // 줌 레벨 설정
+                this.applySheetOffset();
             }
         }
     };
