@@ -146,85 +146,161 @@ export function buildBigMapButton(wcongnamul) {
 
 /**
  * 요청 마커 인포윈도우 카드 HTML 생성.
+ * CustomOverlay로 표시되므로 카드 자체 배경/그림자/말풍선 꼬리를 포함한다.
+ * 하단 여백(padding-bottom)으로 카드를 마커 위로 띄워, 핀이 카드를 파고드는 겹침을 방지한다.
  * @param {{requestLat:string|number, requestLong:string|number, bigMapButton:string}} params
  * @returns {string}
  */
 export function buildRequestInfoWindowContent({ requestLat, requestLong, bigMapButton }) {
     return `
                     <div style="
-                        padding: 15px;
-                        min-width: 240px;
+                        position: relative;
+                        padding-bottom: 34px;
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     ">
                         <div style="
-                            display: flex;
-                            align-items: center;
-                            margin-bottom: 12px;
-                            padding-bottom: 8px;
-                            border-bottom: 2px solid #fee2e2;
+                            position: relative;
+                            background: #ffffff;
+                            border-radius: 14px;
+                            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+                            padding: 15px;
+                            min-width: 240px;
                         ">
-                            <div style="
+                            <button data-overlay-close type="button" aria-label="닫기" style="
+                                position: absolute;
+                                top: 10px;
+                                right: 10px;
                                 width: 24px;
                                 height: 24px;
-                                background: #dc2626;
+                                padding: 0;
+                                border: none;
                                 border-radius: 50%;
+                                background: #f1f5f9;
+                                color: #64748b;
+                                font-size: 13px;
+                                line-height: 1;
+                                cursor: pointer;
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
-                                margin-right: 8px;
+                            ">✕</button>
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                margin-bottom: 12px;
+                                padding-bottom: 8px;
+                                padding-right: 28px;
+                                border-bottom: 2px solid #fee2e2;
                             ">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                                </svg>
+                                <div style="
+                                    width: 24px;
+                                    height: 24px;
+                                    background: #dc2626;
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    margin-right: 8px;
+                                ">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
+                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                    </svg>
+                                </div>
+                                <span style="
+                                    font-weight: 600;
+                                    font-size: 16px;
+                                    color: #dc2626;
+                                    letter-spacing: -0.02em;
+                                ">요청자 위치</span>
                             </div>
-                            <span style="
-                                font-weight: 600;
-                                font-size: 16px;
-                                color: #dc2626;
-                                letter-spacing: -0.02em;
-                            ">요청자 위치</span>
+                            <div style="
+                                display: flex;
+                                gap: 8px;
+                                flex-wrap: wrap;
+                            ">
+                                ${bigMapButton}
+                                <a href="https://m.map.kakao.com/scheme/route?sp=&sn=&ep=${requestLat},${requestLong}&en=요청자&by=car"
+                                   target="_blank"
+                                   style="
+                                       display: inline-flex;
+                                       align-items: center;
+                                       padding: 8px 12px;
+                                       background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                                       color: white;
+                                       text-decoration: none;
+                                       border-radius: 8px;
+                                       font-size: 13px;
+                                       font-weight: 500;
+                                       transition: all 0.2s ease;
+                                       box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+                                       border: none;
+                                   "
+                                   onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.4)'"
+                                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(16, 185, 129, 0.3)'"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    </svg>
+                                    길찾기
+                                </a>
+                            </div>
+                            <div style="
+                                margin-top: 12px;
+                                padding-top: 8px;
+                                border-top: 1px solid #e2e8f0;
+                                font-size: 11px;
+                                color: #64748b;
+                                text-align: center;
+                            ">
+                                클릭하여 카카오맵으로 이동
+                            </div>
                         </div>
                         <div style="
-                            display: flex;
-                            gap: 8px;
-                            flex-wrap: wrap;
+                            position: absolute;
+                            left: 50%;
+                            bottom: 27px;
+                            width: 14px;
+                            height: 14px;
+                            background: #ffffff;
+                            transform: translateX(-50%) rotate(45deg);
+                            box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.10);
+                        "></div>
+                    </div>
+                `;
+}
+
+/**
+ * 카드가 닫혔을 때 마커 위에 표시되는 '열기' 핀 버튼 HTML.
+ * 하단 여백으로 마커 위에 띄운다. data-overlay-open 으로 클릭을 연결한다.
+ * @returns {string}
+ */
+export function buildReopenButtonContent() {
+    return `
+                    <div style="
+                        position: relative;
+                        padding-bottom: 36px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    ">
+                        <button data-overlay-open type="button" style="
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 5px;
+                            padding: 7px 13px;
+                            border: none;
+                            border-radius: 999px;
+                            background: #dc2626;
+                            color: #ffffff;
+                            font-size: 12px;
+                            font-weight: 600;
+                            white-space: nowrap;
+                            cursor: pointer;
+                            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
                         ">
-                            ${bigMapButton}
-                            <a href="https://m.map.kakao.com/scheme/route?sp=&sn=&ep=${requestLat},${requestLong}&en=요청자&by=car"
-                               target="_blank"
-                               style="
-                                   display: inline-flex;
-                                   align-items: center;
-                                   padding: 8px 12px;
-                                   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                                   color: white;
-                                   text-decoration: none;
-                                   border-radius: 8px;
-                                   font-size: 13px;
-                                   font-weight: 500;
-                                   transition: all 0.2s ease;
-                                   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-                                   border: none;
-                               "
-                               onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.4)'"
-                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(16, 185, 129, 0.3)'"
-                            >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                </svg>
-                                길찾기
-                            </a>
-                        </div>
-                        <div style="
-                            margin-top: 12px;
-                            padding-top: 8px;
-                            border-top: 1px solid #e2e8f0;
-                            font-size: 11px;
-                            color: #64748b;
-                            text-align: center;
-                        ">
-                            클릭하여 카카오맵으로 이동
-                        </div>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff">
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            </svg>
+                            요청 정보
+                        </button>
                     </div>
                 `;
 }

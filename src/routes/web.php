@@ -40,7 +40,38 @@ Route::get('/requests/{request}', function (\App\Models\Request $request) {
 })->middleware(['auth'])->name('request.show');
 
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    $user = Auth::user();
+
+    $counts = $user->requests()
+        ->selectRaw('status, count(*) as aggregate')
+        ->groupBy('status')
+        ->pluck('aggregate', 'status');
+
+    $stats = [
+        'total' => (int) $counts->sum(),
+        'pending' => (int) ($counts[\App\Enums\RequestStatus::PENDING->value] ?? 0),
+        'in_progress' => (int) ($counts[\App\Enums\RequestStatus::IN_PROGRESS->value] ?? 0),
+        'completed' => (int) ($counts[\App\Enums\RequestStatus::COMPLETED->value] ?? 0),
+    ];
+
+    // 처리 중인(대기/진행중) 요청은 상단에 강조 노출
+    $activeRequests = $user->requests()
+        ->with(['project', 'assignedRescuer'])
+        ->whereIn('status', [
+            \App\Enums\RequestStatus::PENDING->value,
+            \App\Enums\RequestStatus::IN_PROGRESS->value,
+        ])
+        ->latest('requested_at')
+        ->get();
+
+    // 전체 최근 요청 내역
+    $recentRequests = $user->requests()
+        ->with('project')
+        ->latest('requested_at')
+        ->limit(8)
+        ->get();
+
+    return view('dashboard', compact('stats', 'activeRequests', 'recentRequests'));
 })->middleware(['auth'])->name('dashboard');
 
 // Admin routes

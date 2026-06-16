@@ -24,7 +24,7 @@
         }
     </style>
 
-    <div id="app" class="w-full h-screen relative">
+    <div id="app" class="w-full h-[calc(100dvh-3.5rem)] relative">
         <map-loader @scripts-loaded="initMap"></map-loader>
         <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
 
@@ -41,7 +41,7 @@
 
             <location-button :loading="loading" @get-location="getLocation"></location-button>
             
-            <div class="max-w-md mx-auto">
+            <div class="max-w-7xl w-full mx-auto">
                 <location-info
                     :latitude="lat"
                     :longitude="long"

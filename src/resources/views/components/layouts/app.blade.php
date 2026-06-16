@@ -44,7 +44,7 @@
                                 <a href="{{ route('register') }}" class="px-4 py-1.5 text-sm font-bold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-all shadow-sm">회원가입</a>
                             </div>
                         @else
-                            <div class="hidden md:flex items-center gap-3 border-l border-slate-200 ml-2 pl-5" x-data="{ open: false }">
+                            <div class="relative hidden md:flex items-center gap-3 border-l border-slate-200 ml-2 pl-5" x-data="{ open: false }">
                                 <button @click="open = !open" class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">
                                     <div class="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-300">
                                         {{ mb_substr(Auth::user()->name, 0, 1) }}
@@ -59,7 +59,7 @@
                                      x-transition:enter="transition ease-out duration-100"
                                      x-transition:enter-start="opacity-0 scale-95"
                                      x-transition:enter-end="opacity-100 scale-100"
-                                     class="absolute right-0 mt-36 w-48 bg-white rounded-xl shadow-xl border border-slate-200/60 py-1.5 z-50">
+                                     class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200/60 py-1.5 z-50">
                                     <a href="{{ route('profile.show') }}" class="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 font-medium transition-colors">프로필 설정</a>
                                     <div class="my-1 border-t border-slate-100"></div>
                                     <form method="POST" action="{{ route('logout') }}">

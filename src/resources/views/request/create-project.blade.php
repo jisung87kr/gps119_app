@@ -24,7 +24,7 @@
         }
     </style>
 
-    <div id="app" class="w-full h-screen relative">
+    <div id="app" class="w-full h-[calc(100dvh-3.5rem)] relative">
         <map-loader @scripts-loaded="initMap"></map-loader>
         <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
 
@@ -49,7 +49,7 @@
 
             <location-button :loading="loading" @get-location="getLocation"></location-button>
             
-            <div class="max-w-md mx-auto">
+            <div class="max-w-7xl w-full mx-auto">
                 <div class="mb-2 px-1">
                     <h1 class="text-lg font-bold text-gray-900 leading-tight">{{ $project->name }}</h1>
                     <p class="text-xs text-gray-500 mt-1">{{ $project->description ?? '위치를 공유하여 구조를 요청하세요.' }}</p>

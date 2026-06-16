@@ -1,170 +1,143 @@
 <x-layouts.app>
-    <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-        <div class="w-full max-w-2xl mx-auto mt-8">
-            <div class="">
-                <h1 class="text-4xl font-bold text-gray-900 mb-4">프로필 수정</h1>
-                <p class="text-xl text-gray-600 mb-6">개인 정보를 수정하세요.</p>
+    <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <!-- Page Header -->
+        <div class="mb-10 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">프로필 수정</h1>
+                <p class="text-sm text-slate-500 font-medium mt-1">개인 정보를 최신 상태로 유지하세요.</p>
             </div>
+            <a href="{{ route('profile.show') }}" class="text-xs font-bold text-slate-400 hover:text-slate-900 transition-colors">돌아가기</a>
+        </div>
 
-            <div class="bg-white rounded-lg shadow-md p-6">
-                @if(session('status'))
-                    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
-                        {{ session('status') }}
-                    </div>
-                @endif
+        <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/40 overflow-hidden">
+                <div class="p-8 sm:p-10">
+                    @if(session('status'))
+                        <div class="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-xl mb-8 text-sm font-bold shadow-sm">
+                            {{ session('status') }}
+                        </div>
+                    @endif
 
-                <!-- 소셜로그인 정보 표시 -->
-                @if(auth()->user()->provider)
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6">
-                        <div class="flex items-center">
-                            @if(auth()->user()->provider === 'naver')
-                                <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
-                                    <span class="text-white font-bold text-sm">N</span>
-                                </div>
-                            @elseif(auth()->user()->provider === 'kakao')
-                                <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center mr-3">
-                                    <span class="text-gray-800 font-bold text-sm">K</span>
-                                </div>
-                            @else
-                                <div class="w-10 h-10 bg-gray-500 rounded-lg flex items-center justify-center mr-3">
-                                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                </div>
-                            @endif
+                    <!-- Social Provider Info -->
+                    @if(auth()->user()->provider)
+                        <div class="mb-10 p-5 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm {{ auth()->user()->provider === 'naver' ? 'bg-[#03C75A]' : 'bg-[#FEE500]' }}">
+                                <span class="text-white font-black text-lg {{ auth()->user()->provider === 'kakao' ? 'text-[#3C1E1E]' : '' }}">
+                                    {{ mb_substr(ucfirst(auth()->user()->provider), 0, 1) }}
+                                </span>
+                            </div>
                             <div class="flex-1">
-                                <div class="flex items-center">
-                                    <h3 class="text-sm font-semibold text-gray-900">
-                                        {{ ucfirst(auth()->user()->provider) }} 계정으로 가입
-                                    </h3>
-                                    <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        연동됨
-                                    </span>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-black text-slate-900 uppercase tracking-tight">{{ ucfirst(auth()->user()->provider) }} 계정 연동됨</h3>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-600 uppercase">Verified</span>
                                 </div>
-                                <p class="text-xs text-gray-600 mt-1">
-                                    소셜 계정으로 간편하게 로그인할 수 있습니다.
+                                <p class="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                                    소셜 계정의 기본 정보가 자동으로 동기화됩니다.
                                 </p>
                             </div>
                         </div>
-                    </div>
-                @endif
+                    @endif
 
-                <form method="POST" action="{{ route('profile.update') }}" class="space-y-6">
-                    @csrf
-                    @method('PATCH')
-
-                    <div>
-                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
-                        <div class="relative">
-                            <input type="text"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('name') border-red-500 @enderror"
-                                   id="name" name="name" value="{{ old('name', auth()->user()->name) }}" required>
-                            @if(auth()->user()->provider)
-                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                    <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                    </svg>
-                                </div>
-                            @endif
-                        </div>
-                        @error('name')
-                        <div class="text-red-500 text-sm mt-1">{{ $message }}</div>
-                        @enderror
-                        @if(auth()->user()->provider)
-                            <p class="text-xs text-gray-500 mt-1">{{ ucfirst(auth()->user()->provider) }}에서 가져온 정보입니다.</p>
-                        @endif
-                    </div>
-
-                    <div>
-                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">연락처</label>
-                        <input type="tel"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('phone') border-red-500 @enderror"
-                               id="phone" name="phone" value="{{ old('phone', auth()->user()->phone) }}" required placeholder="010-1234-5678">
-                        @error('phone')
-                        <div class="text-red-500 text-sm mt-1">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="flex gap-4">
-                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200">
-                            변경사항 저장
-                        </button>
-                        <a href="{{ route('profile.show') }}" class="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition duration-200 text-center">
-                            취소
-                        </a>
-                    </div>
-                </form>
-            </div>
-
-            <!-- 비밀번호 변경 섹션 (소셜 로그인이 아닌 경우에만 표시) -->
-            @if(!auth()->user()->provider)
-                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-gray-900 mb-2">비밀번호 변경</h2>
-                        <p class="text-sm text-gray-600">안전한 비밀번호로 변경하세요.</p>
-                    </div>
-
-                    <form method="POST" action="{{ route('profile.password.update') }}" class="space-y-6">
+                    <form method="POST" action="{{ route('profile.update') }}" class="space-y-8">
                         @csrf
                         @method('PATCH')
 
                         <div>
-                            <label for="current_password" class="block text-sm font-medium text-gray-700 mb-1">현재 비밀번호</label>
-                            <input type="password"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('current_password') border-red-500 @enderror"
-                                   id="current_password" name="current_password" required>
-                            @error('current_password')
-                            <div class="text-red-500 text-sm mt-1">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div>
-                            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
-                            <input type="password"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 @error('password') border-red-500 @enderror"
-                                   id="password" name="password" required>
-                            @error('password')
-                            <div class="text-red-500 text-sm mt-1">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div>
-                            <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</label>
-                            <input type="password"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                   id="password_confirmation" name="password_confirmation" required>
-                        </div>
-
-                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-blue-800">비밀번호 안전 수칙</h3>
-                                    <div class="mt-2 text-sm text-blue-700">
-                                        <ul class="list-disc list-inside space-y-1">
-                                            <li>최소 8자 이상으로 설정하세요</li>
-                                            <li>대문자, 소문자, 숫자, 특수문자를 포함하세요</li>
-                                            <li>개인정보와 관련된 내용은 피하세요</li>
-                                        </ul>
+                            <label for="name" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">이름</label>
+                            <div class="relative group">
+                                <input type="text"
+                                       class="appearance-none block w-full px-4 py-3.5 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-bold text-slate-900 {{ auth()->user()->provider ? 'bg-slate-50/50 cursor-not-allowed opacity-70' : '' }}"
+                                       id="name" name="name" value="{{ old('name', auth()->user()->name) }}" required 
+                                       {{ auth()->user()->provider ? 'readonly' : '' }}>
+                                @if(auth()->user()->provider)
+                                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                                        <svg class="h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
                                     </div>
-                                </div>
+                                @endif
                             </div>
+                            @error('name')
+                                <p class="text-red-500 text-[10px] font-bold mt-2 ml-1 uppercase tracking-tight">{{ $message }}</p>
+                            @enderror
+                            @if(auth()->user()->provider)
+                                <p class="text-[10px] font-bold text-slate-400 mt-2 ml-1 italic">* 소셜 계정 정보는 연동된 사이트에서 변경 가능합니다.</p>
+                            @endif
                         </div>
 
                         <div>
-                            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200">
-                                비밀번호 변경
+                            <label for="phone" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">연락처</label>
+                            <input type="tel"
+                                   class="appearance-none block w-full px-4 py-3.5 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-bold text-slate-900"
+                                   id="phone" name="phone" value="{{ old('phone', auth()->user()->phone) }}" required placeholder="010-0000-0000">
+                            @error('phone')
+                                <p class="text-red-500 text-[10px] font-bold mt-2 ml-1 uppercase tracking-tight">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="pt-4 flex flex-col sm:flex-row gap-3">
+                            <button type="submit" class="flex-1 py-4 px-6 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all active:scale-[0.98] uppercase tracking-widest">
+                                저장
                             </button>
+                            <a href="{{ route('profile.show') }}" class="flex-1 py-4 px-6 bg-slate-100 text-slate-600 font-black text-sm rounded-2xl hover:bg-slate-200 transition-all text-center uppercase tracking-widest">
+                                취소
+                            </a>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Redundant Password Update for non-social users refined -->
+            @if(!auth()->user()->provider)
+                <div class="mt-8 bg-slate-900 rounded-3xl p-8 sm:p-10 shadow-2xl overflow-hidden relative">
+                    <div class="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="mb-8">
+                            <h2 class="text-xl font-black text-white tracking-tight">비밀번호 변경</h2>
+                            <p class="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest">Security Update</p>
+                        </div>
+
+                        <form method="POST" action="{{ route('profile.password.update') }}" class="space-y-6">
+                            @csrf
+                            @method('PATCH')
+
+                            <div>
+                                <label for="current_password" class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">현재 비밀번호</label>
+                                <input type="password"
+                                       class="appearance-none block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-bold"
+                                       id="current_password" name="current_password" required placeholder="••••••••">
+                                @error('current_password')
+                                    <p class="text-red-400 text-[10px] font-bold mt-2 ml-1 tracking-tight">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="password" class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">새 비밀번호</label>
+                                    <input type="password"
+                                           class="appearance-none block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-bold"
+                                           id="password" name="password" required placeholder="••••••••">
+                                    @error('password')
+                                        <p class="text-red-400 text-[10px] font-bold mt-2 ml-1 tracking-tight">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
+                                    <label for="password_confirmation" class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">새 비밀번호 확인</label>
+                                    <input type="password"
+                                           class="appearance-none block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-bold"
+                                           id="password_confirmation" name="password_confirmation" required placeholder="••••••••">
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <button type="submit" class="w-full py-4 bg-white text-slate-900 font-black text-xs rounded-xl hover:bg-slate-100 transition-all active:scale-[0.98] uppercase tracking-widest shadow-xl">
+                                    Update Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             @endif
         </div>
