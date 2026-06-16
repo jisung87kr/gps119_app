@@ -1,26 +1,6 @@
 <x-layouts.app>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
-    <!-- Project Info Banner -->
-    <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-6 shadow-lg">
-        <div class="max-w-md mx-auto">
-            <div class="flex items-center gap-3 mb-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                <h2 class="text-xl font-bold">{{ $project->name }}</h2>
-            </div>
-            @if($project->description)
-                <p class="text-blue-50 text-sm">{{ $project->description }}</p>
-            @endif
-            <div class="mt-3 flex items-center gap-2 text-sm text-blue-50">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                <span>{{ $project->start_date->format('Y.m.d') }} - {{ $project->end_date->format('Y.m.d') }}</span>
-            </div>
-        </div>
-    </div>
 
     <div id="app" class="w-full h-screen" style="padding-bottom: 200px; padding-top: 0;">
         <map-loader @scripts-loaded="initMap"></map-loader>
