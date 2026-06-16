@@ -1,211 +1,165 @@
 <x-layouts.admin title="GPS119 관리자 대시보드">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Page Header -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">관리자 대시보드</h1>
-            <p class="mt-2 text-gray-600">GPS119 시스템 전체 현황을 확인하세요.</p>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">시스템 현황</h1>
+                <p class="text-sm text-slate-500 font-medium mt-1">GPS119의 전체 운영 현황을 실시간으로 확인합니다.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Live Monitoring</span>
+            </div>
         </div>
 
         <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
             <!-- Total Users -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">전체 사용자</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['total_users']) }}</p>
-                    </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Users</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-2xl font-black text-slate-900 tracking-tighter">{{ number_format($stats['total_users']) }}</span>
+                    <span class="text-xs font-bold text-slate-400">명</span>
                 </div>
             </div>
 
             <!-- Total Requests -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">전체 구조요청</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['total_requests']) }}</p>
-                    </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm border-l-4 border-l-red-500">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Requests</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-2xl font-black text-slate-900 tracking-tighter">{{ number_format($stats['total_requests']) }}</span>
+                    <span class="text-xs font-bold text-slate-400">건</span>
                 </div>
             </div>
 
             <!-- Pending Requests -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">대기중 요청</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['pending_requests']) }}</p>
-                    </div>
+            <div class="bg-amber-50 p-5 rounded-2xl border border-amber-100 shadow-sm">
+                <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Pending</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-2xl font-black text-amber-700 tracking-tighter">{{ number_format($stats['pending_requests']) }}</span>
+                    <span class="text-xs font-bold text-amber-500">대기</span>
                 </div>
             </div>
 
             <!-- Total Projects -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">전체 프로젝트</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['total_projects']) }}</p>
-                    </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm border-l-4 border-l-purple-500">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Projects</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-2xl font-black text-slate-900 tracking-tighter">{{ number_format($stats['total_projects']) }}</span>
+                    <span class="text-xs font-bold text-slate-400">개</span>
                 </div>
             </div>
 
             <!-- Active Projects -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
+            <div class="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 shadow-sm">
+                <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Active Projects</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-2xl font-black text-emerald-700 tracking-tighter">{{ number_format($stats['active_projects']) }}</span>
+                    <span class="text-xs font-bold text-emerald-500">활성</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Distribution -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm">
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Request Status</h3>
+                    <div class="space-y-3">
+                        @php
+                            $total = max($stats['total_requests'], 1);
+                            $pendingP = ($stats['pending_requests'] / $total) * 100;
+                            $progressP = ($stats['in_progress_requests'] / $total) * 100;
+                            $completedP = ($stats['completed_requests'] / $total) * 100;
+                        @endphp
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold mb-1">
+                                <span class="text-amber-600">Pending</span>
+                                <span>{{ round($pendingP) }}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-amber-500" style="width: {{ $pendingP }}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold mb-1">
+                                <span class="text-blue-600">In Progress</span>
+                                <span>{{ round($progressP) }}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500" style="width: {{ $progressP }}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold mb-1">
+                                <span class="text-emerald-600">Completed</span>
+                                <span>{{ round($completedP) }}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-500" style="width: {{ $completedP }}%"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">활성 프로젝트</p>
-                        <p class="text-2xl font-semibold text-gray-900">{{ number_format($stats['active_projects']) }}</p>
-                    </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Charts Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <!-- Request Status Chart -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">구조 요청 현황</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">대기중</span>
-                        <span class="text-sm font-medium text-yellow-600">{{ $stats['pending_requests'] }}건</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">진행중</span>
-                        <span class="text-sm font-medium text-blue-600">{{ $stats['in_progress_requests'] }}건</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">완료</span>
-                        <span class="text-sm font-medium text-green-600">{{ $stats['completed_requests'] }}건</span>
+                <div class="bg-slate-900 p-6 rounded-2xl shadow-xl">
+                    <h3 class="text-xs font-black text-white uppercase tracking-widest mb-4">Quick Actions</h3>
+                    <div class="grid grid-cols-1 gap-2">
+                        <a href="{{ route('admin.projects.index') }}" class="flex items-center justify-between p-2 px-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all group">
+                            <span class="text-xs font-bold">프로젝트 관리</span>
+                            <svg class="w-4 h-4 opacity-50 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5l7 7-7 7" stroke-width="2.5"/></svg>
+                        </a>
+                        <a href="{{ route('admin.members') }}" class="flex items-center justify-between p-2 px-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all group">
+                            <span class="text-xs font-bold">회원 관리</span>
+                            <svg class="w-4 h-4 opacity-50 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5l7 7-7 7" stroke-width="2.5"/></svg>
+                        </a>
+                        <a href="{{ route('admin.requests') }}" class="flex items-center justify-between p-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all group">
+                            <span class="text-xs font-bold">전체 요청 보기</span>
+                            <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5l7 7-7 7" stroke-width="2.5"/></svg>
+                        </a>
                     </div>
                 </div>
             </div>
 
-            <!-- User Role Distribution -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">사용자 구성</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">일반 사용자</span>
-                        <span class="text-sm font-medium text-blue-600">{{ $stats['total_users'] - $stats['total_admins'] - $stats['total_rescuers'] }}명</span>
+            <!-- Top Projects -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden h-full flex flex-col">
+                    <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest">Top Projects</h3>
+                        <a href="{{ route('admin.projects.index') }}" class="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">All Projects →</a>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">구조대원</span>
-                        <span class="text-sm font-medium text-green-600">{{ $stats['total_rescuers'] }}명</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600">관리자</span>
-                        <span class="text-sm font-medium text-red-600">{{ $stats['total_admins'] }}명</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">빠른 작업</h3>
-                <div class="space-y-3">
-                    <a href="{{ route('admin.projects.index') }}" class="block w-full bg-purple-600 text-white text-center py-2 px-4 rounded-md hover:bg-purple-700 transition duration-200">
-                        프로젝트 관리
-                    </a>
-                    <a href="{{ route('admin.members') }}" class="block w-full bg-blue-600 text-white text-center py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200">
-                        회원 관리
-                    </a>
-                    <a href="{{ route('admin.requests') }}" class="block w-full bg-green-600 text-white text-center py-2 px-4 rounded-md hover:bg-green-700 transition duration-200">
-                        구조요청 관리
-                    </a>
-                    <a href="{{ route('admin.requests', ['status' => 'pending']) }}" class="block w-full bg-yellow-600 text-white text-center py-2 px-4 rounded-md hover:bg-yellow-700 transition duration-200">
-                        대기중 요청 확인
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top Projects Section -->
-        <div class="mb-8">
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h3 class="text-lg font-semibold text-gray-900">프로젝트별 구조요청 현황 (상위 5개)</h3>
-                    <a href="{{ route('admin.projects.index') }}" class="text-sm text-purple-600 hover:text-purple-800">전체 보기 →</a>
-                </div>
-                <div class="p-6">
-                    @if($project_stats->isEmpty())
-                        <p class="text-gray-500 text-center py-4">등록된 프로젝트가 없습니다.</p>
-                    @else
-                        <div class="space-y-4">
-                            @foreach($project_stats as $project)
-                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-3">
-                                            <a href="{{ route('admin.projects.show', $project->id) }}" class="font-medium text-gray-900 hover:text-purple-600">
-                                                {{ $project->name }}
+                    <div class="p-2 flex-1">
+                        @if($project_stats->isEmpty())
+                            <div class="flex flex-col items-center justify-center py-12 text-slate-400">
+                                <svg class="w-12 h-12 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="1.5"/></svg>
+                                <p class="text-xs font-bold">진행 중인 프로젝트가 없습니다.</p>
+                            </div>
+                        @else
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                @foreach($project_stats as $project)
+                                    <div class="group flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition-all duration-200">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <div class="w-1.5 h-1.5 rounded-full {{ $project->status === 'active' ? 'bg-emerald-500' : 'bg-slate-300' }}"></div>
+                                                <h4 class="text-sm font-bold text-slate-900 truncate tracking-tight">{{ $project->name }}</h4>
+                                            </div>
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{{ $project->start_date->format('M d') }} - {{ $project->end_date->format('M d, Y') }}</p>
+                                        </div>
+                                        <div class="flex items-center gap-4 ml-4">
+                                            <div class="text-right">
+                                                <p class="text-lg font-black text-slate-900 leading-none tracking-tighter">{{ number_format($project->requests_count) }}</p>
+                                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Requests</p>
+                                            </div>
+                                            <a href="{{ route('admin.projects.show', $project->id) }}" class="p-2 bg-slate-100 text-slate-400 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 5l7 7-7 7" stroke-width="2.5"/></svg>
                                             </a>
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                @if($project->status === 'pending') bg-gray-100 text-gray-800
-                                                @elseif($project->status === 'active') bg-green-100 text-green-800
-                                                @elseif($project->status === 'completed') bg-blue-100 text-blue-800
-                                                @else bg-gray-100 text-gray-800
-                                                @endif">
-                                                @if($project->status === 'pending') 시작 대기
-                                                @elseif($project->status === 'active') 진행중
-                                                @elseif($project->status === 'completed') 완료
-                                                @else {{ $project->status }}
-                                                @endif
-                                            </span>
                                         </div>
-                                        @if($project->description)
-                                            <p class="text-sm text-gray-600 mt-1">{{ Str::limit($project->description, 60) }}</p>
-                                        @endif
-                                        <p class="text-xs text-gray-500 mt-1">
-                                            {{ $project->start_date->format('Y.m.d') }} - {{ $project->end_date->format('Y.m.d') }}
-                                        </p>
                                     </div>
-                                    <div class="ml-4 flex items-center gap-4">
-                                        <div class="text-right">
-                                            <p class="text-2xl font-bold text-purple-600">{{ number_format($project->requests_count) }}</p>
-                                            <p class="text-xs text-gray-500">구조요청</p>
-                                        </div>
-                                        <a href="{{ route('admin.requests', ['project_id' => $project->id]) }}" class="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200">
-                                            요청 보기
-                                        </a>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -213,69 +167,67 @@
         <!-- Recent Activity -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Recent Requests -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">최근 구조 요청</h3>
+            <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest">Recent Requests</h3>
+                    <a href="{{ route('admin.requests') }}" class="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">View All</a>
                 </div>
-                <div class="p-6">
-                    @if($recent_requests->isEmpty())
-                        <p class="text-gray-500 text-center py-4">최근 구조 요청이 없습니다.</p>
-                    @else
-                        <div class="space-y-4">
-                            @foreach($recent_requests as $request)
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p class="font-medium text-gray-900">{{ $request->user->name ?? '알 수 없음' }}</p>
-                                        <p class="text-sm text-gray-600">{{ $request->created_at->format('Y-m-d H:i') }}</p>
-                                    </div>
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                        @if($request->status === 'pending') bg-yellow-100 text-yellow-800
-                                        @elseif($request->status === 'in_progress') bg-blue-100 text-blue-800
-                                        @elseif($request->status === 'completed') bg-green-100 text-green-800
-                                        @else bg-gray-100 text-gray-800
-                                        @endif">
-                                        @if($request->status === 'pending') 대기중
-                                        @elseif($request->status === 'in_progress') 진행중
-                                        @elseif($request->status === 'completed') 완료
-                                        @else {{ $request->status }}
-                                        @endif
-                                    </span>
+                <div class="divide-y divide-slate-50">
+                    @forelse($recent_requests as $request)
+                        <div class="flex items-center justify-between p-4 px-6 hover:bg-slate-50/50 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">
+                                    {{ mb_substr($request->user->name ?? '?', 0, 1) }}
                                 </div>
-                            @endforeach
+                                <div>
+                                    <p class="text-sm font-bold text-slate-900 tracking-tight">{{ $request->user->name ?? '알 수 없음' }}</p>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{{ $request->created_at->diffForHumans() }}</p>
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest
+                                @if($request->status === 'pending') bg-amber-100 text-amber-700
+                                @elseif($request->status === 'in_progress') bg-blue-100 text-blue-700
+                                @elseif($request->status === 'completed') bg-emerald-100 text-emerald-700
+                                @else bg-slate-100 text-slate-600
+                                @endif">
+                                {{ $request->status }}
+                            </span>
                         </div>
-                    @endif
+                    @empty
+                        <div class="py-8 text-center text-slate-400 text-xs font-bold italic">No recent activity.</div>
+                    @endforelse
                 </div>
             </div>
 
             <!-- Recent Users -->
-            <div class="bg-white rounded-lg shadow">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">최근 가입 사용자</h3>
+            <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-widest">Recent Members</h3>
+                    <a href="{{ route('admin.members') }}" class="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Manage</a>
                 </div>
-                <div class="p-6">
-                    @if($recent_users->isEmpty())
-                        <p class="text-gray-500 text-center py-4">최근 가입한 사용자가 없습니다.</p>
-                    @else
-                        <div class="space-y-4">
-                            @foreach($recent_users as $user)
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p class="font-medium text-gray-900">{{ $user->name }}</p>
-                                        <p class="text-sm text-gray-600">{{ $user->created_at->format('Y-m-d H:i') }}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        @if($user->hasRole('admin'))
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">관리자</span>
-                                        @elseif($user->hasRole('rescuer'))
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">구조대</span>
-                                        @else
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">사용자</span>
-                                        @endif
-                                    </div>
+                <div class="divide-y divide-slate-50">
+                    @forelse($recent_users as $user)
+                        <div class="flex items-center justify-between p-4 px-6 hover:bg-slate-50/50 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-[10px] font-black text-white">
+                                    {{ mb_substr($user->name, 0, 1) }}
                                 </div>
-                            @endforeach
+                                <div>
+                                    <p class="text-sm font-bold text-slate-900 tracking-tight">{{ $user->name }}</p>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{{ $user->created_at->format('M d, Y') }}</p>
+                                </div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest
+                                @if($user->hasRole('admin')) bg-red-100 text-red-700
+                                @elseif($user->hasRole('rescuer')) bg-emerald-100 text-emerald-700
+                                @else bg-blue-100 text-blue-700
+                                @endif">
+                                {{ $user->roles->first()->name ?? 'User' }}
+                            </span>
                         </div>
-                    @endif
+                    @empty
+                        <div class="py-8 text-center text-slate-400 text-xs font-bold italic">No new members.</div>
+                    @endforelse
                 </div>
             </div>
         </div>

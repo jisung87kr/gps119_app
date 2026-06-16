@@ -35,7 +35,8 @@ export default function createRequestMapApp(options = {}) {
                 addressExtra: '',
                 findAddress: false,
                 showIntro: true,
-                loading: false
+                loading: false,
+                sheetExpanded: true
             };
         },
         mounted() {
@@ -175,6 +176,28 @@ export default function createRequestMapApp(options = {}) {
             setCenter(lat, long) {
                 const moveLatLon = new kakao.maps.LatLng(lat, long);
                 this.mapObject.setCenter(moveLatLon);
+                this.applySheetOffset();
+            },
+            // 바텀시트가 지도 하단을 가리는 만큼 중심을 위로 올려 마커가 보이게 한다.
+            applySheetOffset() {
+                if (!this.mapObject) return;
+                const sheet = document.getElementById('bottom-sheet');
+                const covered = this.sheetExpanded && sheet ? sheet.offsetHeight : 0;
+                if (covered > 0) {
+                    // 가려지는 높이의 절반만큼 지도 내용을 위로 이동
+                    this.mapObject.panBy(0, covered / 2);
+                }
+            },
+            toggleSheet() {
+                this.sheetExpanded = !this.sheetExpanded;
+                // 시트 슬라이드(0.3s) 후 지도 타일을 다시 그린다 (Kakao relayout)
+                if (this.mapObject) {
+                    const center = this.mapObject.getCenter();
+                    setTimeout(() => {
+                        this.mapObject.relayout();
+                        this.mapObject.setCenter(center);
+                    }, 320);
+                }
             },
             getLocation() {
                 this.loading = true;

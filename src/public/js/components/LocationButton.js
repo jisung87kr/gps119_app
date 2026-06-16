@@ -14,16 +14,18 @@ export default {
     template: `
         <div
             @click="handleClick"
-            class="bg-blue-600 hover:bg-blue-700 absolute right-4 top-[-60px] rounded-2xl cursor-pointer p-3 shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl"
+            class="bg-blue-600 hover:bg-blue-700 absolute right-5 top-[-60px] w-10 h-10 rounded-full flex items-center justify-center cursor-pointer shadow-xl transform transition-all duration-300 hover:scale-110 active:scale-95 z-[100]"
         >
+            <div class="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20" v-show="!loading"></div>
+
             <svg
                 v-show="!loading"
                 xmlns="http://www.w3.org/2000/svg"
-                class="icon icon-tabler icon-tabler-focus-2"
-                width="28"
-                height="28"
+                class="icon icon-tabler icon-tabler-focus-2 relative z-10"
+                width="24"
+                height="24"
                 viewBox="0 0 24 24"
-                stroke-width="2"
+                stroke-width="2.5"
                 stroke="#ffffff"
                 fill="none"
                 stroke-linecap="round"
@@ -41,11 +43,11 @@ export default {
             <svg
                 v-show="loading"
                 xmlns="http://www.w3.org/2000/svg"
-                class="icon icon-tabler icon-tabler-loader-2 animate-spin"
+                class="icon icon-tabler icon-tabler-loader-2 animate-spin relative z-10"
                 width="28"
                 height="28"
                 viewBox="0 0 24 24"
-                stroke-width="2"
+                stroke-width="2.5"
                 stroke="#ffffff"
                 fill="none"
                 stroke-linecap="round"

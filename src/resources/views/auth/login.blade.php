@@ -1,74 +1,90 @@
 <x-layouts.app title="GPS119 - 로그인">
-    <div class="flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 w-full">
-        <div class="max-w-md w-full space-y-8">
-            <div>
-                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">GPS119 로그인</h2>
+    <div class="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50/50 w-full">
+        <div class="sm:mx-auto sm:w-full sm:max-w-md">
+            <div class="flex justify-center mb-6">
+                <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-200">
+                    <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                </div>
             </div>
+            <h2 class="text-center text-3xl font-black tracking-tight text-slate-900">로그인</h2>
+            <p class="mt-2 text-center text-sm font-medium text-slate-500">
+                GPS119 서비스에 오신 것을 환영합니다.
+            </p>
+        </div>
 
-            <form class="mt-8 space-y-6" method="POST" action="{{ route('login') }}">
-                @csrf
-
-                <div class="space-y-4">
+        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-[400px]">
+            <div class="bg-white py-10 px-6 sm:px-10 rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/40">
+                <form class="space-y-6" action="{{ route('login') }}" method="POST">
+                    @csrf
                     <div>
-                        <label for="phone" class="block text-sm font-medium text-gray-700">연락처 또는 이메일</label>
-                        <input type="text"
-                               id="phone"
-                               name="phone"
-                               value="{{ old('phone') }}"
-                               required
-                               class="mt-1 appearance-none relative block w-full px-3 py-2 border @error('phone') border-red-300 @else border-gray-300 @enderror placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                               placeholder="010-1234-5678 또는 admin@example.com"
-                               autofocus
-                        >
+                        <label for="phone" class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">연락처 또는 이메일</label>
+                        <div class="relative">
+                            <input id="phone" name="phone" type="text" autocomplete="username" required autofocus
+                                   value="{{ old('phone') }}"
+                                   class="appearance-none block w-full px-4 py-3 border @error('phone') border-red-300 @else border-slate-200 @enderror rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium"
+                                   placeholder="010-1234-5678 또는 admin@example.com">
+                        </div>
                         @error('phone')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            <p class="mt-1.5 ml-1 text-xs font-medium text-red-600">{{ $message }}</p>
                         @enderror
-                        <p class="mt-1 text-xs text-gray-500">
+                        <p class="mt-1.5 ml-1 text-xs font-medium text-slate-400">
                             일반 사용자는 연락처로, 관리자는 이메일로 로그인하세요.
                         </p>
                     </div>
 
                     <div>
-                        <label for="password" class="block text-sm font-medium text-gray-700">비밀번호</label>
-                        <input type="password"
-                               id="password"
-                               name="password"
-                               required
-                               class="mt-1 appearance-none relative block w-full px-3 py-2 border @error('password') border-red-300 @else border-gray-300 @enderror placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                               placeholder="비밀번호">
+                        <label for="password" class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">비밀번호</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" required
+                               class="appearance-none block w-full px-4 py-3 border @error('password') border-red-300 @else border-slate-200 @enderror rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium"
+                               placeholder="••••••••">
                         @error('password')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            <p class="mt-1.5 ml-1 text-xs font-medium text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
-                </div>
 
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <input id="remember"
-                               name="remember"
-                               type="checkbox"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="remember" class="ml-2 block text-sm text-gray-900">
-                            로그인 상태 유지
-                        </label>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input id="remember" name="remember" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded-md">
+                            <label for="remember" class="ml-2 block text-xs font-bold text-slate-500">로그인 유지</label>
+                        </div>
+
+                        <div class="text-xs">
+                            <a href="{{ route('password.request') }}" class="font-bold text-blue-600 hover:text-blue-500">비밀번호 찾기</a>
+                        </div>
                     </div>
 
-                    <div class="text-sm">
-                        <a href="{{ route('password.request') }}" class="font-medium text-blue-600 hover:text-blue-500">
-                            비밀번호를 잊으셨나요?
+                    <div>
+                        <button type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-blue-500/20 text-sm font-black text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all active:scale-[0.98]">
+                            로그인
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-8">
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-slate-100"></div>
+                        </div>
+                        <div class="relative flex justify-center text-xs font-bold uppercase tracking-widest">
+                            <span class="bg-white px-4 text-slate-300">간편 로그인</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 gap-3">
+                        <a href="{{ route('login.social', 'naver') }}" class="flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-[#03C75A] hover:brightness-95 transition-all active:scale-[0.98]">
+                            <span class="text-base font-black">N</span>
+                            네이버
                         </a>
                     </div>
                 </div>
+            </div>
 
-                <div>
-                    <button type="submit"
-                            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        로그인
-                    </button>
-                    <a href="{{route('login.social', 'naver')}}"
-                       class="mt-2 relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">네이버 로그인</a>
-                </div>
-            </form>
+            <p class="mt-8 text-center text-sm font-bold text-slate-500">
+                계정이 없으신가요?
+                <a href="{{ route('register') }}" class="text-blue-600 hover:text-blue-500 ml-1">지금 회원가입</a>
+            </p>
         </div>
     </div>
 </x-layouts.app>
