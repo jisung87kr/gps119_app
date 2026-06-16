@@ -3,6 +3,7 @@ import IntroScreen from '/js/components/IntroScreen.js';
 import LocationButton from '/js/components/LocationButton.js';
 import LocationInfo from '/js/components/LocationInfo.js';
 import MapContainer from '/js/components/MapContainer.js';
+import { reverseGeocode, getCurrentPositionOnce, showGeolocationError } from '/js/components/mapHelpers.js';
 
 /**
  * 구조요청 위치공유 화면(create / create-project)의 공유 Vue 앱 구성.
@@ -71,21 +72,11 @@ export default function createRequestMapApp(options = {}) {
 
                 this.latLongToAddress(this.long, this.lat);
             },
-            latLongToAddress(long, lat) {
-                const numLong = parseFloat(long);
-                const numLat = parseFloat(lat);
-                if (isNaN(numLong) || isNaN(numLat)) {
-                    console.warn('좌표 값이 올바르지 않아 주소 변환을 건너뜁니다.', long, lat);
-                    return;
+            async latLongToAddress(long, lat) {
+                const address = await reverseGeocode(long, lat);
+                if (address) {
+                    this.address = address;
                 }
-                const geocoder = new kakao.maps.services.Geocoder();
-                geocoder.coord2Address(numLong, numLat, (result, status) => {
-                    if (status === kakao.maps.services.Status.OK) {
-                        this.address = result[0].road_address && result[0].road_address.address_name
-                            ? result[0].road_address.address_name
-                            : result[0].address.address_name;
-                    }
-                });
             },
             setMap(address) {
                 const geocoder = new kakao.maps.services.Geocoder();
@@ -187,22 +178,19 @@ export default function createRequestMapApp(options = {}) {
             },
             getLocation() {
                 this.loading = true;
-                const options = {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                };
-
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition((position) => {
+                getCurrentPositionOnce()
+                    .then((position) => {
                         this.showPosition(position);
-                    }, (error) => {
-                        this.showError(error);
-                        this.loading = false;
-                    }, options);
-                } else {
-                    alert("지원하지 않는 브라우저 입니다.");
-                }
+                    })
+                    .catch((error) => {
+                        if (error.message === 'UNSUPPORTED') {
+                            // 기존 동작 보존: 미지원 브라우저 분기는 loading을 초기화하지 않음
+                            alert("지원하지 않는 브라우저 입니다.");
+                        } else {
+                            this.showError(error);
+                            this.loading = false;
+                        }
+                    });
             },
             showPosition(position) {
                 this.lat = position.coords.latitude;
@@ -213,22 +201,7 @@ export default function createRequestMapApp(options = {}) {
                 this.loading = false;
             },
             showError(error) {
-                let message = '';
-                switch (error.code) {
-                    case error.PERMISSION_DENIED:
-                        message = "사용자가 위치 정보 요청을 거부했습니다.";
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        message = "위치 정보를 사용할 수 없습니다.";
-                        break;
-                    case error.TIMEOUT:
-                        message = "사용자 위치 정보를 가져오는 요청이 시간 초과되었습니다.";
-                        break;
-                    case error.UNKNOWN_ERROR:
-                        message = "알 수 없는 오류가 발생했습니다.";
-                        break;
-                }
-                alert(message);
+                showGeolocationError(error);
             }
         }
     };
