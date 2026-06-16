@@ -140,16 +140,22 @@
 
                 kakao.maps.event.addListener(this.mapObject, 'click', (mouseEvent) => {
                     this.addMarker(mouseEvent.latLng);
-                    this.lat = mouseEvent.latLng.Ma;
-                    this.long = mouseEvent.latLng.La;
+                    this.lat = mouseEvent.latLng.getLat();
+                    this.long = mouseEvent.latLng.getLng();
                     this.latLongToAddress(this.long, this.lat);
                 });
 
                 this.latLongToAddress(this.long, this.lat);
             },
             latLongToAddress(long, lat){
+                const numLong = parseFloat(long);
+                const numLat = parseFloat(lat);
+                if (isNaN(numLong) || isNaN(numLat)) {
+                    console.warn('좌표 값이 올바르지 않아 주소 변환을 건너뜁니다.', long, lat);
+                    return;
+                }
                 let geocoder = new kakao.maps.services.Geocoder();
-                geocoder.coord2Address(long, lat, (result, status) => {
+                geocoder.coord2Address(numLong, numLat, (result, status) => {
                     if (status === kakao.maps.services.Status.OK) {
                         this.address = result[0].road_address && result[0].road_address.address_name ? result[0].road_address.address_name : result[0].address.address_name;
                         var detailAddr = !!result[0].road_address ? '<div>도로명주소 : ' + result[0].road_address.address_name + '</div>' : '';
@@ -168,7 +174,6 @@
                 });
             },
             setMap(address){
-                this.initMap();
                 let geocoder = new kakao.maps.services.Geocoder();
                 geocoder.addressSearch(address, (results, status) => {
                     // 정상적으로 검색이 완료됐으면
@@ -283,7 +288,7 @@
                     } else {
                         alert('위치정보 공유에 실패했습니다. 다시 시도해주세요.');
                     }
-                }).catch(err => {;
+                }).catch(err => {
                     console.error(err);
                     alert('위치정보 공유에 실패했습니다. 다시 시도해주세요.');
                 });

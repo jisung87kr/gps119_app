@@ -118,13 +118,21 @@
     <script>
         function wgs84ToWCONGNAMUL(lat, lng) {
             return new Promise((resolve, reject) => {
+                const numLat = parseFloat(lat);
+                const numLng = parseFloat(lng);
+
+                if (isNaN(numLat) || isNaN(numLng)) {
+                    reject(new Error("좌표 값이 올바르지 않습니다."));
+                    return;
+                }
+
                 const geocoder = new kakao.maps.services.Geocoder();
-                geocoder.transCoord(lng, lat, (result, status) => {
+                geocoder.transCoord(numLng, numLat, (result, status) => {
                     if (status === kakao.maps.services.Status.OK) {
                         resolve({ x: result[0].x, y: result[0].y });
                     } else {
-                        // 변환 실패시 기본값으로 fallback
-                        throw new Error("좌표 변환 실패");
+                        // 변환 실패시 reject 처리
+                        reject(new Error("좌표 변환 실패"));
                     }
                 }, {
                     input_coord: kakao.maps.services.Coords.WGS84,
@@ -175,7 +183,12 @@
 
                 // https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=1217272.0&urlX=666028.0
                 // https://m.map.kakao.com/scheme/route?sp=&sn=&ep=37.87963614410788%2C127.75487468836948&en=요청자&by=car
-                let WCONGNAMUL = await wgs84ToWCONGNAMUL(this.requestLat, this.requestLong);
+                let WCONGNAMUL = { x: '', y: '' };
+                try {
+                    WCONGNAMUL = await wgs84ToWCONGNAMUL(this.requestLat, this.requestLong);
+                } catch (e) {
+                    console.warn('좌표 변환 실패 - 큰지도보기 링크가 정확하지 않을 수 있습니다.', e);
+                }
 
                 let infowindow = new kakao.maps.InfoWindow({
                     position : this.requestMarker.position,
@@ -349,8 +362,14 @@
                 }
             },
             getAddressFromCoords(long, lat, type) {
+                const numLong = parseFloat(long);
+                const numLat = parseFloat(lat);
+                if (isNaN(numLong) || isNaN(numLat)) {
+                    console.warn('좌표 값이 올바르지 않아 주소 변환을 건너뜁니다.', long, lat);
+                    return;
+                }
                 let geocoder = new daum.maps.services.Geocoder();
-                geocoder.coord2Address(long, lat, (result, status) => {
+                geocoder.coord2Address(numLong, numLat, (result, status) => {
                     if (status === kakao.maps.services.Status.OK) {
                         const address = result[0].road_address && result[0].road_address.address_name ?
                             result[0].road_address.address_name : result[0].address.address_name;
