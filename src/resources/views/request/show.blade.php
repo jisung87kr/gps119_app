@@ -183,12 +183,39 @@
 
                 // https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=1217272.0&urlX=666028.0
                 // https://m.map.kakao.com/scheme/route?sp=&sn=&ep=37.87963614410788%2C127.75487468836948&en=요청자&by=car
-                let WCONGNAMUL = { x: '', y: '' };
+                let WCONGNAMUL = null;
                 try {
                     WCONGNAMUL = await wgs84ToWCONGNAMUL(this.requestLat, this.requestLong);
                 } catch (e) {
-                    console.warn('좌표 변환 실패 - 큰지도보기 링크가 정확하지 않을 수 있습니다.', e);
+                    console.warn('좌표 변환 실패 - 큰지도보기 버튼을 숨깁니다.', e);
                 }
+
+                // 좌표 변환에 성공했을 때만 '큰지도보기' 버튼을 노출 (빈 좌표 URL 방지)
+                const bigMapButton = WCONGNAMUL ? `
+                            <a href="https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=${WCONGNAMUL.y}&urlX=${WCONGNAMUL.x}"
+                               target="_blank"
+                               style="
+                                   display: inline-flex;
+                                   align-items: center;
+                                   padding: 8px 12px;
+                                   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                                   color: white;
+                                   text-decoration: none;
+                                   border-radius: 8px;
+                                   font-size: 13px;
+                                   font-weight: 500;
+                                   transition: all 0.2s ease;
+                                   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+                                   border: none;
+                               "
+                               onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.4)'"
+                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(59, 130, 246, 0.3)'"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                                큰지도보기
+                            </a>` : '';
 
                 let infowindow = new kakao.maps.InfoWindow({
                     position : this.requestMarker.position,
@@ -231,30 +258,7 @@
                             gap: 8px;
                             flex-wrap: wrap;
                         ">
-                            <a href="https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=${WCONGNAMUL.y}&urlX=${WCONGNAMUL.x}"
-                               target="_blank"
-                               style="
-                                   display: inline-flex;
-                                   align-items: center;
-                                   padding: 8px 12px;
-                                   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-                                   color: white;
-                                   text-decoration: none;
-                                   border-radius: 8px;
-                                   font-size: 13px;
-                                   font-weight: 500;
-                                   transition: all 0.2s ease;
-                                   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-                                   border: none;
-                               "
-                               onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.4)'"
-                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(59, 130, 246, 0.3)'"
-                            >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                </svg>
-                                큰지도보기
-                            </a>
+                            ${bigMapButton}
                             <a href="https://m.map.kakao.com/scheme/route?sp=&sn=&ep=${this.requestLat},${this.requestLong}&en=요청자&by=car"
                                target="_blank"
                                style="
