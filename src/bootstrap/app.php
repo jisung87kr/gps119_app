@@ -33,6 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            // 실시간 관제: 행사 역할/참가 가드 (SPEC-06a / OI-4)
+            'event.role' => \App\Http\Middleware\EnsureEventRole::class,
+            'event.member' => \App\Http\Middleware\EnsureEventMember::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

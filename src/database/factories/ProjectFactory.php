@@ -20,7 +20,8 @@ class ProjectFactory extends Factory
             'is_active' => true,
             'settings' => null,
             'created_by' => User::factory(),
-            // slug/status 는 Project::booted() creating 훅에서 자동 발급
+            // slug/join_code/status 는 Project::booted() creating 훅에서 자동 발급(비우면 자동 생성)
+            'join_code' => null,
         ];
     }
 }

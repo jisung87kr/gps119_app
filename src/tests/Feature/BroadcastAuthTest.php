@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\EventParticipant;
 use App\Models\Project;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -90,24 +91,61 @@ class BroadcastAuthTest extends TestCase
         $this->assertTrue($this->authorizeChannel($admin, "event.{$project->id}.control"));
     }
 
-    public function test_rescuer_passes_event_control(): void
-    {
-        $rescuer = User::factory()->create();
-        $rescuer->assignRole('rescuer');
-        $project = Project::factory()->create(['created_by' => $rescuer->id]);
-
-        $this->assertTrue($this->authorizeChannel($rescuer, "event.{$project->id}.control"));
-    }
-
-    public function test_regular_user_denied_event_control(): void
+    /** 강화 규칙(BE-1.2): 해당 행사 active CONTROLLER 참가자는 control 통과 */
+    public function test_controller_participant_passes_event_control(): void
     {
         $owner = User::factory()->create();
         $project = Project::factory()->create(['created_by' => $owner->id]);
 
-        $user = User::factory()->create();
-        $user->assignRole('user');
+        $controller = User::factory()->create();
+        EventParticipant::factory()->controller()->create([
+            'project_id' => $project->id,
+            'user_id' => $controller->id,
+        ]);
 
-        $this->assertFalse($this->authorizeChannel($user, "event.{$project->id}.control"));
+        $this->assertTrue($this->authorizeChannel($controller, "event.{$project->id}.control"));
+    }
+
+    /** 구급대(paramedic) 참가자는 control 채널 불통과 (ADR-0004) */
+    public function test_paramedic_participant_denied_event_control(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['created_by' => $owner->id]);
+
+        $paramedic = User::factory()->create();
+        EventParticipant::factory()->paramedic()->create([
+            'project_id' => $project->id,
+            'user_id' => $paramedic->id,
+        ]);
+
+        $this->assertFalse($this->authorizeChannel($paramedic, "event.{$project->id}.control"));
+    }
+
+    /** pending(승인대기) CONTROLLER 는 active 아니므로 불통과 */
+    public function test_pending_controller_denied_event_control(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['created_by' => $owner->id]);
+
+        $controller = User::factory()->create();
+        EventParticipant::factory()->controller()->pending()->create([
+            'project_id' => $project->id,
+            'user_id' => $controller->id,
+        ]);
+
+        $this->assertFalse($this->authorizeChannel($controller, "event.{$project->id}.control"));
+    }
+
+    /** 비참가 일반 사용자(시스템 rescuer 포함)는 control 불통과 */
+    public function test_non_participant_denied_event_control(): void
+    {
+        $owner = User::factory()->create();
+        $project = Project::factory()->create(['created_by' => $owner->id]);
+
+        $rescuer = User::factory()->create();
+        $rescuer->assignRole('rescuer');
+
+        $this->assertFalse($this->authorizeChannel($rescuer, "event.{$project->id}.control"));
     }
 
     /**

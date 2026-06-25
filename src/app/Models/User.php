@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\EventRole;
+use App\Enums\ParticipantStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -13,7 +15,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, HasApiTokens;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -68,11 +70,34 @@ class User extends Authenticatable
     }
 
     /**
+     * 이 사용자의 행사 참가 이력 (SPEC-03d).
+     */
+    public function eventParticipations(): HasMany
+    {
+        return $this->hasMany(EventParticipant::class);
+    }
+
+    /**
+     * 해당 행사에서의 역할 — active 참가만 반환, 아니면 null (SPEC-03d).
+     *
+     * 채널 인가·미들웨어가 공통으로 쓰는 단일 진입점(중복 쿼리 방지).
+     */
+    public function eventRoleIn(Project $project): ?EventRole
+    {
+        $participant = $this->eventParticipations()
+            ->where('project_id', $project->id)
+            ->where('status', ParticipantStatus::ACTIVE)
+            ->first();
+
+        return $participant?->role;
+    }
+
+    /**
      * Get the formatted phone number.
      */
     public function getFormattedPhoneAttribute(): ?string
     {
-        if (!$this->phone) {
+        if (! $this->phone) {
             return null;
         }
 
@@ -81,7 +106,7 @@ class User extends Authenticatable
 
         // Format as 010-0000-0000
         if (strlen($cleaned) === 11 && str_starts_with($cleaned, '010')) {
-            return substr($cleaned, 0, 3) . '-' . substr($cleaned, 3, 4) . '-' . substr($cleaned, 7, 4);
+            return substr($cleaned, 0, 3).'-'.substr($cleaned, 3, 4).'-'.substr($cleaned, 7, 4);
         }
 
         // Return original value if it doesn't match expected format
@@ -93,7 +118,7 @@ class User extends Authenticatable
      */
     public function getRawPhoneAttribute(): ?string
     {
-        if (!$this->phone) {
+        if (! $this->phone) {
             return null;
         }
 

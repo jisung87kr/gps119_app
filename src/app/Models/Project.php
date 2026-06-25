@@ -14,6 +14,7 @@ class Project extends Model
     protected $fillable = [
         'name',
         'slug',
+        'join_code',
         'description',
         'start_date',
         'end_date',
@@ -52,9 +53,31 @@ class Project extends Model
                 }
             }
 
+            // join_code 자동 발급(slug 발급 직후). 충돌 시 재생성 루프.
+            if (empty($project->join_code)) {
+                $project->join_code = static::generateUniqueJoinCode();
+            }
+
             // status 자동 설정
             $project->status = $project->getComputedStatus();
         });
+    }
+
+    /**
+     * 입장 코드 생성: 6자리 대문자 영숫자(혼동문자 0/O/1/I 제외), 유니크 보장.
+     */
+    public static function generateUniqueJoinCode(): string
+    {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 0,O,1,I 제외
+
+        do {
+            $code = '';
+            for ($i = 0; $i < 6; $i++) {
+                $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
+        } while (static::where('join_code', $code)->exists());
+
+        return $code;
     }
 
     // Relationships
@@ -66,6 +89,11 @@ class Project extends Model
     public function requests()
     {
         return $this->hasMany(Request::class);
+    }
+
+    public function participants()
+    {
+        return $this->hasMany(EventParticipant::class);
     }
 
     // Accessors & Mutators
