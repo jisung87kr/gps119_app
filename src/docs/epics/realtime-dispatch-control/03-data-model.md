@@ -5,12 +5,11 @@
 ## ER 개요
 
 ```
-projects(행사) 1 ─── N event_participants(행사참가/역할) N ─── 1 users
-   │ 1                                                          │
-   │                                                            │ 1
-   N                                                            N
-requests(신고) 1 ─── 1 dispatches(지령) N ─── 1 users(구급대원)  location_pings(위치)
+projects(행사) 1 ─┬─ N event_participants(행사참가/역할) ─ N ─ 1 users
+                  ├─ N location_pings(위치) ──────────────── N ─ 1 users
+                  └─ N requests(신고) 1 ─ N dispatches(지령) ─ N ─ 1 users(구급대원)
 ```
+> 한 신고는 거절·무응답 시 재지령되므로 `requests 1 ─ N dispatches`(한 시점에 활성 지령은 1건). `dispatches`는 `project_id`를 직접 보유한다.
 
 ## 변경: `projects` (행사)
 
@@ -20,7 +19,7 @@ Schema::table('projects', function (Blueprint $table) {
 });
 ```
 - `Project::booted()`에 `join_code` 자동발급(중복 회피) — 기존 slug 생성 로직 옆에 추가.
-- `Project`에 관계 추가: `participants()` (hasMany EventParticipant), `locationPings()`, `dispatches()` (hasManyThrough requests).
+- `Project`에 관계 추가: `participants()` (hasMany EventParticipant), `locationPings()` (hasMany), `dispatches()` (hasMany — `dispatches.project_id` 직결).
 
 ## 신규: `event_participants` (행사별 역할/소속)
 
@@ -54,7 +53,7 @@ Schema::create('location_pings', function (Blueprint $table) {
     $table->unsignedSmallInteger('heading')->nullable();   // 0-359
     $table->unsignedSmallInteger('speed')->nullable();     // m/s
     $table->timestamp('recorded_at');
-    // created_at만 필요 — updated_at 생략 가능
+    // timestamps() 생략 — append-only 이력이라 recorded_at 하나로 충분
     $table->index(['project_id', 'recorded_at']);
     $table->index(['user_id', 'recorded_at']);
 });

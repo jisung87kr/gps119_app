@@ -32,7 +32,7 @@
 |--------|------|------|------|
 | POST | `/api/requests/{id}/dispatch` | 지령 배정 `{paramedic_id, note}` | event.role:controller |
 | PATCH | `/api/dispatches/{id}/status` | 전이 `{status, note?}` (accept/en_route/arrived/completed/reject) | 해당 구급대원 또는 controller |
-| GET | `/api/dispatches/mine` | 내 지령 목록 | event.role:paramedic |
+| GET | `/api/dispatches/mine` | 내 지령 목록(행사 무관, 본인 소유) | auth (paramedic_id=본인) |
 | GET | `/api/events/{id}/dispatches` | 출동 현황 보드 | event.role:controller |
 
 ### 리포트
@@ -61,7 +61,10 @@
 
 ## 미들웨어
 - `bootstrap/app.php` `$middleware->alias()`에 `'event.role' => EnsureEventRole::class` 추가(기존 `admin` 옆).
-- `EnsureEventRole`은 라우트의 `{id}`(project)와 인증 사용자의 `event_participants`(active) 역할을 대조.
+- `EnsureEventRole`은 행사(project) id로 인증 사용자의 `event_participants`(active) 역할을 대조한다. 행사 id 출처:
+  - 라우트 파라미터가 project인 경우(`/api/events/{id}/...`) → `{id}` 직접 사용.
+  - 라우트 파라미터가 dispatch인 경우(`PATCH /api/dispatches/{id}/status`) → 바인딩된 `Dispatch->project_id`에서 해석. 이 라우트는 "해당 지령의 paramedic 본인 또는 그 행사의 controller"를 추가로 검사.
+  - project 컨텍스트가 없는 본인 소유 라우트(`/api/dispatches/mine`)는 `event.role`을 쓰지 않고 `auth` + 소유자 스코프로 처리.
 
 ## OpenAPI/문서화
 - `PROMPT.MD` 규약대로 Swagger 자동생성 도입(`darkaonline/l5-swagger` 등) — 신규 API 어노테이션. (현재 미설치, 도입 권장)

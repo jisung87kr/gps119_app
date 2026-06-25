@@ -19,12 +19,14 @@
 
 | 채널 | 타입 | 구독자 | 흐르는 이벤트 |
 |------|------|--------|----------------|
-| `event.{projectId}.control` | private | controller/admin/구급대 | `request.created`, `dispatch.*`, `participant.location` |
+| `event.{projectId}.control` | private | controller/admin(상황실)만 | `request.created`, `dispatch.*`, `participant.location` |
 | `event.{projectId}.locations` | presence | active 참가자 전원 | `participant.location` (위치 ping 팬아웃) |
 | `event.{projectId}.dispatch.{userId}` | private | 해당 구급대원 본인 | `dispatch.assigned`, `dispatch.updated` |
 | `event.{projectId}.requester.{userId}` | private | 신고자 본인 | `request.status.updated`(대기→진행→완료) |
 
 `routes/channels.php`에서 각 채널 인가: 구독자가 해당 행사에 `active`로 속하고 역할 조건을 만족하는지 `EventParticipant` 조회로 검증.
+
+> **연락처 노출 최소화**: 신고자 연락처가 실리는 `control` 채널은 **상황실(controller)·시스템 admin 전용**이다. 구급대원은 control을 구독하지 않고, 배정받은 건만 `event.{id}.dispatch.{userId}` 채널로(연락처 포함, 본인 지령 한정) 받으며, 현장 지도 맥락은 연락처가 없는 `event.{id}.locations` presence 채널로 받는다. 이로써 배정되지 않은 신고의 신고자 연락처가 전체 구급대원에게 팬아웃되지 않는다.
 
 > 기존 `RequestCreated`는 `new Channel('requests')` + `PrivateChannel('rescuers')`로 하드코딩됨. → **행사 스코프 채널**(`event.{projectId}.control`)로 변경 필요. `broadcastOn()` 수정.
 

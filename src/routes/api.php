@@ -14,5 +14,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/requests/{id}', [RequestApiController::class, 'show'])->name('api.requests.show');
     Route::put('/requests/{id}', [RequestApiController::class, 'update'])->name('api.requests.update');
     Route::delete('/requests/{id}', [RequestApiController::class, 'destroy'])->name('api.requests.destroy');
-    Route::get('/requests/{id}/assign', [RequestApiController::class, 'assign'])->name('api.requests.assign');
+    // 구조대원 배정. 실시간 지령 에픽에서 POST /requests/{id}/dispatch 로 대체 예정(ADR-0003).
+    Route::post('/requests/{id}/assign', [RequestApiController::class, 'assignRescuer'])->name('api.requests.assign');
 });
