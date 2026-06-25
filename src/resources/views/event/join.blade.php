@@ -134,11 +134,14 @@
             },
             mounted() {
                 // QR 딥링크 진입 시 서버가 넣어준 코드 프리필 → 자동 미리보기
-                const prefill = (this.$el.dataset.prefill || '').toUpperCase();
-                if (prefill) {
-                    this.code = prefill;
-                    this.lookup();
-                }
+                // 템플릿이 다중 루트라 this.$el은 fragment placeholder(텍스트 노드) → 컨테이너에서 직접 읽는다
+                const root = document.getElementById('eventJoinApp');
+                const prefill = (root?.dataset.prefill || '').toUpperCase();
+                if (!prefill) return;
+                this.code = prefill;
+                // window.axios는 deferred 모듈(bootstrap.js)에서 로드되어 인라인 mounted보다 늦으므로, 준비될 때까지 대기 후 자동 미리보기
+                const waitAxios = () => window.axios ? this.lookup() : setTimeout(waitAxios, 50);
+                waitAxios();
             },
             methods: {
                 // 역할 코드 → 한글 라벨 (EventRole 과 동기화. 백엔드가 단일 출처지만 표시용 매핑)

@@ -941,8 +941,15 @@
 
                 // Echo 구독 시도. window.Echo 없거나 실패하면 폴링 폴백으로 전환.
                 initRealtime() {
+                    // window.Echo는 deferred 모듈(app.js→bootstrap.js)에서 생성되어 인라인 mounted보다 늦게 준비됨.
+                    // 즉시 폴백하면 실시간이 항상 죽으므로 최대 ~3초 대기 후 판정한다.
                     if (!window.Echo) {
-                        console.warn('[realtime] Echo 미초기화 — 폴링 폴백');
+                        this._echoWaitTicks = (this._echoWaitTicks || 0) + 1;
+                        if (this._echoWaitTicks <= 60) {
+                            setTimeout(() => this.initRealtime(), 50);
+                            return;
+                        }
+                        console.warn('[realtime] Echo 미초기화(타임아웃) — 폴링 폴백');
                         this.startRealtimePolling();
                         return;
                     }
