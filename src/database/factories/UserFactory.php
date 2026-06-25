@@ -26,6 +26,8 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            // 전화번호 인증 도메인: phone 은 NOT NULL + unique. 010 + 8자리 유니크 시퀀스.
+            'phone' => '010'.fake()->unique()->numerify('########'),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),

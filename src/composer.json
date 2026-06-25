@@ -10,6 +10,7 @@
         "endroid/qr-code": "^6.0",
         "laravel/fortify": "^1.27",
         "laravel/framework": "^12.0",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.21",
         "laravel/tinker": "^2.10.1",

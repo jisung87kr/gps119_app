@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // 실시간 관제: 브로드캐스팅 채널 인가 라우트 등록 (ADR-0001 / SPEC-05)
+    // reverb:install이 만들었다가 DevOps가 되돌린 배선을 BE-0.1에서 재작성.
+    ->withBroadcasting(__DIR__.'/../routes/channels.php')
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->group('web', [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,

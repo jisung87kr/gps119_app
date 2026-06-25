@@ -22,6 +22,46 @@ services:
     networks:
       - gps-network
 
+  # Laravel Reverb WebSocket 데몬 (OPS-01). app 과 동일 이미지/소스, command 만 오버라이드.
+  reverb:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    restart: unless-stopped
+    ports:
+      - "9055:8080"            # 호스트 9055 -> 컨테이너 8080 (개발용 WS 직노출)
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=password
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - gps-network
+
+  # 큐 워커 상시화 (OPS-04, QUEUE_CONNECTION=database). 메모리 누수 방지용 재기동 옵션 포함.
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php artisan queue:work database --queue=default --sleep=1 --tries=3 --max-time=3600
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=password
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - gps-network
+
   db:
     image: mysql:8.3
     ports:

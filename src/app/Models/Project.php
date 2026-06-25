@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class Project extends Model
 {
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -39,14 +40,14 @@ class Project extends Model
 
                 // 한글 등으로 slug가 빈 문자열이 된 경우 랜덤 문자열 생성
                 if (empty($project->slug)) {
-                    $project->slug = 'project-' . Str::random(8);
+                    $project->slug = 'project-'.Str::random(8);
                 }
 
                 // slug가 중복되는 경우 번호 추가
                 $originalSlug = $project->slug;
                 $count = 1;
                 while (static::where('slug', $project->slug)->exists()) {
-                    $project->slug = $originalSlug . '-' . $count;
+                    $project->slug = $originalSlug.'-'.$count;
                     $count++;
                 }
             }
@@ -74,6 +75,7 @@ class Project extends Model
         if ($this->end_date && $this->end_date->isPast()) {
             return false;
         }
+
         return $value;
     }
 
@@ -111,7 +113,7 @@ class Project extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true)
-                    ->where('status', 'active');
+            ->where('status', 'active');
     }
 
     public function scopeByStatus($query, $status)

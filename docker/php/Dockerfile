@@ -21,8 +21,8 @@ RUN apt-get update && apt-get install -y \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip soap
 
-# Enable apache rewrite module
-RUN a2enmod rewrite
+# Enable apache modules (rewrite + WebSocket reverse-proxy for Reverb)
+RUN a2enmod rewrite proxy proxy_http proxy_wstunnel headers
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
