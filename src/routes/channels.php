@@ -38,3 +38,25 @@ Broadcast::channel('event.{projectId}.control', function (User $user, int $proje
     // active 참가 + CONTROLLER 만 통과
     return $user->eventRoleIn($project) === EventRole::CONTROLLER;
 });
+
+// event.{projectId}.locations — 위치 presence 채널 (BE-2.2 / SPEC-05a)
+// 해당 행사 active 참가자면 누구나 통과(역할 무관). 시스템 admin 도 통과.
+// presence 인가 payload 는 {user_id, role} 만(연락처 없음).
+Broadcast::channel('event.{projectId}.locations', function (User $user, int $projectId) {
+    $project = Project::find($projectId);
+    if (! $project) {
+        return false;
+    }
+
+    // 시스템 admin: 관제 모니터링용 통과(역할은 표기상 controller 로 노출)
+    if ($user->hasRole('admin')) {
+        return ['user_id' => $user->id, 'role' => EventRole::CONTROLLER->value];
+    }
+
+    $role = $user->eventRoleIn($project); // active 만 역할 반환
+    if ($role === null) {
+        return false;
+    }
+
+    return ['user_id' => $user->id, 'role' => $role->value];
+});

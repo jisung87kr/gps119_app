@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\EventApiController;
+use App\Http\Controllers\Api\LocationApiController;
 use App\Http\Controllers\Api\RequestApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -26,4 +27,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // 현장 수동 역할 배정 — controller/admin 만
     Route::patch('/events/{id}/participants/{userId}', [EventApiController::class, 'assignRole'])
         ->middleware('event.role:controller')->name('api.events.participants.assign');
+
+    // 위치 (실시간 관제 — BE-2.1 / SPEC-06b)
+    // ping 수신: active 참가자(역할무관) + rate-limit(초당 1~2). 큐로 적재.
+    Route::post('/events/{id}/location', [LocationApiController::class, 'store'])
+        ->middleware(['event.member', 'throttle:2,1'])->name('api.events.location.store');
+    // 관제 roster: controller 만
+    Route::get('/events/{id}/participants', [LocationApiController::class, 'participants'])
+        ->middleware('event.role:controller')->name('api.events.participants.index');
+    // 위치공유 토글: active 참가자
+    Route::patch('/events/{id}/sharing', [LocationApiController::class, 'sharing'])
+        ->middleware('event.member')->name('api.events.sharing');
 });

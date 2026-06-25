@@ -35,7 +35,16 @@
 - **OI-3 적용**: `event_participants` 자식 FK는 `cascadeOnDelete` 유지. projects는 SoftDeletes라 소프트삭제 시 자식 cascade 안 됨(forceDelete 시에만) — 마이그레이션/모델 주석에 명시. 정리정책은 OPS lane.
 - **OI-4 적용**: 위치/공용 라우트의 "역할무관 active 참가자" 가드를 위해 `EnsureEventMember`(`event.member`) 신설. 역할 가드는 `EnsureEventRole`(`event.role:controller` 등).
 - **Q1 (사전명단 CSV)**: v1 풀 구현 안 함. `joinByCode`는 기본 `participant=active` + 수동배정(`PATCH /participants/{userId}`)으로 처리. 전화번호 기반 사전명단 CSV 매칭은 `EventParticipantService::joinByCode` 주석에 TODO stub만 남김(데이터소스 결정 후).
-- **이연 TODO**: `EnsureEventRole`의 dispatch 라우트({id}=dispatch) 해석은 Phase 3(BE-3.x)에서 확장. Phase 1은 project 라우트만 사용. `EventParticipantService::rosterForControl`(관제 초기 로드 1쿼리)은 위치 캐시가 필요한 Phase 2(BE-2.x)에서 구현.
+- **이연 TODO**: `EnsureEventRole`의 dispatch 라우트({id}=dispatch) 해석은 Phase 3(BE-3.x)에서 확장. Phase 1은 project 라우트만 사용.
+
+## Phase 2 구현 메모 (BE-2.1 / BE-2.2)
+
+- **OI-4 확정 사용**: 위치 ping(`POST .../location`)·sharing 토글은 `event.member`(역할무관 active) 가드. roster(`GET .../participants`)는 `event.role:controller`.
+- **SPEC-04c 적용**: `LocationService::record`가 ① `event_participants` 캐시 즉시 갱신 ② `PersistLocationPing` 큐 적재(append-only) ③ `ParticipantLocationUpdated` 브로드캐스트. `sharing_location=false`면 셋 다 스킵.
+- **rosterForControl 구현 완료**(BE-1.2에서 이연했던 것) — `EventParticipantService::rosterForControl`, active 참가 전원 last_lat/lng+role+online(`last_seen_at` 임계 60s) 1쿼리.
+- **BE-2.2 채널**: `ParticipantLocationUpdated`가 `event.{id}.locations`(presence) + `event.{id}.control`(private) 두 채널, 페이로드 `{user_id, role, latitude, longitude, accuracy, recorded_at}` — **연락처 없음**(ADR-0004). presence 인가는 active 참가자 통과 + `{user_id, role}` 반환.
+- **OI-7(위치이력 보존기간)**: 여전히 OPEN. `location_pings`는 append-only로 적재만, 자동파기 잡은 미구현(OPS lane / 법무 결정 대기). 마이그레이션 주석에 명시.
+- **rate-limit**: `POST .../location`에 `throttle:2,1`(초당 2) 적용(SPEC-06b "초당 1~2"). 부하검증 후 OPS에서 조정 가능.
 
 ## 처리 규칙
 - 사람 결정 5건은 소유자 합의 즉시 이 표에 `Decided: <결론>`으로 갱신하고, 막던 태스크를 해제한다.

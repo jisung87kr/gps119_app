@@ -97,4 +97,32 @@ class EventParticipantService
 
         return $participant;
     }
+
+    /**
+     * 관제 초기 로드/폴백용 roster (SPEC-04b/06b).
+     *
+     * active 참가 전원의 최신 위치 캐시 + 역할 + online 여부를 1쿼리로 반환.
+     * 이력(location_pings) 미조회 — event_participants 캐시만 사용.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function rosterForControl(Project $project, int $onlineThresholdSeconds = 60): array
+    {
+        $rows = EventParticipant::query()
+            ->forProject($project->id)
+            ->active()
+            ->with('user:id,name')
+            ->get();
+
+        return $rows->map(fn (EventParticipant $p) => [
+            'user_id' => $p->user_id,
+            'name' => $p->user?->name,
+            'role' => $p->role->value,
+            'status' => $p->status->value,
+            'last_lat' => $p->last_lat,
+            'last_lng' => $p->last_lng,
+            'last_seen_at' => $p->last_seen_at?->toISOString(),
+            'online' => $p->isOnline($onlineThresholdSeconds),
+        ])->all();
+    }
 }
