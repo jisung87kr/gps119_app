@@ -51,6 +51,34 @@ Route::get('/events/join/{joinCode}', function (string $joinCode) {
     return view('event.join', ['prefillCode' => strtoupper($joinCode)]);
 })->middleware(['auth'])->name('events.join.code');
 
+// 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
+// admin → 활성 행사 전체, controller → 본인이 active CONTROLLER 인 활성 행사만.
+Route::get('/control', function () {
+    $user = Auth::user();
+
+    if ($user->hasRole('admin')) {
+        $projects = \App\Models\Project::active()->orderByDesc('id')->get(['id', 'name']);
+    } else {
+        $projectIds = \App\Models\EventParticipant::query()
+            ->where('user_id', $user->id)
+            ->where('role', \App\Enums\EventRole::CONTROLLER->value)
+            ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
+            ->pluck('project_id');
+
+        $projects = \App\Models\Project::active()
+            ->whereIn('id', $projectIds)
+            ->orderByDesc('id')
+            ->get(['id', 'name']);
+
+        // controller 권한이 없거나 관제할 활성 행사가 없으면 차단
+        if ($projects->isEmpty()) {
+            abort(403, '관제 권한이 없습니다.');
+        }
+    }
+
+    return view('control.index', ['projects' => $projects]);
+})->middleware(['auth'])->name('control');
+
 Route::get('/dashboard', function () {
     $user = Auth::user();
 
