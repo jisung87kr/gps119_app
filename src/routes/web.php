@@ -1,16 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\SocialController;
+use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('request.create');
 });
 
 Route::get('/requests/create', function () {
-    if(!Auth::user()->phone){
+    if (! Auth::user()->phone) {
         // 회원정보 변경 페이지 리다이렉트
         return view('errors.require-phone');
     }
@@ -22,11 +22,11 @@ Route::get('/requests/create/{slug}', function ($slug) {
     $project = \App\Models\Project::where('slug', $slug)->firstOrFail();
 
     // 프로젝트가 활성화되어 있는지 확인
-    if (!$project->isActive()) {
+    if (! $project->isActive()) {
         return view('errors.project-inactive', compact('project'));
     }
 
-    if(!Auth::user()->phone){
+    if (! Auth::user()->phone) {
         return view('errors.require-phone', compact('project'));
     }
 
@@ -38,6 +38,18 @@ Route::get('/requests/{request}', function (\App\Models\Request $request) {
         'request' => $request,
     ]);
 })->middleware(['auth'])->name('request.show');
+
+// 행사 입장 (FE-1.1). auth 미들웨어가 미로그인 시 로그인으로 보내고 intended URL 보존 →
+// 폼 로그인(redirect()->intended)으로 같은 입장 지점 복귀. (소셜 로그인 복귀는 후속 TODO)
+Route::get('/events/join', function () {
+    return view('event.join');
+})->middleware(['auth'])->name('events.join');
+
+// QR 딥링크: join_code 를 URL 로 전달 → 코드 프리필 후 자동 미리보기.
+// (카메라 스캐너는 v1 범위 밖 — QR 는 이 URL 로 진입시키는 방식. 카메라 라이브러리는 후속 TODO)
+Route::get('/events/join/{joinCode}', function (string $joinCode) {
+    return view('event.join', ['prefillCode' => strtoupper($joinCode)]);
+})->middleware(['auth'])->name('events.join.code');
 
 Route::get('/dashboard', function () {
     $user = Auth::user();
