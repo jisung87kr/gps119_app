@@ -140,8 +140,13 @@ class Project extends Model
     // Scopes
     public function scopeActive($query)
     {
+        // 자동 비활성화(getIsActiveAttribute)·getComputedStatus 와 일치하도록 날짜로 판정한다.
+        // status 컬럼은 생성 시점값이라 종료된 행사에 'active'로 stale하게 남으므로 신뢰하지 않는다.
+        $now = now();
+
         return $query->where('is_active', true)
-            ->where('status', 'active');
+            ->where('start_date', '<=', $now)
+            ->where('end_date', '>=', $now);
     }
 
     public function scopeByStatus($query, $status)
