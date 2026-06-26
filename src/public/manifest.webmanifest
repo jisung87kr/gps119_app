@@ -1,0 +1,27 @@
+{
+    "name": "GPS119 — 위치공유 구조요청",
+    "short_name": "GPS119",
+    "description": "GPS 위치 기반 구조요청·실시간 관제 서비스",
+    "lang": "ko",
+    "dir": "ltr",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "theme_color": "#2563EB",
+    "background_color": "#ffffff",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

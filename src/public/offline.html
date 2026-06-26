@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오프라인 - GPS119</title>
+    <style>
+        body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
+               background:#f8fafc; color:#0f172a; font-family:system-ui,-apple-system,sans-serif; }
+        .box { text-align:center; padding:24px; }
+        .pin { width:64px; height:64px; margin:0 auto 16px; background:#2563EB; border-radius:16px;
+               display:flex; align-items:center; justify-content:center; }
+        .pin svg { width:36px; height:36px; color:#fff; }
+        h1 { font-size:20px; font-weight:800; margin:0 0 8px; }
+        p { color:#64748b; font-size:14px; margin:0 0 20px; }
+        button { background:#2563EB; color:#fff; border:0; padding:12px 24px; border-radius:12px;
+                 font-size:15px; font-weight:700; cursor:pointer; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="pin">
+            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+        </div>
+        <h1>오프라인 상태입니다</h1>
+        <p>인터넷 연결을 확인한 뒤 다시 시도해 주세요.<br>긴급 시에는 119로 전화하세요.</p>
+        <button onclick="location.reload()">다시 시도</button>
+    </div>
+</body>
+</html>
