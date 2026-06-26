@@ -36,6 +36,7 @@ export default {
             onlineCount: 0,
             requestCount: 0,
             wsState: 'connecting', // connecting | ws | polling
+            reportMenu: false,     // 기록 다운로드 메뉴(BE-4.1)
 
             // FE-3.3 지령 배정 패널
             assign: {
@@ -341,6 +342,11 @@ export default {
         boardCount(s) { return this.board.counts?.[s] || 0; },
         requestStatus(id) { return this.requestStatusMap[id] || null; },
 
+        // 기록 다운로드 URL(BE-4.1) — 세션 쿠키로 GET 다운로드
+        reportUrl(kind) {
+            return `/api/events/${this.selectedProjectId}/report/${kind}.csv`;
+        },
+
         _startPolling() {
             if (this._pollTimer) return;
             this.wsState = 'polling';
@@ -421,6 +427,17 @@ export default {
       </h1>
     </div>
     <div class="flex items-center gap-4 text-sm">
+      <!-- 기록 다운로드(BE-4.1) — controller/admin, 세션 쿠키로 GET -->
+      <div v-if="hasProject" class="relative" @mouseleave="reportMenu=false">
+        <button @click="reportMenu=!reportMenu" class="px-2.5 py-1 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 text-xs font-medium">
+          기록 ▾
+        </button>
+        <div v-if="reportMenu" class="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-20">
+          <a :href="reportUrl('requests')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">신고 기록 CSV</a>
+          <a :href="reportUrl('dispatches')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">지령 기록 CSV</a>
+          <a :href="reportUrl('tracks')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">동선 기록 CSV</a>
+        </div>
+      </div>
       <span class="text-gray-600">온라인 <b class="text-gray-900">{{ onlineCount }}</b></span>
       <span class="text-gray-600">신고 <b class="text-gray-900">{{ requestCount }}</b></span>
       <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"

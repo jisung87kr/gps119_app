@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\DispatchApiController;
 use App\Http\Controllers\Api\EventApiController;
+use App\Http\Controllers\Api\EventReportController;
 use App\Http\Controllers\Api\LocationApiController;
 use App\Http\Controllers\Api\RequestApiController;
 use Illuminate\Http\Request;
@@ -55,4 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // 출동 현황 보드: controller
     Route::get('/events/{id}/dispatches', [DispatchApiController::class, 'board'])
         ->middleware('event.role:controller')->name('api.events.dispatches');
+
+    // 기록 다운로드 (BE-4.1) — controller/admin, 스트리밍 CSV
+    Route::middleware('event.role:controller')->group(function () {
+        Route::get('/events/{id}/report/requests.csv', [EventReportController::class, 'requests'])->name('api.events.report.requests');
+        Route::get('/events/{id}/report/dispatches.csv', [EventReportController::class, 'dispatches'])->name('api.events.report.dispatches');
+        Route::get('/events/{id}/report/tracks.csv', [EventReportController::class, 'tracks'])->name('api.events.report.tracks');
+    });
 });
