@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\RequestPriority;
 use App\Enums\RequestStatus;
+use App\Enums\RequestType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -21,6 +22,7 @@ class RequestFactory extends Factory
             'longitude' => fake()->longitude(126.8, 127.2),
             'address' => fake()->streetAddress(),
             'description' => fake()->sentence(),
+            'type' => RequestType::OTHER,
             'status' => RequestStatus::PENDING,
             'priority' => RequestPriority::MEDIUM,
             'contact_phone' => '01012345678',

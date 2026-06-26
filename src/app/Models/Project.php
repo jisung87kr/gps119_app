@@ -96,6 +96,11 @@ class Project extends Model
         return $this->hasMany(EventParticipant::class);
     }
 
+    public function dispatches()
+    {
+        return $this->hasMany(Dispatch::class);
+    }
+
     // Accessors & Mutators
     public function getIsActiveAttribute($value)
     {

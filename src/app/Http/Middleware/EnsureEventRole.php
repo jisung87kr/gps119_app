@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Dispatch;
 use App\Models\Project;
+use App\Models\Request as RescueRequest;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,9 +14,10 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * 사용: event.role:controller  또는  event.role:paramedic,controller (콤마=OR)
  *
- * 행사 id 해석 (Phase 1은 project 라우트만 사용):
- *   - 라우트 파라미터 {id}/{project} 가 project → 직접 해석.
- *   - (Phase 3) dispatch 라우트 → Dispatch->project_id 로 해석 — BE-3.x 에서 확장.
+ * 행사 id 해석(08 문서):
+ *   - {requestId} → 신고의 project_id (신고 스코프 라우트: 지령 배정 등)
+ *   - {dispatch}  → 지령의 project_id (지령 스코프 라우트)
+ *   - {project}/{id} → 프로젝트 직접
  *
  * 판정: User::eventRoleIn($project) 가 허용 역할에 포함되거나 시스템 admin 이면 통과.
  */
@@ -53,13 +56,29 @@ class EnsureEventRole
      */
     private function resolveProject(Request $request): ?Project
     {
-        // 모델 바인딩으로 이미 Project 인스턴스가 들어온 경우
+        // 1. 신고 스코프({requestId}) → 신고의 행사
+        $reqParam = $request->route('requestId');
+        if ($reqParam !== null) {
+            $r = $reqParam instanceof RescueRequest ? $reqParam : RescueRequest::find($reqParam);
+
+            return $r?->project;
+        }
+
+        // 2. 지령 스코프({dispatch}) → 지령의 행사 (08 문서)
+        $dispatchParam = $request->route('dispatch');
+        if ($dispatchParam !== null) {
+            $d = $dispatchParam instanceof Dispatch ? $dispatchParam : Dispatch::find($dispatchParam);
+
+            return $d?->project;
+        }
+
+        // 3. 모델 바인딩으로 이미 Project 인스턴스가 들어온 경우
         $bound = $request->route('project');
         if ($bound instanceof Project) {
             return $bound;
         }
 
-        // {id} 또는 {project} 가 프로젝트 id(정수) 인 경우
+        // 4. {id} 또는 {project} 가 프로젝트 id(정수) 인 경우
         $id = $request->route('id') ?? $request->route('project');
         if ($id !== null) {
             return Project::find($id);

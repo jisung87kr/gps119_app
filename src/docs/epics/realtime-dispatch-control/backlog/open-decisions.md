@@ -46,6 +46,17 @@
 - **OI-7(위치이력 보존기간)**: 여전히 OPEN. `location_pings`는 append-only로 적재만, 자동파기 잡은 미구현(OPS lane / 법무 결정 대기). 마이그레이션 주석에 명시.
 - **rate-limit**: `POST .../location`에 `throttle:2,1`(초당 2) 적용(SPEC-06b "초당 1~2"). 부하검증 후 OPS에서 조정 가능.
 
+## Phase 3 구현 메모 (BE-3.1 / BE-3.2 / BE-3.3)
+
+- **BE-3.1**: `RequestType`(accident/breakdown/other/emergency) + `requests.type`(default other). `RequestService::createRequest`가 priority 미지정 시 `type->defaultPriority()` 매핑(EMERGENCY→CRITICAL/ACCIDENT→HIGH/BREAKDOWN→MEDIUM/OTHER→LOW), priority 명시 시 우선.
+- **BE-3.2**: `DispatchStatus` 전이표(assigned→accepted|rejected, accepted→en_route|rejected, en_route→arrived, arrived→completed; completed/rejected terminal). `DispatchService`가 requests.status 동기화 단일 출처.
+  - **OI-2 적용**: `DB::transaction` + `Request` 행 `lockForUpdate`로 동시 배정 직렬화 → 활성 지령 1건 보장(부분 유니크 인덱스 대신 비관적 락 권장안 채택).
+  - **OI-6 적용**: 동일 상태 재전송은 멱등 no-op(200, 예외 없음).
+  - **OI-8 적용**: 배정 단일 출처는 dispatch. `requests.assigned_rescuer_id`/`responded_at`은 레거시 — `responded_at`은 동기화에서 파생 세팅만, `assigned_rescuer_id`는 신규 흐름에서 미사용(레거시 assignRescuer만 세팅). 컬럼 제거는 추후.
+- **BE-3.3**: 이벤트 3종 — `DispatchAssigned`(개인 dispatch 채널, 연락처 포함) / `DispatchStatusUpdated`(control, 연락처 없음) / `RequestStatusUpdated`(requester 본인 채널, 담당자 연락처 포함). 서비스가 명시 발행(모델 훅 아님). 채널 인가: dispatch.{userId}=본인+수령가능역할, requester.{userId}=본인+신고이력(OI-5: 존재만 확인).
+- **EnsureEventRole 확장**: 라우트 {requestId}→신고→행사, {dispatch}→지령→행사 해석 추가(08 문서). 3중 방어(채널+미들웨어+서비스).
+- **이연**: 레거시 `POST /requests/{id}/assign`(assignRescuer)는 Deprecated 주석만(제거 X, Q6). reassign의 "controller 명시 회수"(active 강제 종료) 경로는 미구현 — 현재는 직전 지령이 terminal일 때만 재지령. FE(신고모달·구급대앱·관제배정UI·신고자추적)는 다음 단계.
+
 ## 처리 규칙
 - 사람 결정 5건은 소유자 합의 즉시 이 표에 `Decided: <결론>`으로 갱신하고, 막던 태스크를 해제한다.
 - 기술 결정 7건은 아키텍트/디자이너가 권장안대로 종결하되, 결과를 `architecture-spec.md`/`ux-tasks.md`에 반영한다.

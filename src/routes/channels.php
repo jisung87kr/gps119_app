@@ -60,3 +60,30 @@ Broadcast::channel('event.{projectId}.locations', function (User $user, int $pro
 
     return ['user_id' => $user->id, 'role' => $role->value];
 });
+
+// event.{projectId}.dispatch.{userId} — 구급대원 개인 지령 채널 (BE-3.3 / SPEC-05a)
+// 본인(auth id===userId) + 해당 행사 active 참가 + 지령 수령 가능 역할만.
+Broadcast::channel('event.{projectId}.dispatch.{userId}', function (User $user, int $projectId, int $userId) {
+    if ($user->id !== $userId) {
+        return false;
+    }
+    $project = Project::find($projectId);
+    if (! $project) {
+        return false;
+    }
+    $role = $user->eventRoleIn($project);
+
+    return $role !== null && $role->canReceiveDispatch();
+});
+
+// event.{projectId}.requester.{userId} — 신고자 본인 채널 (BE-3.3 / SPEC-05a)
+// 본인(auth id===userId) + 그 행사에 본인 신고 이력 보유(OI-5: 소유 신고 존재만 확인).
+Broadcast::channel('event.{projectId}.requester.{userId}', function (User $user, int $projectId, int $userId) {
+    if ($user->id !== $userId) {
+        return false;
+    }
+
+    return \App\Models\Request::where('project_id', $projectId)
+        ->where('user_id', $user->id)
+        ->exists();
+});

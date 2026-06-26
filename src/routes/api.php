@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\DispatchApiController;
 use App\Http\Controllers\Api\EventApiController;
 use App\Http\Controllers\Api\LocationApiController;
 use App\Http\Controllers\Api\RequestApiController;
@@ -38,4 +39,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // 위치공유 토글: active 참가자
     Route::patch('/events/{id}/sharing', [LocationApiController::class, 'sharing'])
         ->middleware('event.member')->name('api.events.sharing');
+
+    // 지령(출동) (실시간 관제 — BE-3.3 / SPEC-06b)
+    // 배정: 해당 신고 행사의 controller (event.role 은 {requestId}→신고→행사 해석)
+    Route::post('/requests/{requestId}/dispatch', [DispatchApiController::class, 'store'])
+        ->middleware('event.role:controller')->name('api.requests.dispatch');
+    // 가용 구급대원(거리순+보유지령수): controller
+    Route::get('/requests/{requestId}/available-paramedics', [DispatchApiController::class, 'availableParamedics'])
+        ->middleware('event.role:controller')->name('api.requests.available-paramedics');
+    // 상태 전이: paramedic 본인 또는 그 행사 controller (서비스가 권한 검사)
+    Route::patch('/dispatches/{id}/status', [DispatchApiController::class, 'updateStatus'])
+        ->name('api.dispatches.status');
+    // 본인 지령 목록
+    Route::get('/dispatches/mine', [DispatchApiController::class, 'mine'])->name('api.dispatches.mine');
+    // 출동 현황 보드: controller
+    Route::get('/events/{id}/dispatches', [DispatchApiController::class, 'board'])
+        ->middleware('event.role:controller')->name('api.events.dispatches');
 });
