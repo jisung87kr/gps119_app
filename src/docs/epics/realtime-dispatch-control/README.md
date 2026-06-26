@@ -5,6 +5,24 @@
 
 기존 GPS119(단발성 위치 공유 신고)를 **실시간 다중역할 현장 안전관제 플랫폼**으로 확장한다.
 
+## 구현 현황 (M0~M4 코드분 완료 ✅)
+
+> 2026-06 기준. 백엔드+프론트 코드분 구현 완료, 131 테스트 그린, 브라우저 검증 완료.
+> 계약/설계는 [`backlog/architecture-spec.md`](backlog/architecture-spec.md)·[ADR 0001~0004](../../adr/), 실행 단위는 [`backlog/impl-tasks.md`](backlog/impl-tasks.md), 미결 결정은 [`backlog/open-decisions.md`](backlog/open-decisions.md) 참조.
+
+| 마일스톤 | 상태 | 핵심 산출물 (대표 파일) |
+|----------|------|-------------------------|
+| **M0 — 실시간 기반** | ✅ | Reverb 채널 인가 배선(`bootstrap/app.php` `withBroadcasting` + `routes/channels.php`), `RequestCreated` 채널 분기(control/`requests.global`), `NotifyRescuers` 큐 전환, Echo 클라이언트(`resources/js/echo.js`) |
+| **M1 — 행사 입장·역할** | ✅ | `event_participants`/`projects.join_code` 마이그레이션, `EventRole`(7종)·`ParticipantStatus` enum, `EventParticipant` 모델, `EventParticipantService`, `EnsureEventRole`·`EnsureEventMember` 미들웨어, 입장 API(`EventApiController`) + 참가자 입장 화면(`event/join`, `event/active`) |
+| **M2 — 실시간 위치 관제** | ✅ | `location_pings` + `LocationPing`/`PersistLocationPing`(큐) + `LocationService`, 위치/roster/sharing API(`LocationApiController`), `ParticipantLocationUpdated`(presence+control), **웹 관제 SPA**(`resources/js/control/`, `/control`), 참가자 자동 위치공유(`public/js/components/locationShare.js`) |
+| **M3 — 신고 고도화·지령 상태머신** | ✅ | `requests.type`+`RequestType`, `dispatches`+`DispatchStatus`+`Dispatch`, `DispatchService`(전이검증·`requests.status` 동기화·활성지령 1건 락), `DispatchApiController`, 이벤트 3종(`DispatchAssigned`/`DispatchStatusUpdated`/`RequestStatusUpdated`), 관제 배정 패널·출동보드, 구급대원 앱(`dispatch/index`), 주소확인 모달(`request/_confirm-modal`), 신고자 상태추적(`RequestShowApp.js`) |
+| **M4 — 마감·운영(코드분)** | ✅ | 기록 다운로드 CSV(`EventReportController`, requests/dispatches/tracks), **PWA 셸**(`public/manifest.webmanifest`·`sw.js`·`offline.html`·아이콘, `resources/js/pwa.js`) |
+
+**남은 것 / 범위 밖:**
+- **결정 대기(미구현)**: Q2/OI-7 위치이력 보존기간·자동파기 정책(개인정보·법무), Q4 동시 행사 규모·Reverb 스케일링(부하검증 후). `location_pings`는 적재만 하고 자동 파기 잡 없음.
+- **범위 밖(이번 에픽 비대상)**: Capacitor 하이브리드 래핑, FCM 백그라운드 푸시(현재 Reverb 인앱 실시간만), 네이티브 스토어 배포, 결제/다국어.
+- **이연 TODO(코드 주석)**: 출동대원→신고핀 폴리라인(`control-map-spec §3③`), `GET /dispatches/mine` 응답에 신고자 연락처 미포함, PWA 아이콘은 GD 생성 플레이스홀더(브랜드 교체 예정), 레거시 `POST /requests/{id}/assign`·`requests.assigned_rescuer_id` Deprecated.
+
 ## 산출물 구성 (3 surface)
 
 | # | 산출물 | 대상 | 형태 |

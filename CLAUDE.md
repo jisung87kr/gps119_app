@@ -20,13 +20,25 @@ GPS119 — an emergency rescue-request web app. A regular user shares their GPS 
 
 **End-to-end flow:** organizer creates a project → issues URL/QR → posts it at the venue → participant scans, logs in (phone), pulls current location via Kakao Maps, taps a situation button → `Request` created → `RequestCreated` event notifies rescuers/admins (+ Discord webhook) → rescuer assigns (in_progress) and navigates via Kakao Map → requester watches status on the dashboard.
 
-**Spec vs. reality.** PROMPT.MD and `EPIC-project-management.md` are the original specs; some planned items are not built. Notably there is **no `project_user` table** — "per-project dedicated rescuers" isn't implemented; new-request notifications fan out to *all* rescuers/admins by role. Per-project time-series charts and map-view project filtering are likewise not present. Treat the manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`) as the source of truth for intended UX, and the code for what actually ships.
+**Realtime dispatch & control (implemented, M0–M4).** The original GPS119 (one-shot location share) has been extended into a **realtime event-scoped dispatch platform** — see `src/docs/epics/realtime-dispatch-control/`. What now ships beyond the base concepts above:
+- **Event-scoped roles via `event_participants` pivot** (the old "no `project_user` table" note is obsolete). Participants join a project by a 6-char `join_code` and hold an `EventRole` (participant/staff/police/volunteer_course/volunteer_medic/paramedic/controller). This is *separate* from the spatie system roles.
+- **Live broadcasting over Laravel Reverb** (presence + private channels), replacing the old log-only best-effort path.
+- **Dispatch state machine** (`dispatches` table + `DispatchService`) replaces single-field assignment as the source of truth for who is responding.
+- **Realtime location tracking** (`location_pings`), a **web control SPA** (`/control`), **event record CSV exports**, and a **PWA shell** were added.
+
+Still pending / out of scope: data-retention auto-purge for `location_pings` (Q2 policy undecided), multi-event scale tuning (Q4), and Capacitor/FCM background push. `requests.assigned_rescuer_id`/`responded_at` are legacy (dispatch is now authoritative). Treat the manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`) and the epic backlog as the source of truth for intended UX, and the code for what actually ships.
 
 ## Layout & Docker
 
 The Laravel application lives in **`src/`**, not the repo root. The repo root holds only Docker config and manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`, `EPIC-project-management.md`). `src/PROMPT.MD` is the original product spec.
 
-The app runs in Docker (`docker-compose.yml` at root): **PHP/Apache** in container `gps119_app-app-1`, **MySQL 8.3** in `gps119_app-db-1`. `src/` is bind-mounted into the web container at `/var/www/html`. Host ports: app `9050→80`, Vite `9093`, MySQL `9052→3306`.
+The app runs in Docker (`docker-compose.yml` at root), **four services** all built from the same `docker/php/Dockerfile` and sharing the `src/` bind-mount at `/var/www/html`:
+- **app** (`gps119_app-app-1`) — PHP/Apache web server. Apache also reverse-proxies WebSocket upgrades (`/app`) to the reverb service.
+- **reverb** (`gps119_app-reverb-1`) — Laravel Reverb WebSocket daemon (`php artisan reverb:start`), container port `8080`.
+- **queue** (`gps119_app-queue-1`) — queue worker (`php artisan queue:work database`) processing broadcasts + the `NotifyRescuers` listener.
+- **db** (`gps119_app-db-1`) — MySQL 8.3.
+
+Host ports: app `9050→80`, Vite `9093`, **Reverb WS `9055→8080`** (dev-direct), MySQL `9052→3306`. The browser connects Echo to `9055` (`VITE_REVERB_PORT=9055`); inside the network the app reaches reverb at host `reverb:8080`. `BROADCAST_CONNECTION=reverb`, `QUEUE_CONNECTION=database`.
 
 **Run all `artisan`/`composer`/`npm` commands inside the app container**, e.g.:
 
@@ -46,19 +58,33 @@ Note: `.env.example` defaults to `sqlite`, but the real `src/.env` points at the
 
 ## Architecture
 
-**Stack:** Laravel 12 / PHP 8.2, MySQL, Blade + Vue 3 (loaded per-page from a CDN), Tailwind 4 via Vite, Kakao Maps JS API.
+**Stack:** Laravel 12 / PHP 8.2, MySQL, Blade + Vue 3 (per-page from a CDN; the `/control` SPA is the one exception — a Vite-bundled Vue app), Tailwind 4 via Vite, Kakao Maps JS API, **Laravel Reverb** (WebSocket) + Laravel Echo, **Sanctum**.
 
 **Auth & roles.** Authentication is Laravel **Fortify** (not Breeze, despite PROMPT.MD), customized in `app/Providers/FortifyServiceProvider.php`: regular users log in by **phone number** (digits only — `User::setPhoneAttribute` strips formatting), admins by **email**. **Sanctum** secures the `/api/*` routes. **Socialite** handles Naver/Kakao login (providers registered in `AppServiceProvider::boot`). Authorization uses **spatie/laravel-permission** with three roles — `user`, `rescuer`, `admin` — seeded by `RolePermissionSeeder` (also creates `admin@admin.com`). Code checks `$user->hasRole('admin'|'rescuer')` directly; admin web routes are additionally gated by the `admin` middleware alias (`App\Http\Middleware\AdminMiddleware`).
 
 **Request flow & layering.** Business logic lives in **`app/Services/RequestService.php`**; controllers stay thin. The web `/requests/*` and `/dashboard` routes are mostly **closures defined inline in `routes/web.php`** (not controllers) — that file is the source of truth for page behavior. The JSON API (`routes/api.php` → `app/Http/Controllers/Api/RequestApiController.php`) delegates to `RequestService` and returns a uniform envelope via the `response()->success()` / `response()->error()` **macros defined in `AppServiceProvider::boot`** — use these for all API responses.
 
-**Events / real-time.** Creating a `Request` fires `RequestCreated` from the model's `booted()` `created` hook (`app/Models/Request.php`). `RequestCreated implements ShouldBroadcast` (channels `requests`, private `rescuers`) and is auto-discovered by the `NotifyRescuers` listener, which logs, notifies rescuers/admins, and posts to a **Discord webhook** (`DISCORD_WEBHOOK_URL`). `BROADCAST_CONNECTION` defaults to `log` and the queue listener is currently disabled in the listener — treat broadcasting/notifications as best-effort, synchronous side effects.
+**Events / real-time (live over Reverb).** Broadcasting runs on **Laravel Reverb** (`BROADCAST_CONNECTION=reverb`); channel authorization is wired via `->withBroadcasting(routes/channels.php)` in `bootstrap/app.php`. Channels (`routes/channels.php`):
+- `requests.global` (private) — generic non-event requests; system admin/rescuer.
+- `event.{projectId}.control` (private) — situation room; active `EventRole::CONTROLLER` **or** system admin.
+- `event.{projectId}.locations` (presence) — any active participant; presence payload is `{user_id, role}` only.
+- `event.{projectId}.dispatch.{userId}` (private) — the assigned paramedic only (own id + `canReceiveDispatch`).
+- `event.{projectId}.requester.{userId}` (private) — the requester only (own id + owns a request in the event).
 
-**Projects.** `Project` (soft-deleted) models QR-code rescue campaigns: auto-generates a unique `slug` and computed `status` on create, and auto-deactivates past `end_date`. Public entry point is `/requests/create/{slug}`; admins manage projects, QR codes, cloning, and CSV export under `/admin/*`.
+Broadcast events live in `app/Events`: `RequestCreated` (→ `event.{id}.control` when `project_id` set, else `requests.global`), `ParticipantLocationUpdated` (locations + control), `DispatchAssigned` (→ dispatch.{userId}, includes requester contact), `DispatchStatusUpdated` (→ control, no contact), `RequestStatusUpdated` (→ requester.{userId}, includes assigned paramedic contact). **Contact-in-payload rule (ADR-0004):** only the control / personal-dispatch / requester channels carry phone numbers. `RequestCreated` still fires from the model `created` hook; the `NotifyRescuers` listener now `implements ShouldQueue` (runs on the queue worker) — logs, notifies, and posts the **Discord webhook** (`DISCORD_WEBHOOK_URL`). Frontend `window.Echo` is initialized in `resources/js/echo.js` (imported by `bootstrap.js`).
 
-**Enums.** Domain enums live in `app/Enums` (`RequestStatus`, `RequestPriority`) as backed string enums and carry **view helpers** (`label()`, `badgeClasses()`, `dotClass()`, `isActive()`) — render status/priority through these rather than hardcoding Korean strings or Tailwind classes. They're cast on the model, so query scopes and comparisons use the enum cases.
+**Event participation & dispatch (the realtime epic core).**
+- `EventParticipant` (`event_participants`) ties a `User` to a `Project` with an `EventRole` + `ParticipantStatus` (pending/active/left), plus `sharing_location` and `last_lat/lng/last_seen_at` location cache. `User::eventRoleIn(Project)` returns the active role (single source for guards). Web join flow: `/events/join`, `/events/join/{joinCode}`, `/events/{id}/active`.
+- Two middleware aliases gate event routes: **`event.role:controller`** (`EnsureEventRole` — resolves the project from `{requestId}`/`{dispatch}`/`{id}`, allows the listed `EventRole`s or system admin) and **`event.member`** (`EnsureEventMember` — any active participant).
+- **Location pipeline:** `POST /api/events/{id}/location` (`event.member`, `throttle:2,1`) → `LocationService::record` updates the participant cache, queues a `PersistLocationPing` job into `location_pings` (append-only, no timestamps), and broadcasts `ParticipantLocationUpdated`. `sharing_location=false` short-circuits all three.
+- **Dispatch state machine:** `Dispatch` (`dispatches`) + `DispatchService::assign/transition/reassign`. `DispatchStatus` (assigned→accepted→en_route→arrived→completed, plus rejected) enforces `allowedTransitions()`; transitions run in a `lockForUpdate` transaction (one active dispatch per request), are idempotent on same-status, and **DispatchService is the single writer of `requests.status`** (accepted/en_route/arrived→in_progress, completed→completed, rejected→unchanged). Endpoints: `POST /api/requests/{requestId}/dispatch`, `GET /api/requests/{requestId}/available-paramedics`, `PATCH /api/dispatches/{id}/status`, `GET /api/dispatches/mine`, `GET /api/events/{id}/dispatches`.
+- **Reports:** `EventReportController` streams CSV (UTF-8 BOM, `fputcsv` + chunked) at `GET /api/events/{id}/report/{requests,dispatches,tracks}.csv` (`event.role:controller`).
 
-**Frontend convention.** Pages are Blade views; interactive map pages (`request/create*`, `request/show`, `admin/requests/index`) pull **Vue 3 from `unpkg.com`** and `createApp(...).mount('#app')` inline per page (no SPA build, no app-wide Vue bundle). Shared map logic and the Kakao Maps integration live in page scripts. Layouts are in `resources/views/components/layouts` (`app`, `admin`).
+**Projects.** `Project` (soft-deleted) models QR-code rescue campaigns: auto-generates a unique `slug`, a 6-char `join_code`, and computed `status` on create, and auto-deactivates past `end_date`. Public request entry is `/requests/create/{slug}`; admins manage projects, QR codes, cloning, and CSV export under `/admin/*`.
+
+**Enums.** Domain enums live in `app/Enums` as backed string enums with **view helpers** (`label()`, `badgeClasses()`, `dotClass()`, etc.): `RequestStatus`, `RequestPriority`, `RequestType` (accident/breakdown/other/emergency, `defaultPriority()`), `EventRole` (7 roles, `markerColor()`/`canReceiveDispatch()`/`canDispatch()`), `ParticipantStatus`, `DispatchStatus` (`allowedTransitions()`/`syncsRequestStatus()`). They're cast on models — render through the helpers; query/compare with the enum cases. Some frontend code mirrors these maps in JS (clearly commented) since the browser can't call PHP enums.
+
+**Frontend convention.** Pages are Blade views; interactive map pages (`request/create*`, `request/show`, `event/*`, `dispatch/*`, `admin/requests/index`) pull **Vue 3 from `unpkg.com`** and `createApp(...).mount('#X')` inline per page. **Exception:** the web control SPA (`/control`) is a **Vite-bundled** Vue app (`resources/js/control/main.js`, added to `vite.config.js` input) — keep it separate from the per-page CDN pattern and from the `app.js` entry. Shared participant JS modules live in `public/js/components/` (e.g. `locationShare.js`, `dispatchMeta.js`, `kakaoNavi.js`). PWA assets are in `public/` (`manifest.webmanifest`, `sw.js`, `offline.html`, `icon-192/512.png`), registered by `resources/js/pwa.js` (imported by `app.js`) and linked from the `app` layout only. Layouts are in `resources/views/components/layouts` (`app`, `admin`); `/control` uses its own full-bleed shell.
 
 ## Conventions (from PROMPT.MD)
 
