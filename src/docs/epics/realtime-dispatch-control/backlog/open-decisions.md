@@ -62,7 +62,14 @@
 - **FE-3.3(관제 SPA 확장)**: 신고목록 행 `[배정]`/`[재배정]` → 우측 슬라이드 패널(권장안). `available-paramedics`(online·거리순+보유지령수 배지) 선택+메모 → `POST dispatch`. 출동보드: 진입 시 `GET dispatches` + control 채널 `dispatch.updated` 수신마다 보드 재조회(저빈도, controller 전용). 동시배정 422 → "이미 배정된 신고" 안내. 신고 연락처는 배정 패널/신고 펼침에서만(ADR-0004).
 - **FE-3.2(구급대원 앱)**: 신규 web `/events/{id}/dispatch`(가드: active + canReceiveDispatch). `dispatch.assigned`(개인 채널) 수신 → 풀스크린 + `navigator.vibrate` + WebAudio 비프(asset 없이). 전이 버튼은 `nextStatuses(status)`(allowedTransitions 미러)만 렌더 → `PATCH status`. 거절 사유 필수 모달(assigned/accepted만). 출동 시 카카오내비 딥링크(신고 **고정좌표**, 미설치 웹 폴백). 위치공유(FE-2.2 locationShare) 재사용. 연락처는 실시간 assigned 페이로드(본인 배정건)만 — `mine` 엔 미포함(백엔드 동결).
 - **클라 미러**: DispatchStatus 전이표/뱃지·RequestType 메타를 control `roleMeta.js`·`public/js/dispatchMeta.js`에 미러(백엔드 단일출처 enum과 동기, 주석 명시). 최종 검증은 서버 PATCH.
-- **이연/TODO**: ① `mine` 응답에 본인 배정건 신고자 연락처 미포함 → 새로고침 후엔 전화 슬롯 비표시(백엔드 확장 시 보강). ② FE-3.1(신고 type 모달)·FE-3.4(신고자 추적)는 다음 웨이브. ③ 출동대원→신고핀 폴리라인(control-map §3③)은 미구현.
+- **이연/TODO**: ① `mine` 응답에 본인 배정건 신고자 연락처 미포함 → 새로고침 후엔 전화 슬롯 비표시(백엔드 확장 시 보강). ② 출동대원→신고핀 폴리라인(control-map §3③)은 미구현.
+
+## Wave 2b 구현 메모 (FE-3.1 신고 모달·유형 / FE-3.4 신고자 추적)
+
+- **FE-3.1**: `RequestMapApp.js` 의 `confirm('위치공유...')` → "이 위치가 맞습니까?" 모달(역지오코딩 **주소 텍스트** + Kakao **StaticMap** 미리보기 + 주소재검색/지도보정 + 확인/취소). 상황 버튼 → `RequestType`(사고=accident/고장=breakdown/기타=other) `openConfirm` → `POST /api/requests {type,...,contact_phone}`. **긴급전화=모달 없이 즉시 `tel:`**(projects.settings.emergency_tel 있으면 사용, 없으면 기본). 접수완료 화면에 [내 신고 상태 보기]+[상황실 전화]. 모달/완료 마크업은 공유 partial `request/_confirm-modal.blade.php` 로 **#app 내부** include(QA 교훈 #1). 역지오코딩 실패/저정확도여도 좌표로 신고 가능(막힘 방지).
+- **FE-3.4**: `RequestShowApp.js` 가 `event.{projectId}.requester.{userId}` 구독 → `request.status.updated` 로 **접수→구조 진행중→완료 3단계 타임라인** + 담당자 이름·전화 실시간 갱신. 행사 신고(project_id 有)만 활성. 배정 전=상황실 번호/배정 후=담당자 번호 자동 전환. WS 끊김 → `GET /api/requests/{id}` 15초 폴링 + "갱신 지연중" 배너. 초기 담당자 정보는 show 라우트에서 `activeDispatch.paramedic` eager-load 로 plumbing(웹 뷰 데이터, 채널 계약 무변경). 자가취소 불가 정책 안내 유지.
+- **QA 교훈 반영**: 모달/오버레이 전부 마운트 루트(#app) 내부, 옵션은 함수 인자(`$el.dataset` 미사용), `window.axios/Echo` 준비 최대 3초 대기 후 사용. 전역 훅 `window.__requestShow`.
+- **이연**: StaticMap 미리보기의 핀 드래그 보정은 미구현 — 대신 "지도에서 보정"(모달 닫고 본 지도 탭) + "주소 다시 검색"으로 대체(QA 리스크 회피). 신고자 타임라인 세부 전이(수락/출동/도착) 펼침은 3단계 묶음으로 단순화(권장안).
 
 ## 처리 규칙
 - 사람 결정 5건은 소유자 합의 즉시 이 표에 `Decided: <결론>`으로 갱신하고, 막던 태스크를 해제한다.

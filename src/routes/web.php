@@ -34,6 +34,9 @@ Route::get('/requests/create/{slug}', function ($slug) {
 })->middleware(['auth'])->name('request.create.project');
 
 Route::get('/requests/{request}', function (\App\Models\Request $request) {
+    // FE-3.4: 신고자 상태추적용 담당자/상황실 정보 동봉(웹 뷰 데이터 — 실시간 갱신은 채널)
+    $request->load(['activeDispatch.paramedic', 'project']);
+
     return view('request.show', [
         'request' => $request,
     ]);
