@@ -99,12 +99,16 @@
                     </div>
 
                     <div class="mt-6 space-y-3">
-                        <a href="{{ route('request.create') }}"
+                        <a v-if="joined.status === 'active'" :href="`/events/${joined.project_id}/active`"
                            class="w-full inline-flex justify-center items-center py-3.5 px-4 text-base font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition">
+                            위치 공유 시작
+                        </a>
+                        <a href="{{ route('request.create') }}"
+                           class="w-full inline-flex justify-center items-center py-3 px-4 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
                             구조요청 화면으로
                         </a>
                         <a href="{{ route('dashboard') }}"
-                           class="w-full inline-flex justify-center items-center py-3 px-4 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
+                           class="w-full inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-xl text-slate-500 hover:text-slate-700 transition">
                             대시보드로
                         </a>
                     </div>
@@ -193,6 +197,7 @@
                             role: d.participant.role,
                             status: d.participant.status,
                             project_name: d.project.name,
+                            project_id: d.project.id,
                         };
                         this.step = 'joined';
                     } catch (e) {

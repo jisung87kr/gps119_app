@@ -51,6 +51,24 @@ Route::get('/events/join/{joinCode}', function (string $joinCode) {
     return view('event.join', ['prefillCode' => strtoupper($joinCode)]);
 })->middleware(['auth'])->name('events.join.code');
 
+// 참가자 활동 화면 (FE-2.2): 위치 자동공유 시작/토글. 가드: 해당 행사 active 참가자.
+Route::get('/events/{id}/active', function ($id) {
+    $user = Auth::user();
+    $project = \App\Models\Project::findOrFail($id);
+
+    $role = $user->eventRoleIn($project); // active 참가만 역할 반환
+    if ($role === null) {
+        // 미참가/pending → 입장 화면으로 유도
+        return redirect()->route('events.join');
+    }
+
+    return view('event.active', [
+        'project' => $project,
+        'role' => $role->value,
+        'roleLabel' => $role->label(),
+    ]);
+})->middleware(['auth'])->name('events.active');
+
 // 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
 // admin → 활성 행사 전체, controller → 본인이 active CONTROLLER 인 활성 행사만.
 Route::get('/control', function () {
