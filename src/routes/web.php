@@ -69,6 +69,26 @@ Route::get('/events/{id}/active', function ($id) {
     ]);
 })->middleware(['auth'])->name('events.active');
 
+// 구급대원 지령 앱 (FE-3.2). 가드: 해당 행사 active + 지령 수령 가능 역할(paramedic/volunteer_medic).
+Route::get('/events/{id}/dispatch', function ($id) {
+    $user = Auth::user();
+    $project = \App\Models\Project::findOrFail($id);
+
+    $role = $user->eventRoleIn($project);
+    if ($role === null) {
+        return redirect()->route('events.join'); // 미참가 → 입장
+    }
+    if (! $role->canReceiveDispatch()) {
+        return redirect()->route('events.active', $project->id); // 수령 역할 아님 → 활동화면
+    }
+
+    return view('dispatch.index', [
+        'project' => $project,
+        'role' => $role->value,
+        'roleLabel' => $role->label(),
+    ]);
+})->middleware(['auth'])->name('events.dispatch');
+
 // 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
 // admin → 활성 행사 전체, controller → 본인이 active CONTROLLER 인 활성 행사만.
 Route::get('/control', function () {

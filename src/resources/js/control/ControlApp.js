@@ -1,9 +1,12 @@
-// 웹 관제 SPA — Vue 옵션 객체 (FE-2.1 / control-map-spec).
-// 인원 마커 풀 + 신고 고정핀 + 역할필터 + 실시간(presence/control) + 폴링 폴백.
-// 출동현황 보드/지령 배정/폴리라인은 Phase 3 — 자리만 비워둠.
+// 웹 관제 SPA — Vue 옵션 객체 (FE-2.1 + FE-3.3).
+// 인원 마커 풀 + 신고 고정핀 + 역할필터 + 실시간(presence/control) + 폴링 폴백
+// + 지령 배정 패널 + 출동현황 보드(FE-3.3).
 
 import { PersonMarkerPool, RequestPinLayer } from './markerPool';
-import { ROLE_ORDER, ROLE_META, roleMeta, priorityMeta } from './roleMeta';
+import {
+    ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
+    dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta,
+} from './roleMeta';
 
 const POLL_INTERVAL_MS = 12000;
 const KAKAO_KEY = '509c2656c00fa9af4782197a888763f6';
@@ -28,10 +31,27 @@ export default {
 
             requests: [],          // 라이브 신고(최신 우선)
             expandedRequestId: null,
+            requestStatusMap: {},  // request_id -> dispatch status(배정후 신고행 표시용)
 
             onlineCount: 0,
             requestCount: 0,
             wsState: 'connecting', // connecting | ws | polling
+
+            // FE-3.3 지령 배정 패널
+            assign: {
+                open: false,
+                request: null,     // 대상 신고(payload)
+                paramedics: [],     // 가용 대원
+                selectedId: null,
+                note: '',
+                loading: false,
+                submitting: false,
+                error: '',
+            },
+
+            // FE-3.3 출동현황 보드
+            dispatchStatusOrder: DISPATCH_STATUS_ORDER,
+            board: { counts: {}, active: [], history: [], loading: false },
         };
     },
 
@@ -54,6 +74,8 @@ export default {
         if (this.projects.length === 1) {
             this.selectProject(this.projects[0].id);
         }
+        // 브라우저 QA용 전역 노출
+        window.__control = this;
     },
 
     beforeUnmount() {
@@ -65,6 +87,9 @@ export default {
         roleColor(role) { return roleMeta(role).color; },
         priorityLabel(p) { return priorityMeta(p).label; },
         priorityColor(p) { return priorityMeta(p).color; },
+        dispatchLabel(s) { return dispatchStatusMeta(s).label; },
+        dispatchBadge(s) { return dispatchStatusMeta(s).badge; },
+        typeLabel(t) { return requestTypeMeta(t).label; },
 
         async selectProject(id) {
             if (id == null) return;
@@ -74,6 +99,8 @@ export default {
             this._teardownRealtime();
             this.requests = [];
             this.requestCount = 0;
+            this.requestStatusMap = {};
+            this.closeAssign();
 
             await this._ensureMap();
             if (!this.mapReady) return;
@@ -84,6 +111,7 @@ export default {
             this._applyFilterToPool();
 
             await this.fetchRoster(true);
+            await this.loadBoard();
             this._subscribeRealtime();
         },
 
@@ -150,9 +178,10 @@ export default {
             // presence: 위치
             this._locCh = echo.join(`event.${pid}.locations`)
                 .listen('.participant.location', (e) => this._onLocation(e));
-            // private control: 신규 신고
+            // private control: 신규 신고 + 지령 상태 갱신
             this._ctrlCh = echo.private(`event.${pid}.control`)
-                .listen('.request.created', (e) => this._onRequestCreated(e));
+                .listen('.request.created', (e) => this._onRequestCreated(e))
+                .listen('.dispatch.updated', (e) => this._onDispatchUpdated(e));
 
             // 연결 상태 → 인디케이터 + 폴백
             const conn = echo.connector?.pusher?.connection;
@@ -213,6 +242,104 @@ export default {
             this.requests.unshift(payload);
             this.requestCount = this.requestPins.count();
         },
+
+        // ── FE-3.3: 지령 배정 패널 ──────────────────────────────
+        async openAssign(req) {
+            this.assign.open = true;
+            this.assign.request = req;
+            this.assign.selectedId = null;
+            this.assign.note = '';
+            this.assign.error = '';
+            this.assign.paramedics = [];
+            this.assign.loading = true;
+            try {
+                const res = await window.axios.get(
+                    `/api/requests/${req.request_id}/available-paramedics`,
+                    { headers: { Accept: 'application/json' } }
+                );
+                this.assign.paramedics = res.data.data || [];
+            } catch (e) {
+                this.assign.error = '가용 구급대원 조회에 실패했습니다.';
+            } finally {
+                this.assign.loading = false;
+            }
+        },
+
+        closeAssign() {
+            this.assign.open = false;
+            this.assign.request = null;
+            this.assign.paramedics = [];
+            this.assign.selectedId = null;
+            this.assign.note = '';
+            this.assign.error = '';
+            this.assign.submitting = false;
+        },
+
+        fmtDistance(m) {
+            if (m == null) return '거리 미상';
+            return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${m}m`;
+        },
+
+        async submitAssign() {
+            if (!this.assign.selectedId || this.assign.submitting) return;
+            this.assign.submitting = true;
+            this.assign.error = '';
+            try {
+                await window.axios.post(
+                    `/api/requests/${this.assign.request.request_id}/dispatch`,
+                    { paramedic_id: this.assign.selectedId, note: this.assign.note || null },
+                    { headers: { Accept: 'application/json' } }
+                );
+                // 신고행 상태 = 배정
+                this.requestStatusMap[this.assign.request.request_id] = 'assigned';
+                this.closeAssign();
+                await this.loadBoard();
+            } catch (e) {
+                const status = e.response?.status;
+                // OI-2 동시 배정 경합 → 422
+                this.assign.error = status === 422
+                    ? (e.response?.data?.message || '이미 배정된 신고입니다.')
+                    : (status === 403 ? '배정 권한이 없습니다.' : '지령 발령에 실패했습니다.');
+            } finally {
+                this.assign.submitting = false;
+            }
+        },
+
+        // ── FE-3.3: 출동 현황 보드 ──────────────────────────────
+        async loadBoard() {
+            if (!this.hasProject) return;
+            this.board.loading = true;
+            try {
+                const res = await window.axios.get(
+                    `/api/events/${this.selectedProjectId}/dispatches`,
+                    { headers: { Accept: 'application/json' } }
+                );
+                const d = res.data.data || {};
+                this.board.counts = d.counts || {};
+                this.board.active = d.active || [];
+                this.board.history = d.history || [];
+                // 신고행 상태 맵 갱신(활성 지령 기준)
+                const map = {};
+                (d.active || []).forEach((x) => { map[x.request_id] = x.status; });
+                this.requestStatusMap = map;
+            } catch (e) {
+                console.error('[control] 출동보드 조회 실패', e);
+            } finally {
+                this.board.loading = false;
+            }
+        },
+
+        _onDispatchUpdated(payload) {
+            // 실시간 상태 갱신: 보드 재조회(controller 전용, 저빈도) + 신고행 상태 반영
+            if (payload && payload.request_id) {
+                // rejected 면 재지령 필요 → 신고행 경고 표시
+                this.requestStatusMap[payload.request_id] = payload.status;
+            }
+            this.loadBoard();
+        },
+
+        boardCount(s) { return this.board.counts?.[s] || 0; },
+        requestStatus(id) { return this.requestStatusMap[id] || null; },
 
         _startPolling() {
             if (this._pollTimer) return;
@@ -390,15 +517,28 @@ export default {
           아직 접수된 신고가 없습니다.
         </div>
         <div v-for="req in requests" :key="req.request_id" class="border-b border-gray-50">
-          <button @click="toggleRequest(req.request_id)"
-                  class="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 text-left">
-            <span class="flex items-center gap-2 min-w-0">
+          <div class="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+            <button @click="toggleRequest(req.request_id)" class="flex items-center gap-2 min-w-0 text-left flex-1">
               <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :style="{ backgroundColor: priorityColor(req.priority) }"></span>
               <span class="text-sm font-medium">#{{ req.request_id }}</span>
-              <span class="text-xs text-gray-500">{{ priorityLabel(req.priority) }}</span>
-            </span>
-            <span class="text-xs text-gray-400">{{ fmtTime(req.created_at) }}</span>
-          </button>
+              <span class="text-xs text-gray-500">{{ typeLabel(req.type) }}</span>
+              <!-- 배정 상태 뱃지 -->
+              <span v-if="requestStatus(req.request_id)"
+                    class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(requestStatus(req.request_id))">
+                {{ dispatchLabel(requestStatus(req.request_id)) }}
+              </span>
+              <span v-if="requestStatus(req.request_id)==='rejected'" class="text-[10px] text-rose-600 font-semibold">재지령 필요</span>
+            </button>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <span class="text-xs text-gray-400">{{ fmtTime(req.created_at) }}</span>
+              <!-- 활성 배정 없으면 [배정], 거절상태면 [재배정] -->
+              <button v-if="!requestStatus(req.request_id) || requestStatus(req.request_id)==='rejected'"
+                      @click="openAssign(req)"
+                      class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium">
+                {{ requestStatus(req.request_id)==='rejected' ? '재배정' : '배정' }}
+              </button>
+            </div>
+          </div>
           <!-- 펼침: §7 연락처 노출 허용 -->
           <div v-if="expandedRequestId===req.request_id" class="px-3 pb-3 text-sm bg-gray-50">
             <div class="text-gray-700">{{ req.requester ? req.requester.name : '' }}</div>
@@ -408,13 +548,111 @@ export default {
           </div>
         </div>
       </div>
-      <!-- 출동 현황 보드 (Phase 3 자리) -->
+      <!-- 지령 배정 패널 (우측 슬라이드, FE-3.3) -->
+      <div v-if="assign.open" class="fixed inset-0 z-[200]" @click.self="closeAssign">
+        <div class="absolute inset-0 bg-black/30"></div>
+        <div class="absolute top-0 right-0 h-full w-96 bg-white shadow-2xl flex flex-col">
+          <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-base font-bold text-gray-900">지령 배정 — 신고 #{{ assign.request && assign.request.request_id }}</h3>
+            <button @click="closeAssign" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <!-- 신고 요약 + 연락처(관제 노출 허용) -->
+          <div class="px-4 py-3 border-b border-gray-100 text-sm">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: priorityColor(assign.request && assign.request.priority) }"></span>
+              <span class="font-medium">{{ assign.request ? typeLabel(assign.request.type) : '' }}</span>
+            </div>
+            <div v-if="assign.request && assign.request.address" class="text-gray-500">📍 {{ assign.request.address }}</div>
+            <div v-if="assign.request && assign.request.requester" class="text-gray-600 mt-1">
+              {{ assign.request.requester.name }}
+              <a v-if="assign.request.requester.phone" :href="'tel:'+assign.request.requester.phone" class="text-blue-600 font-semibold ml-1">{{ assign.request.requester.phone }}</a>
+            </div>
+          </div>
+          <!-- 가용 대원 리스트 -->
+          <div class="flex-1 overflow-y-auto p-2">
+            <div class="px-2 py-1 text-xs font-semibold text-gray-500">가용 구급대원 (online · 거리순)</div>
+            <div v-if="assign.loading" class="p-4 text-center text-sm text-gray-400">불러오는 중…</div>
+            <div v-else-if="assign.paramedics.length === 0" class="p-4 text-center text-sm text-gray-400">
+              배정 가능한 구급대원이 없습니다.
+            </div>
+            <label v-for="m in assign.paramedics" :key="m.user_id"
+                   class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                   :class="{ 'bg-blue-50 ring-1 ring-blue-300': assign.selectedId === m.user_id }">
+              <input type="radio" name="medic" :value="m.user_id" v-model="assign.selectedId" class="text-blue-600">
+              <span class="w-2 h-2 rounded-full flex-shrink-0" :class="m.online ? 'bg-green-500' : 'bg-gray-300'"></span>
+              <span class="flex-1 min-w-0">
+                <span class="text-sm font-medium">{{ m.name }}</span>
+                <span class="text-xs text-gray-400 ml-1">{{ roleLabel(m.role) }}</span>
+              </span>
+              <span class="text-xs text-gray-500">{{ fmtDistance(m.distance_m) }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                    :class="m.active_dispatch_count > 1 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'">
+                지령 {{ m.active_dispatch_count }}
+              </span>
+            </label>
+          </div>
+          <!-- 메모 + 발령 -->
+          <div class="px-4 py-3 border-t border-gray-200">
+            <input v-model="assign.note" type="text" placeholder="메모(선택)"
+                   class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 mb-2 focus:ring-2 focus:ring-blue-500">
+            <p v-if="assign.error" class="text-xs text-rose-600 mb-2">{{ assign.error }}</p>
+            <div class="flex gap-2">
+              <button @click="closeAssign" class="flex-1 py-2 text-sm font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">취소</button>
+              <button @click="submitAssign" :disabled="!assign.selectedId || assign.submitting"
+                      class="flex-1 py-2 text-sm font-bold rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+                {{ assign.submitting ? '발령 중…' : '지령 발령' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 출동 현황 보드 (FE-3.3) -->
       <div class="overflow-y-auto">
         <div class="px-3 py-2 border-b border-gray-100 sticky top-0 bg-white">
           <h2 class="text-sm font-bold text-gray-700">출동 현황</h2>
         </div>
-        <div class="p-6 text-center text-sm text-gray-300">
-          출동 지령 배정/현황은 다음 단계에서 제공됩니다.
+        <!-- 카운트 칩(배정/출동/도착/완료) -->
+        <div class="grid grid-cols-4 gap-1.5 px-3 py-2 border-b border-gray-50">
+          <div class="text-center rounded-md py-1.5 bg-amber-50">
+            <div class="text-base font-bold text-amber-700">{{ boardCount('assigned') }}</div>
+            <div class="text-[10px] text-amber-600">배정</div>
+          </div>
+          <div class="text-center rounded-md py-1.5 bg-blue-50">
+            <div class="text-base font-bold text-blue-700">{{ boardCount('en_route') }}</div>
+            <div class="text-[10px] text-blue-600">출동</div>
+          </div>
+          <div class="text-center rounded-md py-1.5 bg-indigo-50">
+            <div class="text-base font-bold text-indigo-700">{{ boardCount('arrived') }}</div>
+            <div class="text-[10px] text-indigo-600">도착</div>
+          </div>
+          <div class="text-center rounded-md py-1.5 bg-emerald-50">
+            <div class="text-base font-bold text-emerald-700">{{ boardCount('completed') }}</div>
+            <div class="text-[10px] text-emerald-600">완료</div>
+          </div>
+        </div>
+        <!-- 활성 지령 타임라인 -->
+        <div v-if="board.active.length === 0 && board.history.length === 0" class="p-6 text-center text-xs text-gray-300">
+          진행 중인 지령이 없습니다.
+        </div>
+        <div v-for="d in board.active" :key="'a'+d.dispatch_id" class="flex items-center justify-between px-3 py-2 border-b border-gray-50">
+          <span class="flex items-center gap-2 min-w-0">
+            <span class="text-sm font-medium">#{{ d.request_id }}</span>
+            <span class="text-xs text-gray-500">{{ d.request ? typeLabel(d.request.type) : '' }}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
+          </span>
+          <span class="text-xs text-gray-500 truncate">{{ d.paramedic_name }}</span>
+        </div>
+        <!-- 완료 이력 -->
+        <div v-if="board.history.length" class="px-3 py-1.5 text-[10px] text-gray-400 bg-gray-50">완료/종료 이력</div>
+        <div v-for="d in board.history" :key="'h'+d.dispatch_id" class="flex items-center justify-between px-3 py-1.5 border-b border-gray-50 opacity-70">
+          <span class="flex items-center gap-2 min-w-0">
+            <span class="text-sm">#{{ d.request_id }}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
+          </span>
+          <span class="text-xs text-gray-400">{{ d.paramedic_name }}</span>
         </div>
       </div>
     </div>

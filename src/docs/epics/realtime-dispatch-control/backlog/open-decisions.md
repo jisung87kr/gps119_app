@@ -55,7 +55,14 @@
   - **OI-8 적용**: 배정 단일 출처는 dispatch. `requests.assigned_rescuer_id`/`responded_at`은 레거시 — `responded_at`은 동기화에서 파생 세팅만, `assigned_rescuer_id`는 신규 흐름에서 미사용(레거시 assignRescuer만 세팅). 컬럼 제거는 추후.
 - **BE-3.3**: 이벤트 3종 — `DispatchAssigned`(개인 dispatch 채널, 연락처 포함) / `DispatchStatusUpdated`(control, 연락처 없음) / `RequestStatusUpdated`(requester 본인 채널, 담당자 연락처 포함). 서비스가 명시 발행(모델 훅 아님). 채널 인가: dispatch.{userId}=본인+수령가능역할, requester.{userId}=본인+신고이력(OI-5: 존재만 확인).
 - **EnsureEventRole 확장**: 라우트 {requestId}→신고→행사, {dispatch}→지령→행사 해석 추가(08 문서). 3중 방어(채널+미들웨어+서비스).
-- **이연**: 레거시 `POST /requests/{id}/assign`(assignRescuer)는 Deprecated 주석만(제거 X, Q6). reassign의 "controller 명시 회수"(active 강제 종료) 경로는 미구현 — 현재는 직전 지령이 terminal일 때만 재지령. FE(신고모달·구급대앱·관제배정UI·신고자추적)는 다음 단계.
+- **이연**: 레거시 `POST /requests/{id}/assign`(assignRescuer)는 Deprecated 주석만(제거 X, Q6). reassign의 "controller 명시 회수"(active 강제 종료) 경로는 미구현 — 현재는 직전 지령이 terminal일 때만 재지령.
+
+## Wave 2a 구현 메모 (FE-3.3 관제 배정·보드 / FE-3.2 구급대원 앱)
+
+- **FE-3.3(관제 SPA 확장)**: 신고목록 행 `[배정]`/`[재배정]` → 우측 슬라이드 패널(권장안). `available-paramedics`(online·거리순+보유지령수 배지) 선택+메모 → `POST dispatch`. 출동보드: 진입 시 `GET dispatches` + control 채널 `dispatch.updated` 수신마다 보드 재조회(저빈도, controller 전용). 동시배정 422 → "이미 배정된 신고" 안내. 신고 연락처는 배정 패널/신고 펼침에서만(ADR-0004).
+- **FE-3.2(구급대원 앱)**: 신규 web `/events/{id}/dispatch`(가드: active + canReceiveDispatch). `dispatch.assigned`(개인 채널) 수신 → 풀스크린 + `navigator.vibrate` + WebAudio 비프(asset 없이). 전이 버튼은 `nextStatuses(status)`(allowedTransitions 미러)만 렌더 → `PATCH status`. 거절 사유 필수 모달(assigned/accepted만). 출동 시 카카오내비 딥링크(신고 **고정좌표**, 미설치 웹 폴백). 위치공유(FE-2.2 locationShare) 재사용. 연락처는 실시간 assigned 페이로드(본인 배정건)만 — `mine` 엔 미포함(백엔드 동결).
+- **클라 미러**: DispatchStatus 전이표/뱃지·RequestType 메타를 control `roleMeta.js`·`public/js/dispatchMeta.js`에 미러(백엔드 단일출처 enum과 동기, 주석 명시). 최종 검증은 서버 PATCH.
+- **이연/TODO**: ① `mine` 응답에 본인 배정건 신고자 연락처 미포함 → 새로고침 후엔 전화 슬롯 비표시(백엔드 확장 시 보강). ② FE-3.1(신고 type 모달)·FE-3.4(신고자 추적)는 다음 웨이브. ③ 출동대원→신고핀 폴리라인(control-map §3③)은 미구현.
 
 ## 처리 규칙
 - 사람 결정 5건은 소유자 합의 즉시 이 표에 `Decided: <결론>`으로 갱신하고, 막던 태스크를 해제한다.

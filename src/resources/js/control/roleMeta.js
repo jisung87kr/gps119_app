@@ -52,6 +52,34 @@ export function presenceState(lastSeenAt) {
     return 'offline';
 }
 
+// 지령 상태 메타 (control-map / dispatch-screens-spec). 백엔드 App\Enums\DispatchStatus 미러.
+export const DISPATCH_STATUS_ORDER = ['assigned', 'accepted', 'en_route', 'arrived', 'completed', 'rejected'];
+
+export const DISPATCH_STATUS_META = {
+    assigned:  { label: '배정', badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', dot: 'bg-amber-500' },
+    accepted:  { label: '수락', badge: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200', dot: 'bg-sky-500' },
+    en_route:  { label: '출동', badge: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200', dot: 'bg-blue-500' },
+    arrived:   { label: '도착', badge: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200', dot: 'bg-indigo-500' },
+    completed: { label: '완료', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', dot: 'bg-emerald-500' },
+    rejected:  { label: '거절', badge: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200', dot: 'bg-rose-500' },
+};
+
+export function dispatchStatusMeta(s) {
+    return DISPATCH_STATUS_META[s] || DISPATCH_STATUS_META.assigned;
+}
+
+// 신고 유형 메타 (dispatch-screens-spec §0). 백엔드 App\Enums\RequestType 미러.
+export const REQUEST_TYPE_META = {
+    accident:  { label: '사고', color: '#EA580C' },
+    breakdown: { label: '고장', color: '#F59E0B' },
+    other:     { label: '기타', color: '#6B7280' },
+    emergency: { label: '긴급전화', color: '#DC2626' },
+};
+
+export function requestTypeMeta(t) {
+    return REQUEST_TYPE_META[t] || REQUEST_TYPE_META.other;
+}
+
 // Heroicons 차용 path(흰색 글리프). 24x24 viewBox 기준 d 문자열.
 // 인접 역할은 형태로도 구분(색맹 대비, §2 검증).
 export const ICON_PATHS = {
