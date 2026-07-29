@@ -14,9 +14,14 @@
 
             <!-- 헤더 -->
             <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h1 class="text-lg font-black tracking-tight text-slate-900">@{{ projectName }}</h1>
-                    <p class="text-xs text-slate-400">@{{ roleLabel }} · 지령 수신 대기</p>
+                <div class="flex items-center gap-2 min-w-0">
+                    <a href="{{ route('events.active', $project->id) }}" class="flex-none p-1.5 -ml-1 rounded-lg text-slate-400 hover:bg-slate-100" title="활동 화면으로">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+                    </a>
+                    <div class="min-w-0">
+                        <h1 class="text-lg font-black tracking-tight text-slate-900 truncate">@{{ projectName }}</h1>
+                        <p class="text-xs text-slate-400">@{{ roleLabel }} · 지령 수신 대기</p>
+                    </div>
                 </div>
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
                       :class="wsState==='ws' ? 'bg-green-100 text-green-700' : (wsState==='polling' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500')">

@@ -27,27 +27,37 @@
     @endif
 
     {{-- 행사 기능 바로가기 --}}
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+    @php $joinUrl = route('events.join.code', $project->join_code); @endphp
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm" x-data="{ copied: null }">
         <div class="px-6 py-4 border-b border-slate-100">
-            <h2 class="text-base font-semibold text-slate-900">행사 기능 바로가기</h2>
-            <p class="mt-0.5 text-xs text-slate-400">참가자가 입장·활동하는 /events 화면과 입장 코드입니다.</p>
+            <h2 class="text-base font-semibold text-slate-900">운영 인력 입장 안내</h2>
+            <p class="mt-0.5 text-xs text-slate-400">아래 입장 링크·코드를 구급대·경찰·자원봉사 등 <b class="text-slate-500">운영 인력에게 공유</b>하면, 입장 후 관제 지도에 표시되고 역할을 배정할 수 있습니다.</p>
         </div>
         <div class="p-6 space-y-4">
-            <div class="flex flex-wrap items-center gap-3">
+            {{-- 입장 링크 (핵심 배포 대상) --}}
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">참가자 입장 링크</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" readonly value="{{ $joinUrl }}" x-ref="joinUrl" onclick="this.select()"
+                           class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700 font-mono">
+                    <button type="button"
+                            @click="$refs.joinUrl.select(); document.execCommand('copy'); try { navigator.clipboard.writeText(@js($joinUrl)); } catch (e) {} copied='url'; setTimeout(() => copied = null, 1500)"
+                            class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-600/20 flex-none transition-colors">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        <span x-text="copied === 'url' ? '복사됨' : '링크 복사'"></span>
+                    </button>
+                </div>
+            </div>
+            {{-- 입장 코드 (링크 대신 구두/수기 공유용) --}}
+            <div class="flex flex-wrap items-center gap-3 pt-1">
                 <span class="text-sm text-slate-500 w-24">입장 코드</span>
                 <span class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 font-mono font-bold tracking-widest">{{ $project->join_code }}</span>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <span class="text-sm text-slate-500 w-24">참가자 입장</span>
-                <a href="{{ route('events.join.code', $project->join_code) }}" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-700 break-all">{{ route('events.join.code', $project->join_code) }}</a>
-            </div>
-            <div class="pt-3 border-t border-slate-100">
-                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">참가자용 화면 (참고 · 로그인/참가 상태에 따라 접근)</p>
-                <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('events.join') }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100">행사 입장</a>
-                    <a href="{{ route('events.active', $project->id) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100">참가자 활동(위치·신고)</a>
-                    <a href="{{ route('events.dispatch', $project->id) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100">구급대원 지령</a>
-                </div>
+                <button type="button"
+                        @click="navigator.clipboard.writeText(@js($project->join_code)); copied='code'; setTimeout(() => copied = null, 1500)"
+                        class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700">
+                    <span x-text="copied === 'code' ? '복사됨' : '코드 복사'"></span>
+                </button>
+                <span class="text-xs text-slate-400">링크 없이 코드만 알려주고 <a href="{{ route('events.join') }}" target="_blank" class="text-blue-600 hover:underline">events/join</a> 에서 입력하게 할 수도 있습니다.</span>
             </div>
         </div>
     </div>

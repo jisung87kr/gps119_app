@@ -69,6 +69,8 @@ Route::get('/events/{id}/active', function ($id) {
         'project' => $project,
         'role' => $role->value,
         'roleLabel' => $role->label(),
+        // 구급대/자원봉사 구급이면 지령(출동) 화면 진입 링크 노출
+        'canDispatch' => $role->canReceiveDispatch(),
     ]);
 })->middleware(['auth'])->name('events.active');
 
@@ -152,7 +154,16 @@ Route::get('/dashboard', function () {
         ->limit(8)
         ->get();
 
-    return view('dashboard', compact('stats', 'activeRequests', 'recentRequests'));
+    // 참가 중인 행사(활동/지령 화면 진입점) — 운영 인력이 로그인 후 자기 행사로 갈 통로
+    $myEvents = \App\Models\EventParticipant::query()
+        ->where('user_id', $user->id)
+        ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
+        ->with('project:id,name')
+        ->orderByDesc('project_id')
+        ->get()
+        ->filter(fn ($p) => $p->project !== null);
+
+    return view('dashboard', compact('stats', 'activeRequests', 'recentRequests', 'myEvents'));
 })->middleware(['auth'])->name('dashboard');
 
 // Admin routes

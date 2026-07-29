@@ -36,6 +36,41 @@
             @endforeach
         </div>
 
+        {{-- 참가 중인 행사 (운영 인력용 진입점) --}}
+        @if ($myEvents->isNotEmpty())
+            <section class="mb-8">
+                <h2 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 9h18"/><rect x="3" y="4" width="18" height="17" rx="2"/></svg>
+                    내 행사 {{ $myEvents->count() }}
+                </h2>
+                <div class="space-y-3">
+                    @foreach ($myEvents as $p)
+                        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 flex flex-wrap items-center gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <p class="text-sm font-bold text-slate-800 truncate">{{ $p->project->name }}</p>
+                                    <span class="flex-none px-2 py-0.5 text-[11px] font-medium rounded-full bg-slate-100 text-slate-600">{{ $p->role->label() }}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                @if ($p->role->canReceiveDispatch())
+                                    <a href="{{ route('events.dispatch', $p->project_id) }}"
+                                       class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold rounded-xl text-white bg-red-600 hover:bg-red-700 transition shadow-sm shadow-red-600/25">
+                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V5a1 1 0 0 1 1-1h11l3 3v10"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                                        지령·출동
+                                    </a>
+                                @endif
+                                <a href="{{ route('events.active', $p->project_id) }}"
+                                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
+                                    활동 화면
+                                </a>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         {{-- 진행 중인 요청 강조 --}}
         @if ($activeRequests->isNotEmpty())
             <section class="mb-8">
