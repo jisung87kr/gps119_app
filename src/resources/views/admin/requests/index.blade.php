@@ -40,20 +40,18 @@
         </div>
 
         <!-- Page Header -->
-        <div class="flex justify-between items-center mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">구조요청 관리</h1>
-                <p class="mt-2 text-gray-600">모든 구조 요청을 관리하세요.</p>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">구조요청 관리</h1>
+                <p class="mt-1 text-sm text-slate-500">모든 구조 요청을 접수·배정·관리합니다.</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="sm:ml-auto flex flex-wrap items-center gap-2">
                 <!-- View Toggle -->
-                <div class="flex bg-gray-100 rounded-md p-1">
+                <div class="flex bg-slate-100 rounded-xl p-1">
                     <button @click="viewMode = 'table'" type="button"
                             :class="[
-                                'px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-2',
-                                viewMode === 'table'
-                                    ? 'bg-white text-gray-900 shadow'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                'px-3.5 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2',
+                                viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                             ]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -62,10 +60,8 @@
                     </button>
                     <button @click="viewMode = 'map'" type="button"
                             :class="[
-                                'px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-2',
-                                viewMode === 'map'
-                                    ? 'bg-white text-gray-900 shadow'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                'px-3.5 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2',
+                                viewMode === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                             ]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
@@ -76,23 +72,23 @@
 
                 <button @click="toggleAutoRefresh" type="button"
                         :class="[
-                            'px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2',
+                            'px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2 border',
                             autoRefresh
-                                ? 'bg-green-100 text-green-700 hover:bg-green-200 focus:ring-green-500 border-2 border-green-500'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 focus:ring-gray-400 border-2 border-gray-300'
+                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'
+                                : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'
                         ]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path v-if="autoRefresh" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                     <span>자동 갱신</span>
-                    <span :class="['px-2 py-0.5 rounded text-xs font-semibold', autoRefresh ? 'bg-green-600 text-white' : 'bg-gray-500 text-white']">
+                    <span :class="['px-1.5 py-0.5 rounded text-xs font-bold', autoRefresh ? 'bg-emerald-600 text-white' : 'bg-slate-400 text-white']">
                         @{{ autoRefresh ? 'ON' : 'OFF' }}
                     </span>
                 </button>
 
                 <button @click="manualRefresh" type="button" :disabled="isLoading"
-                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm">
+                        class="bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm shadow-sm shadow-blue-600/20">
                     <svg :class="['w-4 h-4', {'animate-spin': isLoading}]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
@@ -102,41 +98,38 @@
         </div>
 
         <!-- Filters -->
-        <div class="bg-white rounded-lg shadow mb-6">
-            <div class="p-6">
-                <form method="GET" action="{{ route('admin.requests') }}" class="flex flex-wrap gap-4">
-                    <div class="flex-1 min-w-0">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm mb-6">
+            <div class="p-4 sm:p-5">
+                <form method="GET" action="{{ route('admin.requests') }}" class="flex flex-col sm:flex-row flex-wrap gap-3">
+                    <div class="flex-1 min-w-0 relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
                         <input type="text"
                                name="search"
                                value="{{ request('search') }}"
                                placeholder="요청자 이름, 연락처로 검색..."
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                               class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
                     </div>
-                    <div>
-                        <select name="project_id" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">모든 프로젝트</option>
-                            <option value="none" {{ request('project_id') === 'none' ? 'selected' : '' }}>프로젝트 없음</option>
-                            @foreach($projects as $project)
-                                <option value="{{ $project->id }}" {{ request('project_id') == $project->id ? 'selected' : '' }}>
-                                    {{ $project->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <select name="status" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">모든 상태</option>
-                            <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>대기중</option>
-                            <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>진행중</option>
-                            <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>완료</option>
-                            <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>취소됨</option>
-                        </select>
-                    </div>
+                    <select name="project_id" class="px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
+                        <option value="">모든 프로젝트</option>
+                        <option value="none" {{ request('project_id') === 'none' ? 'selected' : '' }}>프로젝트 없음</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}" {{ request('project_id') == $project->id ? 'selected' : '' }}>
+                                {{ $project->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <select name="status" class="px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
+                        <option value="">모든 상태</option>
+                        <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>대기중</option>
+                        <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>진행중</option>
+                        <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>완료</option>
+                        <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>취소됨</option>
+                    </select>
                     <div class="flex gap-2">
-                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200">
+                        <button type="submit" class="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 transition font-medium text-sm shadow-sm shadow-blue-600/20">
                             검색
                         </button>
-                        <a href="{{ route('admin.requests') }}" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition duration-200">
+                        <a href="{{ route('admin.requests') }}" class="flex-1 sm:flex-none text-center bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 transition font-medium text-sm">
                             초기화
                         </a>
                     </div>
@@ -145,74 +138,50 @@
         </div>
 
         <!-- Quick Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-yellow-50 rounded-lg p-4">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-yellow-600">대기중</p>
-                        <p class="text-lg font-semibold text-yellow-900">@{{ stats.pending }}</p>
-                    </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+                <div class="flex items-center gap-2.5">
+                    <span class="grid place-items-center w-9 h-9 rounded-lg bg-amber-50 text-amber-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </span>
+                    <span class="text-sm font-medium text-slate-500">대기중</span>
                 </div>
+                <p class="mt-3 text-2xl font-bold tabular-nums text-slate-900">@{{ stats.pending }}</p>
             </div>
 
-            <div class="bg-blue-50 rounded-lg p-4">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-blue-600">진행중</p>
-                        <p class="text-lg font-semibold text-blue-900">@{{ stats.in_progress }}</p>
-                    </div>
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+                <div class="flex items-center gap-2.5">
+                    <span class="grid place-items-center w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </span>
+                    <span class="text-sm font-medium text-slate-500">진행중</span>
                 </div>
+                <p class="mt-3 text-2xl font-bold tabular-nums text-slate-900">@{{ stats.in_progress }}</p>
             </div>
 
-            <div class="bg-green-50 rounded-lg p-4">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-green-600">완료</p>
-                        <p class="text-lg font-semibold text-green-900">@{{ stats.completed }}</p>
-                    </div>
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+                <div class="flex items-center gap-2.5">
+                    <span class="grid place-items-center w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </span>
+                    <span class="text-sm font-medium text-slate-500">완료</span>
                 </div>
+                <p class="mt-3 text-2xl font-bold tabular-nums text-slate-900">@{{ stats.completed }}</p>
             </div>
 
-            <div class="bg-red-50 rounded-lg p-4">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-red-600">취소됨</p>
-                        <p class="text-lg font-semibold text-red-900">@{{ stats.cancelled }}</p>
-                    </div>
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+                <div class="flex items-center gap-2.5">
+                    <span class="grid place-items-center w-9 h-9 rounded-lg bg-slate-100 text-slate-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </span>
+                    <span class="text-sm font-medium text-slate-500">취소됨</span>
                 </div>
+                <p class="mt-3 text-2xl font-bold tabular-nums text-slate-900">@{{ stats.cancelled }}</p>
             </div>
         </div>
 
         <!-- Map View -->
-        <div v-show="viewMode === 'map'" class="bg-white rounded-lg shadow overflow-hidden">
+        <div v-show="viewMode === 'map'" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div id="map" class="w-full" style="height: 700px;"></div>
         </div>
 
@@ -319,36 +288,36 @@
         </div>
 
         <!-- Requests Table -->
-        <div v-show="viewMode === 'table'" class="bg-white rounded-lg shadow overflow-hidden">
+        <div v-show="viewMode === 'table'" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-slate-100">
+                    <thead class="bg-slate-50/70">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">요청자</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">프로젝트</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">담당자</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">요청일시</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">요청자</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">프로젝트</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">상태</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">담당자</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">요청일시</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">작업</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="divide-y divide-slate-100">
                         <tr v-if="requests.length === 0">
-                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                            <td colspan="7" class="px-6 py-14 text-center text-sm text-slate-400">
                                 검색된 구조 요청이 없습니다.
                             </td>
                         </tr>
-                        <tr v-for="request in requests" :key="request.id" class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <tr v-for="request in requests" :key="request.id" class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-500 tabular-nums">
                                 #@{{ request.id }}
                             </td>
                             <td class="px-6 py-4">
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900">@{{ request.user?.name || '알 수 없음' }}</div>
-                                    <div class="text-sm text-gray-500">@{{ request.user?.formatted_phone || '-' }}</div>
+                                    <div class="text-sm font-medium text-slate-800">@{{ request.user?.name || '알 수 없음' }}</div>
+                                    <div class="text-sm text-slate-400">@{{ request.user?.formatted_phone || '-' }}</div>
                                     <div v-if="request.description" class="mt-2">
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 max-w-xs">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 max-w-xs">
                                             <svg class="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
@@ -358,16 +327,16 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span v-if="request.project" class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                <span v-if="request.project" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                                     @{{ request.project.name }}
                                 </span>
-                                <span v-else class="text-sm text-gray-400">-</span>
+                                <span v-else class="text-sm text-slate-300">-</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <select @change="updateRequest(request.id, 'status', $event.target.value)"
                                         v-model="request.status"
                                         :disabled="updatingRequests[request.id]"
-                                        class="text-xs font-medium rounded-full px-2.5 py-1 border-0 focus:ring-2 focus:ring-offset-2 min-w-[100px]"
+                                        class="text-xs font-medium rounded-full px-2.5 py-1.5 border-0 focus:ring-2 focus:ring-offset-1 min-w-[100px]"
                                         :class="[
                                             getStatusClass(request.status),
                                             updatingRequests[request.id] ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
@@ -382,7 +351,7 @@
                                 <select @change="updateRequest(request.id, 'assigned_rescuer_id', $event.target.value || null)"
                                         v-model="request.assigned_rescuer_id"
                                         :disabled="updatingRequests[request.id]"
-                                        class="text-sm text-gray-900 rounded-md px-2 py-1 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[140px]"
+                                        class="text-sm text-slate-700 rounded-lg px-2.5 py-1.5 border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 min-w-[140px]"
                                         :class="updatingRequests[request.id] ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'">
                                     <option value="">미배정</option>
                                     <option v-for="rescuer in rescuers" :key="rescuer.id" :value="rescuer.id">
@@ -390,12 +359,12 @@
                                     </option>
                                 </select>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 tabular-nums">
                                 <div>@{{ formatDate(request.created_at) }}</div>
-                                <div>@{{ formatTime(request.created_at) }}</div>
+                                <div class="text-slate-400">@{{ formatTime(request.created_at) }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <a :href="`/admin/requests/${request.id}`" class="text-blue-600 hover:text-blue-900">상세보기</a>
+                                <a :href="`/admin/requests/${request.id}`" class="text-blue-600 hover:text-blue-700">상세보기</a>
                             </td>
                         </tr>
                     </tbody>
@@ -404,7 +373,7 @@
 
             <!-- Pagination -->
             @if($requests->hasPages())
-                <div class="px-6 py-4 border-t border-gray-200">
+                <div class="px-6 py-4 border-t border-slate-100">
                     {{ $requests->appends(request()->query())->links() }}
                 </div>
             @endif

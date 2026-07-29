@@ -7,7 +7,6 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-PJV2CH8GCP');
     </script>
     <meta charset="utf-8">
@@ -16,103 +15,115 @@
 
     <title>{{ $title ?? 'GPS119 관리자' }}</title>
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-    <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>[x-cloak]{display:none!important;}</style>
 </head>
-<body class="font-sans antialiased bg-gray-100">
-    <div class="min-h-screen">
-        <!-- Admin Navigation -->
-        <nav class="bg-white shadow-sm border-b border-gray-200">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <!-- Logo -->
-                        <div class="flex-shrink-0">
-                            <a href="{{ route('admin.dashboard') }}" class="flex items-center">
-                                <span class="text-2xl font-bold text-blue-600">GPS119</span>
-                                <span class="ml-2 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">관리자</span>
-                            </a>
-                        </div>
+<body class="font-sans antialiased bg-slate-50 text-slate-900">
+@php
+    $pendingCount = \App\Models\Request::where('status', 'pending')->count();
+    $navItems = [
+        ['label' => '대시보드', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'group' => '운영',
+         'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
+        ['label' => '구조요청', 'route' => 'admin.requests', 'active' => 'admin.requests*', 'group' => '운영', 'badge' => $pendingCount,
+         'icon' => 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z'],
+        ['label' => '실시간 관제', 'url' => '/control', 'active_uri' => 'control*', 'group' => '운영',
+         'icon' => 'M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 12c0 1.2-.3 2.3-.9 3.3M4.5 12c0-1.2.3-2.3.9-3.3'],
+        ['label' => '행사', 'route' => 'admin.projects.index', 'active' => 'admin.projects*', 'group' => '관리',
+         'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
+        ['label' => '회원관리', 'route' => 'admin.members', 'active' => 'admin.members*', 'group' => '관리',
+         'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
+    ];
+@endphp
 
-                        <!-- Navigation Links -->
-                        <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
-                            <a href="{{ route('admin.dashboard') }}"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.dashboard') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium">
-                                대시보드
-                            </a>
-                            <a href="{{ route('admin.projects.index') }}"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.projects*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium">
-                                프로젝트
-                            </a>
-                            <a href="{{ route('admin.members') }}"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.members*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium">
-                                회원관리
-                            </a>
-                            <a href="{{ route('admin.requests') }}"
-                               class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('admin.requests*') ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} text-sm font-medium">
-                                구조요청관리
-                            </a>
-                        </div>
-                    </div>
+<div x-data="{ nav: false, user: false }" class="min-h-screen">
 
-                    <!-- User Menu -->
-                    <div class="hidden sm:flex sm:items-center sm:ml-6" x-data="{ open: false }">
-                        <div class="relative">
-                            <button @click="open = !open" class="flex items-center text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700">
-                                <span class="mr-2">{{ auth()->user()->name }}</span>
-                                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
+    <!-- mobile backdrop -->
+    <div x-show="nav" x-cloak x-transition.opacity @click="nav = false"
+         class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"></div>
 
-                            <div x-show="open" @click.away="open = false"
-                                 class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
-                                 x-transition:enter="transition ease-out duration-200"
-                                 x-transition:enter-start="transform opacity-0 scale-95"
-                                 x-transition:enter-end="transform opacity-100 scale-100"
-                                 x-transition:leave="transition ease-in duration-75"
-                                 x-transition:leave-start="transform opacity-100 scale-100"
-                                 x-transition:leave-end="transform opacity-0 scale-95">
+    <!-- ===== SIDEBAR ===== -->
+    <aside x-cloak
+           class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white border-r border-slate-200 transition-transform duration-200 lg:translate-x-0"
+           :class="nav ? 'translate-x-0' : '-translate-x-full'">
+        <!-- brand -->
+        <div class="flex items-center gap-2.5 h-16 px-5 border-b border-slate-100">
+            <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2.5">
+                <span class="grid place-items-center w-8 h-8 rounded-lg bg-blue-600 text-white">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>
+                </span>
+                <span class="text-lg font-bold tracking-tight">GPS119</span>
+                <span class="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 bg-slate-100 rounded">관제</span>
+            </a>
+            <button @click="nav = false" class="ml-auto p-1 text-slate-400 lg:hidden" aria-label="닫기">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
 
-                                <a href="{{ route('dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    사용자 페이지
-                                </a>
-                                <a href="{{ route('profile.show') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                    프로필
-                                </a>
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        로그아웃
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Mobile menu button -->
-                    <div class="sm:hidden flex items-center" x-data="{ open: false }">
-                        <button @click="open = !open" class="text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700">
-                            <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                                <path :class="{'hidden': open, 'inline-flex': !open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                                <path :class="{'hidden': !open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
+        <!-- nav -->
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+            @php $lastGroup = null; @endphp
+            @foreach($navItems as $item)
+                @if($item['group'] !== $lastGroup)
+                    <p class="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{{ $item['group'] }}</p>
+                    @php $lastGroup = $item['group']; @endphp
+                @endif
+                @php
+                    $isActive = isset($item['active']) ? request()->routeIs($item['active'])
+                              : (isset($item['active_uri']) ? request()->is($item['active_uri']) : false);
+                    $href = $item['url'] ?? route($item['route']);
+                @endphp
+                <a href="{{ $href }}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ $isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' }}">
+                    <svg class="w-5 h-5 flex-none {{ $isActive ? 'text-blue-600' : 'text-slate-400' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="{{ $item['icon'] }}"/>
+                    </svg>
+                    <span>{{ $item['label'] }}</span>
+                    @if(!empty($item['badge']) && $item['badge'] > 0)
+                        <span class="ml-auto grid place-items-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-red-500 rounded-full tabular-nums">{{ $item['badge'] }}</span>
+                    @endif
+                </a>
+            @endforeach
         </nav>
 
-        <!-- Page Content -->
-        <main class="py-6">
+        <!-- user -->
+        <div class="relative border-t border-slate-100 p-3">
+            <div x-show="user" x-cloak @click.away="user = false" x-transition
+                 class="absolute left-3 right-3 bottom-[68px] bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                <a href="{{ route('dashboard') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">사용자 페이지</a>
+                <a href="{{ route('profile.show') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">프로필</a>
+                <form method="POST" action="{{ route('logout') }}">@csrf
+                    <button type="submit" class="block w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">로그아웃</button>
+                </form>
+            </div>
+            <button @click="user = !user" class="flex items-center gap-3 w-full px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <span class="grid place-items-center w-9 h-9 rounded-full bg-blue-600 text-white text-sm font-semibold">{{ mb_substr(auth()->user()->name ?? 'A', 0, 1) }}</span>
+                <span class="min-w-0 text-left">
+                    <span class="block text-sm font-semibold text-slate-800 truncate">{{ auth()->user()->name }}</span>
+                    <span class="block text-xs text-slate-400">시스템 관리자</span>
+                </span>
+                <svg class="ml-auto w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <div class="lg:pl-64">
+        <!-- mobile top bar -->
+        <div class="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-white border-b border-slate-200">
+            <button @click="nav = true" class="p-1 -ml-1 text-slate-600" aria-label="메뉴 열기">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <span class="font-bold tracking-tight">GPS119 <span class="text-blue-600">관제</span></span>
+        </div>
+        <main>
             {{ $slot }}
         </main>
     </div>
+</div>
 
-    <script src="//unpkg.com/alpinejs" defer></script>
+<script src="//unpkg.com/alpinejs" defer></script>
 </body>
 </html>
