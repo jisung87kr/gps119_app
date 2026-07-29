@@ -28,6 +28,8 @@ export default {
             roleMetaMap: ROLE_META,
             roleFilter: Object.fromEntries(ROLE_ORDER.map((r) => [r, true])),
             roleCounts: {},        // role -> {online,total}
+            roster: [],            // roster 원본(활성 참가자) — 역할 배정 패널용
+            assigningUserId: null, // 역할 배정 진행중 표시
             hideOffline: false,
 
             requests: [],          // 라이브 신고(최신 우선)
@@ -119,6 +121,7 @@ export default {
             this._applyFilterToPool();
 
             await this.fetchRoster(true);
+            await this.fetchRequests();
             await this.loadBoard();
             this._subscribeRealtime();
         },
@@ -167,6 +170,7 @@ export default {
                     { headers: { Accept: 'application/json' } }
                 );
                 const rows = res.data.data || [];
+                this.roster = rows;
                 rows.forEach((row) => this.pool.upsert(row));
                 if (fit) this.pool.fitBounds();
                 this._refreshCounts();
@@ -174,6 +178,43 @@ export default {
                 console.error('[control] roster 조회 실패', e);
             } finally {
                 this.loadingRoster = false;
+            }
+        },
+
+        // 관제 진입 시 기존 미완료 신고(pending/in_progress) 초기 로드 —
+        // 라이브 브로드캐스트(_onRequestCreated)로만 채워지던 목록의 빈-초기상태 버그 보완.
+        async fetchRequests() {
+            if (!this.hasProject) return;
+            try {
+                const res = await window.axios.get(
+                    `/api/events/${this.selectedProjectId}/requests`,
+                    { headers: { Accept: 'application/json' } }
+                );
+                const rows = res.data.data || [];
+                rows.forEach((r) => this.requestPins.upsert(r));
+                this.requests = rows; // 이미 최신순(desc)
+                this.requestCount = this.requestPins.count();
+            } catch (e) {
+                console.error('[control] 신고 조회 실패', e);
+            }
+        },
+
+        // 참가자 행사 역할 배정(controller/admin) → assignRole API 후 roster 갱신
+        async assignParticipantRole(userId, role) {
+            if (!this.hasProject) return;
+            this.assigningUserId = userId;
+            try {
+                await window.axios.patch(
+                    `/api/events/${this.selectedProjectId}/participants/${userId}`,
+                    { role },
+                    { headers: { Accept: 'application/json' } }
+                );
+                await this.fetchRoster();
+            } catch (e) {
+                console.error('[control] 역할 배정 실패', e);
+                await this.fetchRoster(); // 실패 시 셀렉트 값 원복
+            } finally {
+                this.assigningUserId = null;
             }
         },
 
@@ -491,6 +532,22 @@ export default {
           <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: roleColor(role) }"></span>{{ roleLabel(role) }}
         </span>
         <span class="text-gray-500"><b class="text-green-600">{{ roleOnline(role) }}</b> / {{ roleTotal(role) }}</span>
+      </div>
+    </div>
+
+    <!-- 참가자 역할 배정(controller/admin) -->
+    <div v-if="roster.length" class="p-3 border-t border-gray-100">
+      <h2 class="text-sm font-bold text-gray-700 mb-2">참가자 역할 배정</h2>
+      <div class="space-y-1.5 max-h-56 overflow-y-auto">
+        <div v-for="r in roster" :key="'a-'+r.user_id" class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: roleColor(r.role) }"></span>
+          <span class="text-sm text-gray-700 flex-1 truncate" :title="r.name">{{ r.name }}</span>
+          <select :value="r.role" @change="assignParticipantRole(r.user_id, $event.target.value)"
+                  :disabled="assigningUserId === r.user_id"
+                  class="text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer max-w-[110px]">
+            <option v-for="role in roleOrder" :key="role" :value="role">{{ roleLabel(role) }}</option>
+          </select>
+        </div>
       </div>
     </div>
   </aside>

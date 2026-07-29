@@ -100,6 +100,37 @@ class DispatchApiController extends Controller
     }
 
     /**
+     * GET /api/events/{id}/requests  (event.role:controller)
+     * 관제 초기 로드용 — 미완료(pending/in_progress) 신고 목록.
+     * RequestCreated 브로드캐스트와 동일한 페이로드 형태라 프론트가 라이브 수신분과 같게 처리한다.
+     */
+    public function eventRequests(int $id): JsonResponse
+    {
+        $requests = RescueRequest::where('project_id', $id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->with('user:id,name,phone')
+            ->orderByDesc('requested_at')
+            ->get()
+            ->map(fn (RescueRequest $r) => [
+                'request_id' => $r->id,
+                'project_id' => $r->project_id,
+                'type' => $r->type?->value,
+                'priority' => $r->priority?->value,
+                'latitude' => $r->latitude,
+                'longitude' => $r->longitude,
+                'address' => $r->address,
+                'requester' => [
+                    'id' => $r->user?->id,
+                    'name' => $r->user?->name,
+                    'phone' => $r->user?->phone,
+                ],
+                'created_at' => $r->requested_at?->toISOString(),
+            ]);
+
+        return response()->success($requests);
+    }
+
+    /**
      * GET /api/requests/{id}/available-paramedics  (event.role:controller)
      * 가용 구급대원(거리순 + 보유 지령수, online).
      */

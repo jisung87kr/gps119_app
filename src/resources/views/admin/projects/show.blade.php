@@ -7,6 +7,11 @@
                 <p class="mt-1 text-sm text-slate-500">{{ $project->description }}</p>
             </div>
             <div class="sm:ml-auto flex flex-wrap items-center gap-2">
+                <a href="{{ route('admin.projects.participants', $project->id) }}"
+                   class="inline-flex items-center gap-1.5 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 font-medium text-sm transition-colors">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    참가자 관리
+                </a>
                 <a href="{{ route('admin.projects.edit', $project->id) }}"
                    class="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm shadow-blue-600/20 transition-colors">
                     수정

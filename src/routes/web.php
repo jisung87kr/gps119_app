@@ -177,6 +177,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestUpdate'])->name('requests.update');
     Route::patch('/requests/{id}/quick-update', [\App\Http\Controllers\Admin\AdminController::class, 'requestQuickUpdate'])->name('requests.quick-update');
 
+    // 행사 참가자·역할 관리 (EventRole) — resource projects 보다 먼저 등록해 /{project}/participants 우선 매칭
+    Route::get('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'index'])->name('projects.participants');
+    Route::post('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'store'])->name('projects.participants.store');
+    Route::patch('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'update'])->name('projects.participants.update');
+    Route::delete('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'destroy'])->name('projects.participants.destroy');
+
     // Project management
     Route::resource('projects', \App\Http\Controllers\Admin\ProjectController::class);
     Route::get('/projects/{id}/qrcode', [\App\Http\Controllers\Admin\ProjectController::class, 'qrcode'])->name('projects.qrcode');
