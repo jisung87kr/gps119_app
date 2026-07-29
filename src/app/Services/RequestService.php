@@ -2,12 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\RequestStatus;
+use App\Enums\RequestType;
 use App\Models\Request;
 use App\Models\User;
-use App\Enums\RequestStatus;
-use App\Enums\RequestPriority;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Request as HttpRequest;
 
 class RequestService
 {
@@ -25,8 +24,16 @@ class RequestService
 
     public function createRequest(array $data, User $user): Request
     {
+        // type 미지정 시 기본값(other). priority 미지정 시 type->defaultPriority() 자동 매핑.
+        // priority 가 명시되면 그 값을 우선(상황실 수동 상향).
+        $type = isset($data['type']) ? RequestType::from($data['type']) : RequestType::OTHER;
+        if (empty($data['priority'])) {
+            $data['priority'] = $type->defaultPriority();
+        }
+
         $requestData = array_merge($data, [
             'user_id' => $user->id,
+            'type' => $type,
             'status' => RequestStatus::PENDING,
             'requested_at' => now(),
         ]);
@@ -36,17 +43,17 @@ class RequestService
 
     public function updateRequest(Request $request, array $data, User $user): Request
     {
-        if (!$user->hasRole('admin') && !$user->hasRole('rescuer') && !$request->isOwner($user)) {
+        if (! $user->hasRole('admin') && ! $user->hasRole('rescuer') && ! $request->isOwner($user)) {
             throw new \Exception('Unauthorized to update this request');
         }
 
         $request->update($data);
 
-        if (isset($data['status']) && $data['status'] === RequestStatus::IN_PROGRESS && !$request->responded_at) {
+        if (isset($data['status']) && $data['status'] === RequestStatus::IN_PROGRESS && ! $request->responded_at) {
             $request->update(['responded_at' => now()]);
         }
 
-        if (isset($data['status']) && $data['status'] === RequestStatus::COMPLETED && !$request->completed_at) {
+        if (isset($data['status']) && $data['status'] === RequestStatus::COMPLETED && ! $request->completed_at) {
             $request->update(['completed_at' => now()]);
         }
 
@@ -55,11 +62,11 @@ class RequestService
 
     public function cancelRequest(Request $request, User $user): Request
     {
-        if (!$request->isOwner($user) && !$user->hasRole('admin')) {
+        if (! $request->isOwner($user) && ! $user->hasRole('admin')) {
             throw new \Exception('Unauthorized to cancel this request');
         }
 
-        if (!$request->canBeCancelled()) {
+        if (! $request->canBeCancelled()) {
             throw new \Exception('Request cannot be cancelled in current status');
         }
 
@@ -71,13 +78,16 @@ class RequestService
         return $request->fresh(['user', 'assignedRescuer']);
     }
 
+    /**
+     * @deprecated ADR-0003 — DispatchService::assign 으로 대체. 레거시 라우트만 잠정 유지.
+     */
     public function assignRescuer(Request $request, User $rescuer, User $admin): Request
     {
-        if (!$admin->hasRole('admin') && !$admin->hasRole('rescuer')) {
+        if (! $admin->hasRole('admin') && ! $admin->hasRole('rescuer')) {
             throw new \Exception('Unauthorized to assign rescuer');
         }
 
-        if (!$rescuer->hasRole('rescuer')) {
+        if (! $rescuer->hasRole('rescuer')) {
             throw new \Exception('Selected user is not a rescuer');
         }
 
@@ -94,7 +104,7 @@ class RequestService
     {
         $request = Request::with(['user', 'assignedRescuer'])->findOrFail($id);
 
-        if (!$user->hasRole('admin') && !$user->hasRole('rescuer') && !$request->isOwner($user)) {
+        if (! $user->hasRole('admin') && ! $user->hasRole('rescuer') && ! $request->isOwner($user)) {
             throw new \Exception('Unauthorized to view this request');
         }
 

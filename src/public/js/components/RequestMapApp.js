@@ -15,6 +15,9 @@ import { reverseGeocode, getCurrentPositionOnce, showGeolocationError } from '/j
 export default function createRequestMapApp(options = {}) {
     const projectId = options.projectId ?? null;
 
+    // RequestType(SPEC-02c) 라벨 — 백엔드 enum 미러
+    const TYPE_LABELS = { accident: '사고', breakdown: '고장', other: '기타', emergency: '긴급전화' };
+
     return {
         components: {
             MapLoader,
@@ -36,7 +39,18 @@ export default function createRequestMapApp(options = {}) {
                 findAddress: false,
                 showIntro: true,
                 loading: false,
-                sheetExpanded: true
+                sheetExpanded: true,
+                // FE-3.1 주소확인 모달 + 유형
+                typeLabels: TYPE_LABELS,
+                confirmOpen: false,
+                requestType: null,    // accident | breakdown | other
+                submitting: false,
+                submitError: '',
+                staticMap: null,
+                successOpen: false,
+                createdRequestId: null,
+                contactPhone: options.contactPhone || null,
+                emergencyTel: options.emergencyTel || '010-4794-0119',
             };
         },
         mounted() {
@@ -90,6 +104,8 @@ export default function createRequestMapApp(options = {}) {
                         this.mapObject.relayout();
                         this.mapObject.setCenter(coords);
                         this.marker.setPosition(coords);
+                        // 모달이 열려 있으면 미리보기도 갱신
+                        if (this.confirmOpen) this.$nextTick(() => this.initStaticPreview());
                     }
                 });
             },
@@ -142,36 +158,87 @@ export default function createRequestMapApp(options = {}) {
                     height: '100%'
                 }).embed(this.$refs.search_address_element);
             },
-            shareLocation(type) {
-                if (!confirm('위치공유를 하시겠습니까?')) {
-                    return false;
-                }
+            // FE-3.1: 유형별 신고 진입. 긴급전화는 모달 없이 즉시 통화, 나머지는 주소확인 모달.
+            typeLabel(t) { return this.typeLabels[t] || t; },
 
-                if (!this.address || !this.lat || !this.long) {
-                    alert('위치정보가 정확하지 않습니다. 다시 시도해주세요.');
-                    return false;
+            emergencyCall() {
+                // 행사 구조본부 번호(projects.settings) 또는 기본 안내번호
+                window.location.href = 'tel:' + this.emergencyTel;
+            },
+
+            openConfirm(type) {
+                if (!this.lat || !this.long) {
+                    alert('위치정보가 정확하지 않습니다. 잠시 후 다시 시도해주세요.');
+                    return;
                 }
+                this.requestType = type;
+                this.submitError = '';
+                this.confirmOpen = true;
+                // 모달 미니 지도 미리보기(정적 지도, 두 번째 동적 지도 인스턴스 회피)
+                this.$nextTick(() => this.initStaticPreview());
+            },
+
+            initStaticPreview() {
+                const el = document.getElementById('confirm-map');
+                if (!el || !(window.kakao && kakao.maps && kakao.maps.StaticMap)) return;
+                el.innerHTML = '';
+                try {
+                    this.staticMap = new kakao.maps.StaticMap(el, {
+                        center: new kakao.maps.LatLng(this.lat, this.long),
+                        level: 3,
+                        marker: [{ position: new kakao.maps.LatLng(this.lat, this.long) }],
+                    });
+                } catch (e) {
+                    // 미리보기 실패해도 주소 텍스트로 신고 진행 가능(막힘 방지)
+                    console.warn('미리보기 지도 생성 실패', e);
+                }
+            },
+
+            closeConfirm() {
+                this.confirmOpen = false;
+                this.requestType = null;
+                this.submitError = '';
+            },
+
+            // 모달에서 [지도에서 위치 보정] → 모달 닫고 본 지도에서 탭으로 보정(기존 흐름 재사용)
+            correctOnMap() {
+                this.closeConfirm();
+            },
+
+            async confirmSubmit() {
+                if (this.submitting) return;
+                if (!this.lat || !this.long) {
+                    this.submitError = '위치정보가 정확하지 않습니다.';
+                    return;
+                }
+                this.submitting = true;
+                this.submitError = '';
 
                 const params = {
+                    type: this.requestType,
                     latitude: this.lat,
                     longitude: this.long,
-                    address: this.address,
-                    description: type,
+                    address: this.address || null,
                 };
-                if (this.projectId) {
-                    params.project_id = this.projectId;
-                }
+                if (this.projectId) params.project_id = this.projectId;
+                if (this.contactPhone) params.contact_phone = this.contactPhone;
 
-                axios.post('/api/requests', params).then(res => {
-                    if (res.data.success) {
-                        alert('위치정보가 공유되었습니다.');
+                try {
+                    const res = await window.axios.post('/api/requests', params,
+                        { headers: { Accept: 'application/json' } });
+                    if (res.data && res.data.success) {
+                        this.createdRequestId = res.data.data?.id ?? null;
+                        this.confirmOpen = false;
+                        this.successOpen = true;
                     } else {
-                        alert('위치정보 공유에 실패했습니다. 다시 시도해주세요.');
+                        this.submitError = '전송에 실패했습니다. 다시 시도해주세요.';
                     }
-                }).catch(err => {
+                } catch (err) {
                     console.error(err);
-                    alert('위치정보 공유에 실패했습니다. 다시 시도해주세요.');
-                });
+                    this.submitError = '전송에 실패했습니다. 다시 시도해주세요.';
+                } finally {
+                    this.submitting = false;
+                }
             },
             setCenter(lat, long) {
                 const moveLatLon = new kakao.maps.LatLng(lat, long);

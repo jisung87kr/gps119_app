@@ -48,6 +48,16 @@ export default function createRequestShowApp(options = {}) {
                 requestLat: request.latitude ?? '33.450701',
                 requestLong: request.longitude ?? '126.570667',
                 requestAddress: request.address ?? '요청 위치를 확인 중입니다...',
+                // FE-3.4 신고자 상태추적
+                requestId: request.id ?? null,
+                projectId: request.projectId ?? null,
+                userId: request.userId ?? null,
+                reqStatus: request.status ?? 'pending',
+                paramedicName: request.paramedicName ?? null,
+                paramedicPhone: request.paramedicPhone ?? null,
+                controlTel: request.controlTel ?? '010-4794-0119',
+                statusWs: 'connecting', // connecting | ws | polling
+                showStageDetail: false,
                 myLat: '33.450701',
                 myLong: '126.570667',
                 myAddress: '현재 위치를 확인 중입니다...',
@@ -261,7 +271,93 @@ export default function createRequestShowApp(options = {}) {
                 this.mapObject.setBounds(bounds);
                 this.mapObject.setLevel(7); // 줌 레벨 설정
                 this.applySheetOffset();
+            },
+
+            // ── FE-3.4 신고자 상태추적 ───────────────────────────
+            statusLabel(s) {
+                return ({ pending: '접수', in_progress: '구조 진행중', completed: '구조 완료', cancelled: '요청 취소' })[s] || s;
+            },
+
+            // 담당자 배정 수신 시 이름/전화 갱신 + 상태 갱신
+            _onStatusUpdated(payload) {
+                if (!payload) return;
+                if (payload.status) this.reqStatus = payload.status;
+                if (payload.dispatch) {
+                    this.paramedicName = payload.dispatch.paramedic_name || this.paramedicName;
+                    this.paramedicPhone = payload.dispatch.paramedic_phone || this.paramedicPhone;
+                }
+            },
+
+            async _subscribeStatus() {
+                // 행사 신고만 실시간 추적(project_id 있을 때)
+                if (!this.projectId || !this.userId) return;
+                const echo = await this._waitForEcho();
+                if (!echo) { this.statusWs = 'polling'; this._startStatusPolling(); return; }
+
+                echo.private(`event.${this.projectId}.requester.${this.userId}`)
+                    .listen('.request.status.updated', (e) => this._onStatusUpdated(e));
+
+                const conn = echo.connector?.pusher?.connection;
+                if (conn) {
+                    conn.bind('state_change', ({ current }) => {
+                        if (current === 'connected') { this.statusWs = 'ws'; this._stopStatusPolling(); }
+                        else if (['unavailable', 'failed', 'disconnected'].includes(current)) { this._startStatusPolling(); }
+                    });
+                    if (conn.state === 'connected') this.statusWs = 'ws';
+                } else { this._startStatusPolling(); }
+            },
+
+            _waitForEcho() {
+                return new Promise((resolve) => {
+                    if (window.Echo) return resolve(window.Echo);
+                    let w = 0;
+                    const t = setInterval(() => {
+                        w += 100;
+                        if (window.Echo) { clearInterval(t); resolve(window.Echo); }
+                        else if (w >= 3000) { clearInterval(t); resolve(null); }
+                    }, 100);
+                });
+            },
+
+            _startStatusPolling() {
+                if (this._statusTimer || !this.requestId) return;
+                this.statusWs = 'polling';
+                this._statusTimer = setInterval(async () => {
+                    try {
+                        const res = await window.axios.get(`/api/requests/${this.requestId}`, { headers: { Accept: 'application/json' } });
+                        const d = res.data?.data;
+                        if (d && d.status) this.reqStatus = d.status;
+                    } catch (e) { /* 조용히 재시도 */ }
+                }, 15000);
+            },
+            _stopStatusPolling() {
+                if (this._statusTimer) { clearInterval(this._statusTimer); this._statusTimer = null; }
+            },
+        },
+
+        computed: {
+            isProjectRequest() { return !!this.projectId; },
+            stageIndex() {
+                return ({ pending: 0, in_progress: 1, completed: 2 })[this.reqStatus] ?? 0;
+            },
+            isCancelled() { return this.reqStatus === 'cancelled'; },
+            // 배정 전 = 상황실, 배정 후 = 담당자
+            callPhone() { return this.paramedicPhone || this.controlTel; },
+            callLabel() { return this.paramedicPhone ? `담당자(${this.paramedicName || '구급대'})에게 전화` : '상황실에 전화'; },
+        },
+
+        mounted() {
+            // window.Echo 준비 대기 후 구독(QA 교훈)
+            this._subscribeStatus();
+            // 전역 QA 훅
+            window.__requestShow = this;
+        },
+
+        beforeUnmount() {
+            this._stopStatusPolling();
+            if (window.Echo && this.projectId && this.userId) {
+                try { window.Echo.leave(`event.${this.projectId}.requester.${this.userId}`); } catch (e) { /* noop */ }
             }
-        }
+        },
     };
 }

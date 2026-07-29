@@ -4,13 +4,13 @@ namespace App\Listeners;
 
 use App\Events\RequestCreated;
 use App\Models\User;
-use Illuminate\Contracts\Queue\ShouldQueue; // 임시로 큐 사용 중지
+use Illuminate\Contracts\Queue\ShouldQueue; // 큐 활성화(워커 가동 중) — 디스코드/알림을 큐에서 처리
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
-class NotifyRescuers
+class NotifyRescuers implements ShouldQueue
 {
-     //use InteractsWithQueue; // 임시로 큐 사용 중지
+    use InteractsWithQueue; // 큐 활성화: file_get_contents 디스코드 호출이 요청 응답을 막지 않도록
 
     /**
      * Create the event listener.
@@ -48,31 +48,33 @@ class NotifyRescuers
             $this->sendNotificationToRescuer($admin, $request);
         }
 
-        // 디스코드 알림
+        // 디스코드 알림 (큐에서 실행 — file_get_contents 유지. URL 미설정 시 스킵하여 잡 실패 방지)
         $url = env('DISCORD_WEBHOOK_URL');
-        $requestUrl = config('app.url') . '/requests/' . $request->id;
-        $message = "[{$request->description}] 공유됨\n" .
-            "요청자: {$request->user->name}\n" .
-            "연락처: {$request->user->formatted_phone}\n" .
-            "위치정보: {$request->latitude}/{$request->longitude}\n" .
-            "주소: {$request->address}\n" .
+        $requestUrl = config('app.url').'/requests/'.$request->id;
+        $message = "[{$request->description}] 공유됨\n".
+            "요청자: {$request->user->name}\n".
+            "연락처: {$request->user->formatted_phone}\n".
+            "위치정보: {$request->latitude}/{$request->longitude}\n".
+            "주소: {$request->address}\n".
             "{$requestUrl}";
 
-         $data = [
-             'content' => "{$message}",
-             'username' => 'gps119 Bot',
-             'avatar_url' => 'https://example.com/avatar.png',
-         ];
+        $data = [
+            'content' => "{$message}",
+            'username' => 'gps119 Bot',
+            'avatar_url' => 'https://example.com/avatar.png',
+        ];
 
-         $options = [
-             'http' => [
-                 'header' => "Content-Type: application/json\r\n",
-                 'method' => 'POST',
-                 'content' => json_encode($data),
-             ],
-         ];
-         $context = stream_context_create($options);
-         file_get_contents($url, false, $context);
+        $options = [
+            'http' => [
+                'header' => "Content-Type: application/json\r\n",
+                'method' => 'POST',
+                'content' => json_encode($data),
+            ],
+        ];
+        if (! empty($url)) {
+            $context = stream_context_create($options);
+            file_get_contents($url, false, $context);
+        }
 
         Log::info('NotifyRescuers listener completed', [
             'request_id' => $request->id,

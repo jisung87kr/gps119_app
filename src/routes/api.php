@@ -1,8 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\DispatchApiController;
+use App\Http\Controllers\Api\EventApiController;
+use App\Http\Controllers\Api\EventReportController;
+use App\Http\Controllers\Api\LocationApiController;
+use App\Http\Controllers\Api\RequestApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\RequestApiController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -14,5 +18,49 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/requests/{id}', [RequestApiController::class, 'show'])->name('api.requests.show');
     Route::put('/requests/{id}', [RequestApiController::class, 'update'])->name('api.requests.update');
     Route::delete('/requests/{id}', [RequestApiController::class, 'destroy'])->name('api.requests.destroy');
-    Route::get('/requests/{id}/assign', [RequestApiController::class, 'assign'])->name('api.requests.assign');
+    // 구조대원 배정. 실시간 지령 에픽에서 POST /requests/{id}/dispatch 로 대체 예정(ADR-0003).
+    Route::post('/requests/{id}/assign', [RequestApiController::class, 'assignRescuer'])->name('api.requests.assign');
+
+    // 행사 입장·참가자 (실시간 관제 — BE-1.2 / SPEC-06b)
+    Route::get('/events/{joinCode}', [EventApiController::class, 'show'])->name('api.events.show');
+    Route::post('/events/{joinCode}/join', [EventApiController::class, 'join'])->name('api.events.join');
+    Route::get('/events/{id}/me', [EventApiController::class, 'me'])
+        ->middleware('event.member')->name('api.events.me');
+    // 현장 수동 역할 배정 — controller/admin 만
+    Route::patch('/events/{id}/participants/{userId}', [EventApiController::class, 'assignRole'])
+        ->middleware('event.role:controller')->name('api.events.participants.assign');
+
+    // 위치 (실시간 관제 — BE-2.1 / SPEC-06b)
+    // ping 수신: active 참가자(역할무관) + rate-limit(초당 1~2). 큐로 적재.
+    Route::post('/events/{id}/location', [LocationApiController::class, 'store'])
+        ->middleware(['event.member', 'throttle:2,1'])->name('api.events.location.store');
+    // 관제 roster: controller 만
+    Route::get('/events/{id}/participants', [LocationApiController::class, 'participants'])
+        ->middleware('event.role:controller')->name('api.events.participants.index');
+    // 위치공유 토글: active 참가자
+    Route::patch('/events/{id}/sharing', [LocationApiController::class, 'sharing'])
+        ->middleware('event.member')->name('api.events.sharing');
+
+    // 지령(출동) (실시간 관제 — BE-3.3 / SPEC-06b)
+    // 배정: 해당 신고 행사의 controller (event.role 은 {requestId}→신고→행사 해석)
+    Route::post('/requests/{requestId}/dispatch', [DispatchApiController::class, 'store'])
+        ->middleware('event.role:controller')->name('api.requests.dispatch');
+    // 가용 구급대원(거리순+보유지령수): controller
+    Route::get('/requests/{requestId}/available-paramedics', [DispatchApiController::class, 'availableParamedics'])
+        ->middleware('event.role:controller')->name('api.requests.available-paramedics');
+    // 상태 전이: paramedic 본인 또는 그 행사 controller (서비스가 권한 검사)
+    Route::patch('/dispatches/{id}/status', [DispatchApiController::class, 'updateStatus'])
+        ->name('api.dispatches.status');
+    // 본인 지령 목록
+    Route::get('/dispatches/mine', [DispatchApiController::class, 'mine'])->name('api.dispatches.mine');
+    // 출동 현황 보드: controller
+    Route::get('/events/{id}/dispatches', [DispatchApiController::class, 'board'])
+        ->middleware('event.role:controller')->name('api.events.dispatches');
+
+    // 기록 다운로드 (BE-4.1) — controller/admin, 스트리밍 CSV
+    Route::middleware('event.role:controller')->group(function () {
+        Route::get('/events/{id}/report/requests.csv', [EventReportController::class, 'requests'])->name('api.events.report.requests');
+        Route::get('/events/{id}/report/dispatches.csv', [EventReportController::class, 'dispatches'])->name('api.events.report.dispatches');
+        Route::get('/events/{id}/report/tracks.csv', [EventReportController::class, 'tracks'])->name('api.events.report.tracks');
+    });
 });

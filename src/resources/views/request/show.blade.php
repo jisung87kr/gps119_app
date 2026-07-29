@@ -41,6 +41,46 @@
 
             <location-button :loading="loading" @get-location="getMyLocation"></location-button>
 
+            <!-- FE-3.4 신고자 상태추적 (행사 신고만) -->
+            <div v-if="isProjectRequest" class="max-w-7xl w-full mx-auto mb-4">
+                <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-slate-800">내 신고 상태</h3>
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-medium"
+                              :class="statusWs==='ws' ? 'text-green-600' : (statusWs==='polling' ? 'text-amber-600' : 'text-gray-400')">
+                            <span class="w-1.5 h-1.5 rounded-full" :class="statusWs==='ws' ? 'bg-green-500' : (statusWs==='polling' ? 'bg-amber-500' : 'bg-gray-400')"></span>
+                            @{{ statusWs==='ws' ? '실시간' : (statusWs==='polling' ? '갱신 지연중' : '연결중') }}
+                        </span>
+                    </div>
+
+                    <!-- 취소 -->
+                    <div v-if="isCancelled" class="text-sm text-slate-500 py-2">요청이 취소되었습니다.</div>
+
+                    <!-- 3단계 타임라인: 접수 → 구조 진행중 → 완료 -->
+                    <div v-else class="flex items-center">
+                        <template v-for="(label, i) in ['접수','구조 진행중','완료']" :key="i">
+                            <div class="flex flex-col items-center flex-shrink-0">
+                                <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                                     :class="i <= stageIndex ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'">
+                                    <span v-if="i < stageIndex">✓</span><span v-else>@{{ i+1 }}</span>
+                                </div>
+                                <span class="text-[11px] mt-1" :class="i <= stageIndex ? 'text-slate-800 font-semibold' : 'text-slate-400'">@{{ label }}</span>
+                            </div>
+                            <div v-if="i < 2" class="flex-1 h-0.5 mx-1" :class="i < stageIndex ? 'bg-blue-600' : 'bg-slate-200'"></div>
+                        </template>
+                    </div>
+
+                    <!-- 담당자 + 전화 (배정 전 상황실, 배정 후 담당자) -->
+                    <div class="mt-4 pt-3 border-t border-slate-100">
+                        <p v-if="paramedicName" class="text-sm text-slate-700 mb-2">담당 구급대원: <b>@{{ paramedicName }}</b></p>
+                        <a :href="'tel:'+callPhone" class="block w-full text-center py-3 text-sm font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700">
+                            📞 @{{ callLabel }}
+                        </a>
+                        <p class="text-[11px] text-slate-400 text-center mt-2">취소가 필요하면 상황실로 전화해 주세요.</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="max-w-7xl w-full mx-auto">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <location-info
@@ -91,6 +131,13 @@
                 latitude:  '{{ $request->latitude ?? "33.450701" }}',
                 longitude: '{{ $request->longitude ?? "126.570667" }}',
                 address:   '{{ $request->address ?? "요청 위치를 확인 중입니다..." }}',
+                id: {{ $request->id }},
+                status: @json($request->status->value),
+                projectId: {{ $request->project_id ?? 'null' }},
+                userId: {{ $request->user_id }},
+                paramedicName: @json(optional(optional($request->activeDispatch)->paramedic)->name),
+                paramedicPhone: @json(optional(optional($request->activeDispatch)->paramedic)->phone),
+                controlTel: @json(data_get(optional($request->project)->settings, 'emergency_tel', '010-4794-0119')),
             }
         })).mount('#app');
     </script>

@@ -7,6 +7,38 @@
     <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=509c2656c00fa9af4782197a888763f6&libraries=services,clusterer,drawing&autoload=false"></script>
 
     <div id="requestsApp" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- 실시간 토스트 (FE-0.1 PoC) -->
+        <div class="fixed top-4 right-4 z-[60] space-y-2 w-80 pointer-events-none">
+            <transition-group name="toast">
+                <div v-for="toast in toasts" :key="toast.id"
+                     class="pointer-events-auto bg-white border-l-4 border-red-500 rounded-lg shadow-lg p-4 flex items-start gap-3">
+                    <div class="flex-shrink-0 w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-2.97L13.74 4.5a2 2 0 00-3.48 0L3.33 16.03A2 2 0 005.07 19z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900">새 구조요청 #@{{ toast.request_id }}</p>
+                        <p class="text-sm text-gray-600 truncate">@{{ toast.name }} · @{{ toast.address || '주소 확인중' }}</p>
+                    </div>
+                    <button @click="dismissToast(toast.id)" class="flex-shrink-0 text-gray-400 hover:text-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </transition-group>
+
+            <!-- 실시간 연결 상태 뱃지 -->
+            <div v-if="realtimeMode" class="pointer-events-auto flex justify-end">
+                <span :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
+                        realtimeMode === 'ws' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700']">
+                    <span :class="['w-2 h-2 rounded-full', realtimeMode === 'ws' ? 'bg-green-500' : 'bg-amber-500']"></span>
+                    @{{ realtimeMode === 'ws' ? '실시간(WS) 연결됨' : '폴링 폴백' }}
+                </span>
+            </div>
+        </div>
+
         <!-- Page Header -->
         <div class="flex justify-between items-center mb-8">
             <div>
@@ -404,7 +436,13 @@
                     infowindow: null,
                     initialBoundsSet: false, // 최초 지도 범위 설정 여부
                     showModal: false,
-                    selectedRequest: null
+                    selectedRequest: null,
+                    // 실시간 관제 (FE-0.1)
+                    toasts: [],            // 화면 우상단 토스트 목록
+                    toastSeq: 0,           // 토스트 고유 키
+                    realtimeMode: null,    // 'ws' | 'polling' | null
+                    realtimePollTimer: null, // WS 실패 시 폴링 폴백 타이머
+                    echoChannels: []       // 구독 채널 보관(정리용)
                 }
             },
             methods: {
@@ -871,6 +909,106 @@
                         // 업데이트 상태 해제
                         delete this.updatingRequests[requestId];
                     }
+                },
+
+                // === 실시간 관제 (FE-0.1) ===
+
+                // 토스트 표시 (자동 사라짐 6초)
+                pushToast(payload) {
+                    const id = ++this.toastSeq;
+                    this.toasts.unshift({
+                        id,
+                        request_id: payload.request_id ?? payload.id,
+                        name: payload.requester?.name ?? payload.user?.name ?? '알 수 없음',
+                        address: payload.address ?? ''
+                    });
+                    // 최대 5개만 유지
+                    if (this.toasts.length > 5) {
+                        this.toasts = this.toasts.slice(0, 5);
+                    }
+                    setTimeout(() => this.dismissToast(id), 6000);
+                },
+
+                dismissToast(id) {
+                    this.toasts = this.toasts.filter(t => t.id !== id);
+                },
+
+                // 신규 신고 수신 공통 처리: 토스트 + 목록 갱신
+                onRequestCreated(payload) {
+                    this.pushToast(payload);
+                    this.fetchRequests();
+                },
+
+                // Echo 구독 시도. window.Echo 없거나 실패하면 폴링 폴백으로 전환.
+                initRealtime() {
+                    // window.Echo는 deferred 모듈(app.js→bootstrap.js)에서 생성되어 인라인 mounted보다 늦게 준비됨.
+                    // 즉시 폴백하면 실시간이 항상 죽으므로 최대 ~3초 대기 후 판정한다.
+                    if (!window.Echo) {
+                        this._echoWaitTicks = (this._echoWaitTicks || 0) + 1;
+                        if (this._echoWaitTicks <= 60) {
+                            setTimeout(() => this.initRealtime(), 50);
+                            return;
+                        }
+                        console.warn('[realtime] Echo 미초기화(타임아웃) — 폴링 폴백');
+                        this.startRealtimePolling();
+                        return;
+                    }
+
+                    try {
+                        // 일반 신고(project_id=null) 전역 채널 — admin/rescuer 인가 (SPEC-05a)
+                        const globalCh = window.Echo.private('requests.global')
+                            .listen('.request.created', (e) => this.onRequestCreated(e));
+                        this.echoChannels.push('private-requests.global');
+
+                        // WS 연결 상태 감지: 연결되면 ws 모드, 끊기면 폴링 폴백 (R5)
+                        const conn = window.Echo.connector?.pusher?.connection;
+                        if (conn) {
+                            conn.bind('state_change', ({ current }) => {
+                                if (current === 'connected') {
+                                    this.realtimeMode = 'ws';
+                                    this.stopRealtimePolling();
+                                } else if (['unavailable', 'failed', 'disconnected'].includes(current)) {
+                                    this.startRealtimePolling();
+                                }
+                            });
+                            // 이미 연결된 상태면 즉시 반영
+                            if (conn.state === 'connected') {
+                                this.realtimeMode = 'ws';
+                            }
+                        } else {
+                            this.startRealtimePolling();
+                        }
+                    } catch (err) {
+                        console.error('[realtime] 구독 실패 — 폴링 폴백', err);
+                        this.startRealtimePolling();
+                    }
+                },
+
+                // WS 실패 시 HTTP 폴링 폴백 (10초)
+                startRealtimePolling() {
+                    if (this.realtimePollTimer) return; // 이미 가동 중
+                    this.realtimeMode = 'polling';
+                    this.realtimePollTimer = setInterval(() => {
+                        this.fetchRequests();
+                    }, 12000); // 10~15초 범위
+                },
+
+                stopRealtimePolling() {
+                    if (this.realtimePollTimer) {
+                        clearInterval(this.realtimePollTimer);
+                        this.realtimePollTimer = null;
+                    }
+                },
+
+                teardownRealtime() {
+                    this.stopRealtimePolling();
+                    if (window.Echo) {
+                        this.echoChannels.forEach((name) => {
+                            const bare = name.replace(/^private-/, '');
+                            try { window.Echo.leave(bare); } catch (e) { /* noop */ }
+                        });
+                    }
+                    this.echoChannels = [];
                 }
             },
             watch: {
@@ -899,10 +1037,14 @@
                 if (this.autoRefresh) {
                     this.startAutoRefresh();
                 }
+                // 실시간 신규 신고 구독 시작 (FE-0.1)
+                this.initRealtime();
             },
             beforeUnmount() {
                 // 컴포넌트 제거 전 자동 갱신 중지
                 this.stopAutoRefresh();
+                // 실시간 구독/폴백 정리
+                this.teardownRealtime();
             }
         });
 

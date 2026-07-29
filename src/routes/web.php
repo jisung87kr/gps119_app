@@ -1,16 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\SocialController;
+use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('request.create');
 });
 
 Route::get('/requests/create', function () {
-    if(!Auth::user()->phone){
+    if (! Auth::user()->phone) {
         // 회원정보 변경 페이지 리다이렉트
         return view('errors.require-phone');
     }
@@ -22,11 +22,11 @@ Route::get('/requests/create/{slug}', function ($slug) {
     $project = \App\Models\Project::where('slug', $slug)->firstOrFail();
 
     // 프로젝트가 활성화되어 있는지 확인
-    if (!$project->isActive()) {
+    if (! $project->isActive()) {
         return view('errors.project-inactive', compact('project'));
     }
 
-    if(!Auth::user()->phone){
+    if (! Auth::user()->phone) {
         return view('errors.require-phone', compact('project'));
     }
 
@@ -34,10 +34,91 @@ Route::get('/requests/create/{slug}', function ($slug) {
 })->middleware(['auth'])->name('request.create.project');
 
 Route::get('/requests/{request}', function (\App\Models\Request $request) {
+    // FE-3.4: 신고자 상태추적용 담당자/상황실 정보 동봉(웹 뷰 데이터 — 실시간 갱신은 채널)
+    $request->load(['activeDispatch.paramedic', 'project']);
+
     return view('request.show', [
         'request' => $request,
     ]);
 })->middleware(['auth'])->name('request.show');
+
+// 행사 입장 (FE-1.1). auth 미들웨어가 미로그인 시 로그인으로 보내고 intended URL 보존 →
+// 폼 로그인(redirect()->intended)으로 같은 입장 지점 복귀. (소셜 로그인 복귀는 후속 TODO)
+Route::get('/events/join', function () {
+    return view('event.join');
+})->middleware(['auth'])->name('events.join');
+
+// QR 딥링크: join_code 를 URL 로 전달 → 코드 프리필 후 자동 미리보기.
+// (카메라 스캐너는 v1 범위 밖 — QR 는 이 URL 로 진입시키는 방식. 카메라 라이브러리는 후속 TODO)
+Route::get('/events/join/{joinCode}', function (string $joinCode) {
+    return view('event.join', ['prefillCode' => strtoupper($joinCode)]);
+})->middleware(['auth'])->name('events.join.code');
+
+// 참가자 활동 화면 (FE-2.2): 위치 자동공유 시작/토글. 가드: 해당 행사 active 참가자.
+Route::get('/events/{id}/active', function ($id) {
+    $user = Auth::user();
+    $project = \App\Models\Project::findOrFail($id);
+
+    $role = $user->eventRoleIn($project); // active 참가만 역할 반환
+    if ($role === null) {
+        // 미참가/pending → 입장 화면으로 유도
+        return redirect()->route('events.join');
+    }
+
+    return view('event.active', [
+        'project' => $project,
+        'role' => $role->value,
+        'roleLabel' => $role->label(),
+    ]);
+})->middleware(['auth'])->name('events.active');
+
+// 구급대원 지령 앱 (FE-3.2). 가드: 해당 행사 active + 지령 수령 가능 역할(paramedic/volunteer_medic).
+Route::get('/events/{id}/dispatch', function ($id) {
+    $user = Auth::user();
+    $project = \App\Models\Project::findOrFail($id);
+
+    $role = $user->eventRoleIn($project);
+    if ($role === null) {
+        return redirect()->route('events.join'); // 미참가 → 입장
+    }
+    if (! $role->canReceiveDispatch()) {
+        return redirect()->route('events.active', $project->id); // 수령 역할 아님 → 활동화면
+    }
+
+    return view('dispatch.index', [
+        'project' => $project,
+        'role' => $role->value,
+        'roleLabel' => $role->label(),
+    ]);
+})->middleware(['auth'])->name('events.dispatch');
+
+// 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
+// admin → 활성 행사 전체, controller → 본인이 active CONTROLLER 인 활성 행사만.
+Route::get('/control', function () {
+    $user = Auth::user();
+
+    if ($user->hasRole('admin')) {
+        $projects = \App\Models\Project::active()->orderByDesc('id')->get(['id', 'name']);
+    } else {
+        $projectIds = \App\Models\EventParticipant::query()
+            ->where('user_id', $user->id)
+            ->where('role', \App\Enums\EventRole::CONTROLLER->value)
+            ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
+            ->pluck('project_id');
+
+        $projects = \App\Models\Project::active()
+            ->whereIn('id', $projectIds)
+            ->orderByDesc('id')
+            ->get(['id', 'name']);
+
+        // controller 권한이 없거나 관제할 활성 행사가 없으면 차단
+        if ($projects->isEmpty()) {
+            abort(403, '관제 권한이 없습니다.');
+        }
+    }
+
+    return view('control.index', ['projects' => $projects]);
+})->middleware(['auth'])->name('control');
 
 Route::get('/dashboard', function () {
     $user = Auth::user();
