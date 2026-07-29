@@ -44,20 +44,23 @@ class RequestCreatedBroadcastTest extends TestCase
         $this->assertSame("private-event.{$project->id}.control", $channels[0]->name);
     }
 
-    /** project_id 없는 일반 신고 → requests.global 채널로 broadcast (OI-1 확정) */
-    public function test_general_request_broadcasts_on_requests_global_channel(): void
+    /** ADR-0005: 행사 미지정 신고는 "상시 운영" 기본 행사로 귀속 → 그 행사 control 채널로 broadcast */
+    public function test_request_without_project_is_attached_to_default_event(): void
     {
         $owner = User::factory()->create();
         $request = RescueRequest::factory()->for($owner)->create([
             'project_id' => null,
         ]);
 
-        $event = new RequestCreated($request);
-        $channels = $event->broadcastOn();
+        // 생성 훅이 기본 행사로 귀속시켜 project_id 가 항상 채워진다
+        $default = Project::where('is_default', true)->firstOrFail();
+        $this->assertSame($default->id, $request->fresh()->project_id);
+
+        $channels = (new RequestCreated($request))->broadcastOn();
 
         $this->assertCount(1, $channels);
         $this->assertInstanceOf(PrivateChannel::class, $channels[0]);
-        $this->assertSame('private-requests.global', $channels[0]->name);
+        $this->assertSame("private-event.{$default->id}.control", $channels[0]->name);
     }
 
     /** 레거시 채널(requests / rescuers)은 더 이상 사용하지 않는다 */

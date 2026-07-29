@@ -105,6 +105,9 @@
                                             비활성
                                         </span>
                                     @endif
+                                    @if($project->is_default)
+                                        <span class="ml-1.5 inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-200" title="행사 미지정 신고가 귀속되는 상시 행사">기본</span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700 tabular-nums">
                                     {{ $project->requests_count }}건
@@ -145,13 +148,15 @@
                                                 </svg>
                                             </button>
                                         </form>
-                                        <form action="{{ route('admin.projects.destroy', $project->id) }}" method="POST" class="inline" onsubmit="return confirm('정말 삭제하시겠습니까?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit"
-                                                    class="text-red-600 hover:text-red-700"
-                                                    title="삭제">삭제</button>
-                                        </form>
+                                        @unless($project->is_default)
+                                            <form action="{{ route('admin.projects.destroy', $project->id) }}" method="POST" class="inline" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit"
+                                                        class="text-red-600 hover:text-red-700"
+                                                        title="삭제">삭제</button>
+                                            </form>
+                                        @endunless
                                     </div>
                                 </td>
                             </tr>

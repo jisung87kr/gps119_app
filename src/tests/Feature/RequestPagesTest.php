@@ -61,13 +61,16 @@ class RequestPagesTest extends TestCase
     }
 
     /** 일반 신고(project_id 없음)도 상세 200(트래커는 클라 v-if 로 숨김) */
-    public function test_show_page_for_general_request_ok(): void
+    public function test_show_page_attaches_default_event_when_no_project(): void
     {
         $requester = User::factory()->create();
         $request = RescueRequest::factory()->for($requester)->create(['project_id' => null]);
 
+        // ADR-0005: 행사 미지정 신고도 "상시 운영" 기본 행사로 귀속 → 추적 활성(그 행사 기준)
+        $default = Project::where('is_default', true)->firstOrFail();
+
         $this->actingAs($requester)->get(route('request.show', $request->id))
             ->assertOk()
-            ->assertSee('projectId: null', false); // 행사 아님 → 추적 비활성
+            ->assertSee("projectId: {$default->id}", false);
     }
 }

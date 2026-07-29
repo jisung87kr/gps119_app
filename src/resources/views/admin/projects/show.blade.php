@@ -16,13 +16,15 @@
                    class="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm shadow-blue-600/20 transition-colors">
                     수정
                 </a>
-                <form action="{{ route('admin.projects.destroy', $project->id) }}" method="POST" class="inline" onsubmit="return confirm('정말 삭제하시겠습니까?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="inline-flex items-center gap-1.5 bg-white text-red-600 border border-red-200 px-4 py-2.5 rounded-xl hover:bg-red-50 font-medium text-sm transition-colors">
-                        삭제
-                    </button>
-                </form>
+                @unless($project->is_default)
+                    <form action="{{ route('admin.projects.destroy', $project->id) }}" method="POST" class="inline" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="inline-flex items-center gap-1.5 bg-white text-red-600 border border-red-200 px-4 py-2.5 rounded-xl hover:bg-red-50 font-medium text-sm transition-colors">
+                            삭제
+                        </button>
+                    </form>
+                @endunless
             </div>
         </div>
 

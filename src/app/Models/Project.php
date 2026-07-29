@@ -19,6 +19,7 @@ class Project extends Model
         'start_date',
         'end_date',
         'is_active',
+        'is_default',
         'status',
         'settings',
         'created_by',
@@ -28,6 +29,7 @@ class Project extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
         'settings' => 'array',
     ];
 
@@ -61,6 +63,32 @@ class Project extends Model
             // status 자동 설정
             $project->status = $project->getComputedStatus();
         });
+
+        // ADR-0005: 기본 행사("상시 운영")는 삭제 불가 — 일반 신고의 귀속처.
+        static::deleting(function ($project) {
+            if ($project->is_default) {
+                return false;
+            }
+        });
+    }
+
+    /**
+     * ADR-0005: "상시 운영" 기본 행사. 행사 미지정 신고의 귀속처(항상 활성).
+     * 없으면 생성한다(멱등). created_by 는 admin 우선, 없으면 아무 유저.
+     */
+    public static function defaultEvent(): self
+    {
+        return static::firstOrCreate(
+            ['is_default' => true],
+            [
+                'name' => '상시 운영',
+                'description' => '행사에 속하지 않은 일반 구조요청이 귀속되는 기본 행사(항상 활성).',
+                'start_date' => now()->subYear(),
+                'end_date' => now()->addYears(50),
+                'is_active' => true,
+                'created_by' => \App\Models\User::role('admin')->value('id') ?? \App\Models\User::query()->value('id'),
+            ]
+        );
     }
 
     /**
