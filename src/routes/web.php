@@ -171,11 +171,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/members/{id}/edit', [\App\Http\Controllers\Admin\AdminController::class, 'memberEdit'])->name('members.edit');
     Route::patch('/members/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'memberUpdate'])->name('members.update');
 
-    // Request management
-    Route::get('/requests', [\App\Http\Controllers\Admin\AdminController::class, 'requests'])->name('requests');
+    // 신고 상세·상태변경 (목록 SPA는 실시간 관제로 대체되어 제거 — ADR-0005 이후)
     Route::get('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestShow'])->name('requests.show');
     Route::patch('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestUpdate'])->name('requests.update');
-    Route::patch('/requests/{id}/quick-update', [\App\Http\Controllers\Admin\AdminController::class, 'requestQuickUpdate'])->name('requests.quick-update');
 
     // 행사 참가자·역할 관리 (EventRole) — resource projects 보다 먼저 등록해 /{project}/participants 우선 매칭
     Route::get('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'index'])->name('projects.participants');

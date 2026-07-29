@@ -42,9 +42,9 @@
             <p class="mt-1 text-sm text-slate-500">{{ now()->format('Y년 n월 j일') }} · 운영 현황 요약</p>
         </div>
         <div class="sm:ml-auto flex items-center gap-2">
-            <a href="{{ route('admin.requests') }}" class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
-                전체 신고
+            <a href="{{ route('admin.control') }}" class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M19.5 12c0 1.2-.3 2.3-.9 3.3M4.5 12c0-1.2.3-2.3.9-3.3"/></svg>
+                실시간 관제
             </a>
             <a href="{{ route('admin.projects.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-600/20 transition-colors">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -203,7 +203,7 @@
             <div class="flex items-center gap-2 px-6 py-4 border-b border-slate-100">
                 <h2 class="text-base font-semibold text-slate-900">최근 신고</h2>
                 <span class="px-2 py-0.5 text-xs font-medium text-slate-500 bg-slate-100 rounded-full tabular-nums">{{ $stats['total_requests'] }}건</span>
-                <a href="{{ route('admin.requests') }}" class="ml-auto text-sm font-medium text-blue-600 hover:text-blue-700">전체 보기 →</a>
+                <a href="{{ route('admin.control') }}" class="ml-auto text-sm font-medium text-blue-600 hover:text-blue-700">관제에서 보기 →</a>
             </div>
             <ul class="divide-y divide-slate-100">
                 @forelse($recent_requests as $r)
