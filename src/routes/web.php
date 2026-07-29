@@ -173,6 +173,7 @@ Route::post('/admin/register', [AuthController::class, 'adminRegister']);
 // Admin panel routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/statistics', [\App\Http\Controllers\Admin\AdminController::class, 'statistics'])->name('statistics');
 
     // Member management
     Route::get('/members', [\App\Http\Controllers\Admin\AdminController::class, 'members'])->name('members');

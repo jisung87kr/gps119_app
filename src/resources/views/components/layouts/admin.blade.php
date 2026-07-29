@@ -29,6 +29,8 @@
          'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
         ['label' => '실시간 관제', 'route' => 'admin.control', 'active' => 'admin.control', 'group' => '운영', 'badge' => $pendingCount,
          'icon' => 'M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 12c0 1.2-.3 2.3-.9 3.3M4.5 12c0-1.2.3-2.3.9-3.3'],
+        ['label' => '통계', 'route' => 'admin.statistics', 'active' => 'admin.statistics', 'group' => '운영',
+         'icon' => 'M3 3v18h18M7 15l3-4 3 3 4-6'],
         ['label' => '행사', 'route' => 'admin.projects.index', 'active' => 'admin.projects*', 'group' => '관리',
          'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
         ['label' => '회원관리', 'route' => 'admin.members', 'active' => 'admin.members*', 'group' => '관리',
