@@ -7,11 +7,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>실시간 관제 - GPS119</title>
 
-    {{-- 기존 페이지와 동일한 Tailwind CDN(유틸 클래스 보장) --}}
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp,container-queries"></script>
-
-    {{-- 관제 전용 Vite 번들 SPA (FE-2.1) --}}
-    @vite('resources/js/control/main.js')
+    {{-- 관제 전용 Vite 번들 SPA (FE-2.1) — app.css로 컴파일된 Tailwind 유틸 로드 --}}
+    @vite(['resources/css/app.css', 'resources/js/control/main.js'])
 
     <style>html,body{height:100%;margin:0;overflow:hidden;}</style>
 </head>
