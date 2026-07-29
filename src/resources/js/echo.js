@@ -26,6 +26,14 @@ export function createEcho() {
         return echoInstance;
     }
 
+    // 크로스-번들 싱글턴: app.js 와 control/main.js 는 별도 번들이라 모듈 스코프
+    // echoInstance 가 공유되지 않는다. 한 페이지에 둘 다 로드돼도 Echo(=WS 연결)가
+    // 두 번 생기지 않도록 이미 초기화된 window.Echo 를 재사용한다.
+    if (typeof window !== 'undefined' && window.Echo) {
+        echoInstance = window.Echo;
+        return echoInstance;
+    }
+
     const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'http';
     const forceTLS = scheme === 'https';
 

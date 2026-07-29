@@ -17,6 +17,7 @@ export default {
             projects: [],          // [{id,name}]
             selectedProjectId: null,
             projectName: '',
+            backUrl: null,         // 지정 시 헤더에 "대시보드로" 백링크 표시(관리자 진입)
 
             mapReady: false,
             mapError: false,
@@ -71,8 +72,14 @@ export default {
         } catch (e) {
             this.projects = [];
         }
-        // 1개면 자동 선택
-        if (this.projects.length === 1) {
+        // 딥링크(?project=id → data-selected)로 지정된 행사가 활성 목록에 있으면 우선 진입,
+        // 없으면 최신(첫 번째, id desc)을 자동 선택. 여러 개면 헤더 셀렉트로 전환.
+        const root = document.getElementById('control-app');
+        this.backUrl = root?.dataset.backUrl || null;
+        const wanted = Number(root?.dataset.selected) || null;
+        if (wanted && this.projects.some((p) => p.id === wanted)) {
+            this.selectProject(wanted);
+        } else if (this.projects.length >= 1) {
             this.selectProject(this.projects[0].id);
         }
         // 브라우저 QA용 전역 노출
@@ -408,23 +415,27 @@ export default {
     },
 
     template: `
-<div class="h-[calc(100vh-0px)] w-full grid grid-cols-[280px_1fr] grid-rows-[56px_1fr] bg-gray-100 text-gray-900"
-     :class="{ 'grid-cols-[48px_1fr]': railCollapsed }">
+<div class="h-[calc(100vh-0px)] w-full grid grid-rows-[56px_1fr] bg-gray-100 text-gray-900"
+     :style="{ gridTemplateColumns: railCollapsed ? '0px 1fr' : '280px 1fr' }">
 
   <!-- HEADER -->
   <header class="col-span-2 row-start-1 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
     <div class="flex items-center gap-3 min-w-0">
+      <a v-if="backUrl" :href="backUrl" class="flex items-center gap-1 pl-1 pr-2 py-1.5 rounded-md hover:bg-gray-100 text-gray-500 text-sm font-medium" title="대시보드로 돌아가기">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        <span class="hidden sm:inline">대시보드</span>
+      </a>
+      <span v-if="backUrl" class="h-5 w-px bg-gray-200"></span>
       <button @click="toggleRail" class="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="사이드바">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <select v-if="projects.length > 1" :value="selectedProjectId" @change="selectProject($event.target.value)"
-              class="text-sm border border-gray-300 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-blue-500">
+      <span class="text-base font-bold whitespace-nowrap">실시간 관제</span>
+      <select v-if="projects.length" :value="selectedProjectId" @change="selectProject($event.target.value)"
+              class="text-sm font-medium border border-gray-300 rounded-md px-2.5 py-1.5 max-w-[220px] focus:ring-2 focus:ring-blue-500">
         <option :value="null" disabled>행사 선택</option>
         <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
       </select>
-      <h1 class="text-base font-bold truncate">
-        실시간 관제<span v-if="projectName"> — {{ projectName }}</span>
-      </h1>
+      <span v-else class="text-sm text-gray-400">활성 행사 없음</span>
     </div>
     <div class="flex items-center gap-4 text-sm">
       <!-- 기록 다운로드(BE-4.1) — controller/admin, 세션 쿠키로 GET -->

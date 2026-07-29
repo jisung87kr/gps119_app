@@ -22,16 +22,18 @@ class AdminController extends Controller
             'in_progress_requests' => RescueRequest::where('status', 'in_progress')->count(),
             'completed_requests' => RescueRequest::where('status', 'completed')->count(),
             'total_projects' => \App\Models\Project::count(),
-            'active_projects' => \App\Models\Project::where('status', 'active')->where('is_active', true)->count(),
+            // 활성 행사는 날짜 기반 스코프가 단일 출처 (stale status 컬럼 대신)
+            'active_projects' => \App\Models\Project::active()->count(),
+            'today_requests' => RescueRequest::whereDate('created_at', now())->count(),
         ];
 
-        $recent_requests = RescueRequest::with('user')
+        $recent_requests = RescueRequest::with(['user', 'project'])
             ->latest()
-            ->limit(10)
+            ->limit(8)
             ->get();
 
         $recent_users = User::latest()
-            ->limit(10)
+            ->limit(6)
             ->get();
 
         // 프로젝트별 요청 통계 (상위 5개 프로젝트)
@@ -40,7 +42,23 @@ class AdminController extends Controller
             ->limit(5)
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'recent_requests', 'recent_users', 'project_stats'));
+        // 최근 14일 일별 신고 수 (차트용, 실데이터)
+        $daily = collect(range(13, 0))->map(fn ($d) => [
+            'label' => now()->subDays($d)->format('n/j'),
+            'count' => RescueRequest::whereDate('created_at', now()->subDays($d))->count(),
+        ]);
+
+        // 오늘 vs 어제 증감 (KPI 추세 뱃지, 실데이터)
+        $yesterday = RescueRequest::whereDate('created_at', now()->subDay())->count();
+        $stats['today_delta'] = $stats['today_requests'] - $yesterday;
+
+        // 최근 7일 vs 이전 7일 신고량 (추세)
+        $week = RescueRequest::where('created_at', '>=', now()->subDays(7))->count();
+        $prevWeek = RescueRequest::whereBetween('created_at', [now()->subDays(14), now()->subDays(7)])->count();
+        $stats['week_requests'] = $week;
+        $stats['week_delta_pct'] = $prevWeek > 0 ? round(($week - $prevWeek) / $prevWeek * 100) : null;
+
+        return view('admin.dashboard', compact('stats', 'recent_requests', 'recent_users', 'project_stats', 'daily'));
     }
 
     public function members(Request $request)
