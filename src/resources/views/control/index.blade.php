@@ -14,6 +14,9 @@
 </head>
 <body class="h-full bg-gray-100">
     {{-- Vue 가 마운트할 루트. 활성 행사 목록을 data-projects 로 전달(1개면 자동선택) --}}
-    <div id="control-app" data-projects='@json($projects)'></div>
+    <div id="control-app"
+         data-projects='@json($projects)'
+         data-selected="{{ $selectedId ?? '' }}"
+         data-back-url="{{ $backUrl ?? '' }}"></div>
 </body>
 </html>

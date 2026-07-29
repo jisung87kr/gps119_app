@@ -114,6 +114,13 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex items-center gap-3">
+                                        @if($project->is_active && optional($project->start_date)->lte(now()) && optional($project->end_date)->gte(now()))
+                                            <a href="{{ route('admin.control', ['project' => $project->id]) }}"
+                                               class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700"
+                                               title="실시간 관제">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>관제
+                                            </a>
+                                        @endif
                                         <a href="{{ route('admin.projects.show', $project->id) }}"
                                            class="text-blue-600 hover:text-blue-700"
                                            title="상세보기">상세</a>

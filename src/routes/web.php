@@ -182,6 +182,25 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/projects/{id}/qrcode', [\App\Http\Controllers\Admin\ProjectController::class, 'qrcode'])->name('projects.qrcode');
     Route::post('/projects/{id}/clone', [\App\Http\Controllers\Admin\ProjectController::class, 'clone'])->name('projects.clone');
     Route::get('/projects/{id}/export-csv', [\App\Http\Controllers\Admin\ProjectController::class, 'exportCsv'])->name('projects.export-csv');
+
+    // 실시간 관제 — 관리자 셸에 임베드된 웹 관제 SPA(FE-2.1). 활성 행사 전체를 관제.
+    // ?project={id} 로 특정 행사를 지정하면 해당 행사로 진입(활성 행사가 아니면 무시).
+    Route::get('/control', function () {
+        $projects = \App\Models\Project::active()->orderByDesc('id')->get(['id', 'name']);
+
+        $selectedId = (int) request('project') ?: null;
+        if ($selectedId && ! $projects->contains('id', $selectedId)) {
+            $selectedId = null;
+        }
+
+        // 관제는 전용 풀블리드 레이아웃(control.index) — 좌측 관리자 GNB 없음.
+        // 헤더에 대시보드로 돌아가는 백링크만 노출한다.
+        return view('control.index', [
+            'projects' => $projects,
+            'selectedId' => $selectedId,
+            'backUrl' => route('admin.dashboard'),
+        ]);
+    })->name('control');
 });
 
 // Profile routes
