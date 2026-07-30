@@ -1,3 +1,6 @@
+// 현재 발송 위치 표시 — src/tmp/dispatch.html 바텀시트 상단 기준.
+// 카드로 감싸지 않고 "라벨 + 주소" 두 줄로 얇게 둔다. 좌표는 GPS 정확도를
+// 확인할 수 있어야 하는 도메인이라 보조 텍스트로 남긴다.
 export default {
     name: 'LocationInfo',
     props: {
@@ -17,117 +20,39 @@ export default {
             type: String,
             default: '위치 정보'
         },
-        bgColor: {
+        // 핀 아이콘 색. 구조 요청지처럼 긴급 대상 위치는 danger, 그 외는 brand.
+        tone: {
             type: String,
-            default: 'gray'
-        },
-        icon: {
-            type: String,
-            default: 'location'
+            default: 'brand'
         }
     },
     computed: {
-        bgClasses() {
-            const colorMap = {
-                'red': 'bg-red-50/80 border-red-100',
-                'blue': 'bg-blue-50/80 border-blue-100',
-                'gray': 'bg-gray-50/80 border-gray-100'
-            };
-            return colorMap[this.bgColor] || colorMap.gray;
+        hasCoords() {
+            return this.latitude !== '' && this.longitude !== '';
         },
-        iconBgClass() {
-            const colorMap = {
-                'red': 'bg-red-100',
-                'blue': 'bg-blue-100',
-                'gray': 'bg-gray-100'
-            };
-            return colorMap[this.bgColor] || colorMap.gray;
-        },
-        textClasses() {
-            const colorMap = {
-                'red': 'text-red-600',
-                'blue': 'text-blue-600',
-                'gray': 'text-gray-600'
-            };
-            return colorMap[this.bgColor] || colorMap.gray;
-        },
-        addressTextClasses() {
-            const colorMap = {
-                'red': 'text-red-900',
-                'blue': 'text-blue-900',
-                'gray': 'text-gray-900'
-            };
-            return colorMap[this.bgColor] || colorMap.gray;
-        },
-        coordTextClasses() {
-            const colorMap = {
-                'red': 'text-red-700/70',
-                'blue': 'text-blue-700/70',
-                'gray': 'text-gray-700/70'
-            };
-            return colorMap[this.bgColor] || colorMap.gray;
-        },
-        iconColor() {
-            const colorMap = {
-                'red': 'text-red-600',
-                'blue': 'text-blue-600',
-                'gray': 'text-gray-600'
-            };
-            return colorMap[this.bgColor] || colorMap.gray;
+        pinClass() {
+            return this.tone === 'danger' ? 'text-danger-600' : 'text-brand-600';
         }
     },
     template: `
-        <div class="rounded-2xl p-4 mb-3 border shadow-sm transition-all duration-300" :class="bgClasses">
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                    <div class="p-1.5 rounded-lg" :class="iconBgClass">
-                        <svg 
-                            v-if="icon === 'location'"
-                            xmlns="http://www.w3.org/2000/svg" 
-                            class="w-4 h-4"
-                            :class="iconColor"
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor" 
-                            stroke-width="2.5"
-                        >
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <svg 
-                            v-else-if="icon === 'clock'"
-                            xmlns="http://www.w3.org/2000/svg" 
-                            class="w-4 h-4"
-                            :class="iconColor"
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor" 
-                            stroke-width="2.5"
-                        >
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <h3 class="text-xs font-bold tracking-tight uppercase" :class="textClasses">{{ title }}</h3>
-                </div>
-            </div>
-            
-            <div v-if="address" class="text-[0.925rem] font-semibold mb-2 leading-snug break-all" :class="addressTextClasses">
-                {{ address }}
-            </div>
-            <div v-else class="text-sm italic mb-2 opacity-50" :class="addressTextClasses">
-                위치 정보를 가져오는 중...
-            </div>
+        <div class="px-5 pb-2 pt-1">
+            <p class="flex items-center gap-1.5 text-sm font-bold text-ink-400">
+                <svg class="h-[15px] w-[15px]" :class="pinClass" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+                </svg>
+                {{ title }}
+            </p>
 
-            <div class="flex gap-3 text-[10px] font-medium" :class="coordTextClasses">
-                <div class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/50 border border-black/5">
-                    <span class="opacity-60">LAT</span>
-                    <span class="font-mono">{{ latitude }}</span>
-                </div>
-                <div class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/50 border border-black/5">
-                    <span class="opacity-60">LNG</span>
-                    <span class="font-mono">{{ longitude }}</span>
-                </div>
-            </div>
+            <p v-if="address" class="mt-1 break-keep text-lg font-extrabold leading-snug text-ink-950">
+                {{ address }}
+            </p>
+            <p v-else class="mt-1 text-lg font-extrabold leading-snug text-ink-400">
+                위치 정보를 가져오는 중…
+            </p>
+
+            <p v-if="hasCoords" class="mt-1 font-mono text-xs text-ink-400">
+                {{ latitude }}, {{ longitude }}
+            </p>
         </div>
     `
 };

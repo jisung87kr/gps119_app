@@ -51,7 +51,33 @@ enum EventRole: string
     }
 
     /**
-     * 역할 뱃지용 Tailwind 클래스 (기존 Enum 패턴 일관성).
+     * 사용자 화면 배지 톤 (x-ui.badge 의 tone 프롭).
+     * 운영 권한이 있는 역할은 brand, 일반 참가자는 muted.
+     */
+    public function badgeTone(): string
+    {
+        return match ($this) {
+            self::PARTICIPANT => 'muted',
+            self::STAFF, self::POLICE, self::VOLUNTEER_COURSE,
+            self::VOLUNTEER_MEDIC, self::PARAMEDIC, self::CONTROLLER => 'brand',
+        };
+    }
+
+    /**
+     * 사용자 화면 아이콘 (x-ui.icon 이름).
+     */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::PARAMEDIC, self::VOLUNTEER_MEDIC => 'ambulance',
+            self::CONTROLLER => 'bell',
+            self::VOLUNTEER_COURSE => 'pin',
+            self::PARTICIPANT, self::STAFF, self::POLICE => 'user',
+        };
+    }
+
+    /**
+     * 역할 뱃지용 Tailwind 클래스 — 관리자 백오피스 전용 구 팔레트.
      */
     public function badgeClasses(): string
     {

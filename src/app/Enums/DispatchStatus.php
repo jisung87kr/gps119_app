@@ -26,6 +26,38 @@ enum DispatchStatus: string
         };
     }
 
+    /**
+     * 사용자 화면(구급대원 지령 앱) 배지 톤 — x-ui.badge 의 tone 프롭.
+     * 진행 단계는 brand, 배정 대기는 warning, 완료는 success, 거절은 muted.
+     */
+    public function badgeTone(): string
+    {
+        return match ($this) {
+            self::ASSIGNED => 'warning',
+            self::ACCEPTED, self::EN_ROUTE, self::ARRIVED => 'brand',
+            self::COMPLETED => 'success',
+            self::REJECTED => 'muted',
+        };
+    }
+
+    /**
+     * 사용자 화면 배지 아이콘 (x-ui.icon 이름).
+     */
+    public function badgeIcon(): string
+    {
+        return match ($this) {
+            self::ASSIGNED => 'bell',
+            self::ACCEPTED => 'check-circle',
+            self::EN_ROUTE => 'ambulance',
+            self::ARRIVED => 'pin',
+            self::COMPLETED => 'check-circle',
+            self::REJECTED => 'x-circle',
+        };
+    }
+
+    /**
+     * 지령 뱃지용 Tailwind 클래스 — 관리자 백오피스 전용 구 팔레트.
+     */
     public function badgeClasses(): string
     {
         return match ($this) {

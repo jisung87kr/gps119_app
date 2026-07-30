@@ -1,176 +1,135 @@
-<x-layouts.app>
-    <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+{{-- 홈(대시보드) — src/tmp/dashboard.html 기준. --}}
+<x-layouts.app title="GPS119 - 홈" tab="home">
+    <div class="space-y-6">
 
-        {{-- 상단: 인사 + 핵심 CTA --}}
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                    안녕하세요, {{ Auth::user()->name }}님 👋
-                </h1>
-                <p class="mt-1 text-sm font-medium text-slate-500">내 구조 요청 현황을 한눈에 확인하세요.</p>
-            </div>
-            <a href="{{ route('request.create') }}"
-               class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-500 transition-all shadow-lg shadow-red-200 active:scale-95 shrink-0">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                </svg>
-                긴급 구조 요청
-            </a>
+        {{-- 인사 --}}
+        <div>
+            <p class="text-sm font-semibold text-ink-500">{{ now()->format('Y년 n월 j일') }}</p>
+            <h1 class="mt-0.5 text-[26px] font-extrabold leading-snug tracking-tight text-ink-950">
+                안녕하세요,<br class="sm:hidden" /> {{ Auth::user()->name }}님
+            </h1>
         </div>
 
-        {{-- 통계 카드 --}}
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-            @php
-                $cards = [
-                    ['label' => '전체 요청', 'value' => $stats['total'], 'accent' => 'text-slate-900', 'ring' => 'ring-slate-200'],
-                    ['label' => '접수 대기', 'value' => $stats['pending'], 'accent' => 'text-amber-600', 'ring' => 'ring-amber-200'],
-                    ['label' => '진행중', 'value' => $stats['in_progress'], 'accent' => 'text-blue-600', 'ring' => 'ring-blue-200'],
-                    ['label' => '완료', 'value' => $stats['completed'], 'accent' => 'text-emerald-600', 'ring' => 'ring-emerald-200'],
-                ];
-            @endphp
-            @foreach ($cards as $card)
-                <div class="bg-white rounded-2xl border border-slate-200/60 p-4 sm:p-5 shadow-sm">
-                    <p class="text-xs font-semibold text-slate-500 mb-1">{{ $card['label'] }}</p>
-                    <p class="text-2xl sm:text-3xl font-black tracking-tight {{ $card['accent'] }}">{{ $card['value'] }}</p>
-                </div>
-            @endforeach
+        {{-- 긴급 구조 요청 — 화면에서 가장 강한 액션이므로 유일하게 danger 를 채운다 --}}
+        <x-ui.button :href="route('request.create')" variant="danger" size="xl">
+            <x-ui.icon name="bolt" class="h-6 w-6" />
+            긴급 구조 요청
+        </x-ui.button>
+
+        {{-- 요청 현황 --}}
+        <div class="grid grid-cols-2 gap-3">
+            <x-ui.stat label="전체 요청" :value="$stats['total']" />
+            <x-ui.stat label="접수 대기" :value="$stats['pending']" />
+            <x-ui.stat label="진행중" :value="$stats['in_progress']" />
+            <x-ui.stat label="완료" :value="$stats['completed']" />
         </div>
 
-        {{-- 참가 중인 행사 (운영 인력용 진입점) --}}
+        {{-- 참가 중인 행사 — 운영 인력이 자기 행사(활동/지령) 화면으로 가는 통로 --}}
         @if ($myEvents->isNotEmpty())
-            <section class="mb-8">
-                <h2 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 9h18"/><rect x="3" y="4" width="18" height="17" rx="2"/></svg>
-                    내 행사 {{ $myEvents->count() }}
-                </h2>
-                <div class="space-y-3">
-                    @foreach ($myEvents as $p)
-                        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 flex flex-wrap items-center gap-3">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                    <p class="text-sm font-bold text-slate-800 truncate">{{ $p->project->name }}</p>
-                                    <span class="flex-none px-2 py-0.5 text-[11px] font-medium rounded-full bg-slate-100 text-slate-600">{{ $p->role->label() }}</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                @if ($p->role->canReceiveDispatch())
-                                    <a href="{{ route('events.dispatch', $p->project_id) }}"
-                                       class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold rounded-xl text-white bg-red-600 hover:bg-red-700 transition shadow-sm shadow-red-600/25">
-                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V5a1 1 0 0 1 1-1h11l3 3v10"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+            <x-ui.section title="내 행사" :meta="$myEvents->count().'개'">
+                <x-ui.list>
+                    @foreach ($myEvents as $participant)
+                        <x-ui.list-item :icon="$participant->role->icon()" icon-tone="neutral"
+                                        :title="$participant->project->name"
+                                        :meta="$participant->role->label()">
+                            <x-slot:trailing>
+                                @if ($participant->role->canReceiveDispatch())
+                                    <x-ui.button :href="route('events.dispatch', $participant->project_id)" size="sm">
                                         지령·출동
-                                    </a>
+                                    </x-ui.button>
+                                    <x-ui.button :href="route('events.active', $participant->project_id)"
+                                                 variant="secondary" size="sm">
+                                        활동
+                                    </x-ui.button>
+                                @else
+                                    <x-ui.button :href="route('events.active', $participant->project_id)"
+                                                 variant="secondary" size="sm">
+                                        활동 화면
+                                    </x-ui.button>
                                 @endif
-                                <a href="{{ route('events.active', $p->project_id) }}"
-                                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
-                                    활동 화면
-                                </a>
-                            </div>
-                        </div>
+                            </x-slot:trailing>
+                        </x-ui.list-item>
                     @endforeach
-                </div>
-            </section>
+                </x-ui.list>
+            </x-ui.section>
         @endif
 
-        {{-- 진행 중인 요청 강조 --}}
+        {{-- 처리 중인 요청 (대기·진행중) — 내역보다 위에 강조 --}}
         @if ($activeRequests->isNotEmpty())
-            <section class="mb-8">
-                <h2 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                    <span class="relative flex h-2.5 w-2.5">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
-                    </span>
-                    처리 중인 요청 {{ $activeRequests->count() }}건
-                </h2>
-                <div class="space-y-3">
+            <x-ui.section title="처리 중인 요청" :meta="$activeRequests->count().'건'">
+                <x-ui.list>
                     @foreach ($activeRequests as $request)
-                        <a href="{{ route('request.show', $request) }}"
-                           class="block bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold {{ $request->status->badgeClasses() }}">
-                                            <span class="w-1.5 h-1.5 rounded-full {{ $request->status->dotClass() }}"></span>
-                                            {{ $request->status->label() }}
-                                        </span>
-                                        <span class="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold {{ $request->priority->badgeClasses() }}">
-                                            {{ $request->priority->label() }}
-                                        </span>
-                                    </div>
-                                    <p class="text-base font-bold text-slate-900 truncate">
-                                        {{ $request->address ?? '위치 확인 중' }}
-                                    </p>
-                                    <p class="mt-1 text-xs font-medium text-slate-400">
-                                        {{ $request->requested_at?->diffForHumans() }}
-                                        @if ($request->project)
-                                            · {{ $request->project->name }}
-                                        @endif
-                                        @if ($request->assignedRescuer)
-                                            · 담당 {{ $request->assignedRescuer->name }}
-                                        @endif
-                                    </p>
-                                </div>
-                                <svg class="w-5 h-5 text-slate-300 shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
+                        <x-ui.list-item :href="route('request.show', $request)" icon="pin">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <x-ui.badge :tone="$request->status->badgeTone()"
+                                            :icon="$request->status->badgeIcon()" size="sm">
+                                    {{ $request->status->label() }}
+                                </x-ui.badge>
+
+                                {{-- 우선순위는 눈에 띄어야 할 때(높음·긴급)만 노출해 배지 소음을 줄인다 --}}
+                                @if ($request->priority->badgeIcon())
+                                    <x-ui.badge :tone="$request->priority->badgeTone()"
+                                                :icon="$request->priority->badgeIcon()"
+                                                :filled="$request->priority->badgeFilled()" size="sm">
+                                        {{ $request->priority->label() }}
+                                    </x-ui.badge>
+                                @endif
                             </div>
-                        </a>
+
+                            <p class="mt-1.5 truncate text-base font-bold text-ink-950">
+                                {{ $request->address ?? '위치 확인 중' }}
+                            </p>
+                            <p class="mt-0.5 truncate text-sm text-ink-400">
+                                {{-- app locale 은 en 이므로 상대시간만 한국어로 지정 --}}
+                                {{ $request->requested_at?->locale('ko')->diffForHumans() }}
+                                @if ($request->project)
+                                    · {{ $request->project->name }}
+                                @endif
+                                @if ($request->assignedRescuer)
+                                    · 담당 {{ $request->assignedRescuer->name }}
+                                @endif
+                            </p>
+                        </x-ui.list-item>
                     @endforeach
-                </div>
-            </section>
+                </x-ui.list>
+            </x-ui.section>
         @endif
 
         {{-- 내 요청 내역 --}}
-        <section>
-            <h2 class="text-sm font-bold text-slate-700 mb-3">내 요청 내역</h2>
-
-            @forelse ($recentRequests as $request)
-                @if ($loop->first)
-                    <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm divide-y divide-slate-100 overflow-hidden">
-                @endif
-                    <a href="{{ route('request.show', $request) }}"
-                       class="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 {{ $request->status->badgeClasses() }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $request->status->dotClass() }}"></span>
-                            {{ $request->status->label() }}
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-sm font-bold text-slate-900 truncate">{{ $request->address ?? '위치 확인 중' }}</p>
-                            <p class="text-xs font-medium text-slate-400 truncate">
+        <x-ui.section title="내 요청 내역">
+            @if ($recentRequests->isNotEmpty())
+                <x-ui.list>
+                    @foreach ($recentRequests as $request)
+                        <x-ui.list-item :href="route('request.show', $request)" icon="pin">
+                            <x-ui.badge :tone="$request->status->badgeTone()"
+                                        :icon="$request->status->badgeIcon()" size="sm">
+                                {{ $request->status->label() }}
+                            </x-ui.badge>
+                            <p class="mt-1.5 truncate text-base font-bold text-ink-950">
+                                {{ $request->address ?? '위치 확인 중' }}
+                            </p>
+                            <p class="mt-0.5 truncate text-sm text-ink-400">
                                 {{ $request->requested_at?->format('Y.m.d H:i') }}
                                 @if ($request->project)
                                     · {{ $request->project->name }}
                                 @endif
                             </p>
-                        </div>
-                        <span class="inline-flex px-2 py-0.5 rounded-md text-xs font-semibold shrink-0 {{ $request->priority->badgeClasses() }}">
-                            {{ $request->priority->label() }}
-                        </span>
-                    </a>
-                @if ($loop->last)
-                    </div>
-                @endif
-            @empty
-                {{-- 빈 상태: 기존 마케팅 카피 재활용 --}}
-                <div class="relative overflow-hidden rounded-3xl bg-slate-900 px-6 py-12 sm:px-12 sm:py-14 shadow-2xl text-center">
-                    <div class="absolute -top-24 -right-24 w-96 h-96 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
-                    <div class="relative z-10 max-w-md mx-auto">
-                        <h3 class="text-2xl font-black text-white tracking-tight mb-3">
-                            아직 구조 요청이 없습니다
-                        </h3>
-                        <p class="text-sm text-slate-400 font-medium mb-7 leading-relaxed">
-                            긴급 상황에서 GPS 위치 정보를 활용해 신속하게 구조 요청을 보낼 수 있습니다.
-                        </p>
-                        <a href="{{ route('request.create') }}"
-                           class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-500 transition-all shadow-lg shadow-red-900/20 active:scale-95">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                            </svg>
-                            첫 구조 요청하기
-                        </a>
-                    </div>
-                </div>
-            @endforelse
-        </section>
+                        </x-ui.list-item>
+                    @endforeach
+                </x-ui.list>
+            @else
+                <x-ui.card class="text-center">
+                    <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                        <x-ui.icon name="pin" class="h-6 w-6" />
+                    </span>
+                    <p class="mt-3 text-base font-bold text-ink-950">아직 구조 요청이 없습니다</p>
+                    <p class="mt-1 text-sm leading-relaxed text-ink-500">
+                        긴급 상황에서 GPS 위치를 보내 신속하게 구조를 요청할 수 있습니다.
+                    </p>
+                    <x-ui.button :href="route('request.create')" class="mt-5">첫 구조 요청하기</x-ui.button>
+                </x-ui.card>
+            @endif
+        </x-ui.section>
 
     </div>
 </x-layouts.app>

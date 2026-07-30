@@ -6,23 +6,83 @@
 @source '../**/*.js';
 @source '../../public/js/**/*.js';
 
+/*
+ * 사용자 화면 디자인 시스템 "Ink + Brand" v6 — src/tmp/design-system.html 기준.
+ * 레퍼런스는 Tailwind 3 CDN + tailwind.config JS 로 작성돼 있으나 이 프로젝트는
+ * Tailwind 4 + Vite 이므로 @theme 으로 이식했다.
+ *
+ * 범위 주의: 관리자 백오피스(/admin/*)와 관제 SPA(/control)는 이번 리뉴얼 대상이
+ * 아니고 Tailwind 기본 slate/blue 팔레트 + Geist 폰트를 계속 쓴다. 그래서 기본
+ * 팔레트와 --font-sans 를 덮어쓰지 않고 신규 토큰만 추가한다.
+ */
 @theme {
-    --font-sans: 'Geist', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    /*
+     * 사용자 화면 폰트 — Pretendard (한글 최적화). layouts/app.blade.php 의 body 에
+     * font-app 으로 걸어 하위 전체가 상속받는다. --font-sans 를 바꾸면 Pretendard
+     * 웹폰트를 로드하지 않는 관리자·관제 화면 폰트까지 깨지므로 별도 토큰으로 둔다.
+     */
+    --font-app: 'Pretendard', 'Pretendard Variable', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Ink — 커스텀 웜 뉴트럴. Tailwind zinc/slate 대신 직접 선정. */
+    --color-ink-50: #fafaf9;
+    --color-ink-100: #f2f1ee;
+    --color-ink-200: #e5e3df;
+    --color-ink-300: #d0cdc7;
+    --color-ink-400: #a7a29a;
+    --color-ink-500: #79746c;
+    --color-ink-600: #57524a;
+    --color-ink-700: #3d3934;
+    --color-ink-800: #26221f;
+    --color-ink-900: #17140f;
+    --color-ink-950: #0e0c0a;
+
+    /* Brand — 메인 페트롤/틸. 로고·주요 버튼·링크·활성 탭·위치(GPS) 아이콘 전용. */
+    --color-brand-50: #e7f4f5;
+    --color-brand-100: #cfe9eb;
+    --color-brand-200: #9fd3d8;
+    --color-brand-500: #2e97a3;
+    --color-brand-600: #0e6e7c;
+    --color-brand-700: #0a5560;
+
+    /* Danger — 긴급 전용 시그널 레드. Tailwind red 보다 채도를 올렸다. */
+    --color-danger-50: #feecec;
+    --color-danger-100: #fcd4d4;
+    --color-danger-200: #f8a8a8;
+    --color-danger-500: #f0453f;
+    --color-danger-600: #e32f28;
+    --color-danger-700: #b91f1a;
+
+    /* Warning — 대기 상태. 비비드 골드. */
+    --color-warning-50: #fef3d9;
+    --color-warning-500: #e0a526;
+    --color-warning-600: #c4890f;
+
+    /* Success — 완료 상태. */
+    --color-success-50: #dff4e7;
+    --color-success-500: #1f9d5c;
+    --color-success-600: #187f49;
 }
 
 @layer base {
+    /*
+     * 사용자 화면 기본값. 관리자·관제 레이아웃은 자체 body 클래스로 덮어쓰므로
+     * (admin: bg-slate-50 text-slate-900 / control: bg-gray-100) 영향 없다.
+     */
     body {
-        @apply text-slate-900 antialiased bg-slate-50/50;
-        letter-spacing: -0.011em;
+        @apply text-ink-950 antialiased bg-ink-50;
     }
 }
 
 @layer components {
+    /*
+     * 관리자 백오피스 전용 레거시 유틸 — 리뉴얼 범위 밖이라 유지한다.
+     * 사용자 화면에서는 쓰지 말고 resources/views/components/ui/* 컴포넌트를 쓸 것.
+     */
     .card-compact {
         @apply bg-white border border-slate-200/60 shadow-sm rounded-xl overflow-hidden transition-all duration-300;
     }
-    
+
     .card-compact:hover {
         @apply border-slate-300/80 shadow-md;
     }

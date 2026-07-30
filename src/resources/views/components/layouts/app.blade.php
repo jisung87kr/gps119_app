@@ -1,3 +1,30 @@
+{{--
+    사용자 화면 셸 — src/tmp/design-system.html "Ink + Brand" v6 기준.
+    기존 웹사이트형 셸(sticky 헤더 + nav + Alpine 드롭다운 + 푸터)을 모바일 앱형
+    셸(최소 헤더 + 고정 하단 탭 바)로 재작성했다.
+
+    프롭:
+      title      <title> 태그 문구
+      heading    주면 서브페이지 헤더(타이틀). 없으면 브랜드 로고 헤더
+      back       heading 과 함께 주면 뒤로가기 버튼 노출 + 타이틀 중앙 정렬
+      tab        하단 탭 강제 지정(home|request|profile). 기본은 라우트명 자동 판별
+      bare       헤더·탭바·컨테이너 없이 슬롯만 렌더 (인증/전체화면 지도/에러 화면)
+      padded     컨테이너 좌우 패딩(px-5) 적용 여부. 기본 true
+
+    슬롯:
+      $actions   헤더 우측 액션 영역
+
+    사업자 정보(업체명·사업자번호)는 푸터가 사라졌으므로 프로필 화면 하단에 있다.
+--}}
+@props([
+    'title' => null,
+    'heading' => null,
+    'back' => null,
+    'tab' => null,
+    'bare' => false,
+    'padded' => true,
+])
+
 <!DOCTYPE html>
 <html lang="ko" class="scroll-smooth">
 <head>
@@ -6,9 +33,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'GPS119' }}</title>
 
-    {{-- PWA (Phase 4): 설치형 매니페스트 + 테마색 + iOS 홈화면 아이콘 --}}
+    {{-- PWA: 설치형 매니페스트 + 테마색(brand-600) + iOS 홈화면 아이콘 --}}
     <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#2563EB">
+    <meta name="theme-color" content="#0E6E7C">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -16,128 +43,52 @@
     <link rel="apple-touch-icon" href="/icon-192.png">
     <link rel="icon" type="image/png" href="/icon-192.png">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" rel="stylesheet">
+    {{-- Pretendard — 한글 최적화 본문 폰트. app.css 의 --font-app 과 짝. --}}
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-700">
-    <div class="flex flex-col min-h-screen">
-        <header class="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-200/60">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6">
-                <div class="flex justify-between items-center h-14">
-                    <div class="flex items-center gap-8">
-                        <a href="{{ url('/') }}" class="flex items-center gap-2 group">
-                            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                            </div>
-                            <span class="text-lg font-black tracking-tighter text-slate-900">GPS<span class="text-blue-600">119</span></span>
-                        </a>
+<body class="min-h-screen bg-ink-50 font-app text-ink-950 antialiased">
+@if ($bare)
+    {{ $slot }}
+@else
+    @php
+        // 하단 탭 바는 로그인 사용자에게만 의미가 있다(모든 탭 목적지가 auth 라우트).
+        $showTabs = auth()->check();
+    @endphp
 
-                        <nav class="hidden md:flex items-center gap-1">
-                            @auth
-                                <a href="{{ route('request.create') }}" class="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">구조 요청</a>
-                                <a href="{{ route('dashboard') }}" class="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">대시보드</a>
-                            @endauth
-                        </nav>
-                    </div>
+    <div @class(['mx-auto max-w-2xl', 'pb-28' => $showTabs, 'pb-10' => ! $showTabs])>
+        @if ($heading)
+            <x-ui.page-header :heading="$heading" :back="$back">
+                @isset($actions)
+                    <x-slot:actions>{{ $actions }}</x-slot:actions>
+                @endisset
+            </x-ui.page-header>
+        @else
+            <header class="flex items-center justify-between px-5 pb-2 pt-6">
+                <a href="{{ auth()->check() ? route('dashboard') : url('/') }}" class="flex items-center gap-2">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
+                        <x-ui.icon name="bolt-outline" class="h-4 w-4" />
+                    </span>
+                    <span class="text-base font-extrabold text-ink-950">GPS<span class="text-brand-600">119</span></span>
+                </a>
 
-                    <div class="flex items-center gap-3">
-                        @guest
-                            <div class="hidden md:flex items-center gap-2">
-                                <a href="{{ route('login') }}" class="px-4 py-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">로그인</a>
-                                <a href="{{ route('register') }}" class="px-4 py-1.5 text-sm font-bold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-all shadow-sm">회원가입</a>
-                            </div>
-                        @else
-                            <div class="relative hidden md:flex items-center gap-3 border-l border-slate-200 ml-2 pl-5" x-data="{ open: false }">
-                                <button @click="open = !open" class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">
-                                    <div class="w-7 h-7 bg-slate-200 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-300">
-                                        {{ mb_substr(Auth::user()->name, 0, 1) }}
-                                    </div>
-                                    <span class="text-sm font-semibold text-slate-700">{{ Auth::user()->name }}</span>
-                                    <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
+                @isset($actions)
+                    <div class="flex items-center gap-1">{{ $actions }}</div>
+                @endisset
+            </header>
+        @endif
 
-                                <div x-show="open" @click.away="open = false" 
-                                     x-transition:enter="transition ease-out duration-100"
-                                     x-transition:enter-start="opacity-0 scale-95"
-                                     x-transition:enter-end="opacity-100 scale-100"
-                                     class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200/60 py-1.5 z-50">
-                                    <a href="{{ route('profile.show') }}" class="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 font-medium transition-colors">프로필 설정</a>
-                                    <div class="my-1 border-t border-slate-100"></div>
-                                    <form method="POST" action="{{ route('logout') }}">
-                                        @csrf
-                                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-semibold transition-colors">로그아웃</button>
-                                    </form>
-                                </div>
-                            </div>
-                        @endguest
-
-                        <!-- Mobile Menu Button -->
-                        <div class="md:hidden" x-data="{ open: false }">
-                            <button @click="open = !open" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                                </svg>
-                            </button>
-                            <div x-show="open" @click.away="open = false" 
-                                 x-transition:enter="transition ease-out duration-150"
-                                 x-transition:enter-start="opacity-0 translate-y-2"
-                                 x-transition:enter-end="opacity-100 translate-y-0"
-                                 class="absolute right-4 left-4 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200/60 p-2 z-[110]">
-                                <div class="space-y-1">
-                                    @auth
-                                        <a href="{{ route('request.create') }}" class="block px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl">구조 요청</a>
-                                        <a href="{{ route('dashboard') }}" class="block px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl">대시보드</a>
-                                        <div class="border-t border-slate-100 my-2"></div>
-                                        <a href="{{ route('profile.show') }}" class="block px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-xl">내 프로필</a>
-                                        <form method="POST" action="{{ route('logout') }}">
-                                            @csrf
-                                            <button type="submit" class="w-full text-left px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl">로그아웃</button>
-                                        </form>
-                                    @else
-                                        <a href="{{ route('login') }}" class="block px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl">로그인</a>
-                                        <a href="{{ route('register') }}" class="block px-4 py-3 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl">회원가입</a>
-                                    @endauth
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <main class="flex-1 flex flex-col">
+        <main @class(['pt-4', 'px-5' => $padded])>
             {{ $slot }}
         </main>
-
-        <footer class="bg-white border-t border-slate-200/60 py-10 mt-auto">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 text-center md:text-left">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                    <div>
-                        <div class="flex items-center gap-2 mb-4 justify-center md:justify-start">
-                            <div class="w-6 h-6 bg-slate-200 rounded flex items-center justify-center">
-                                <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                            </div>
-                            <span class="text-sm font-black tracking-tighter text-slate-400">GPS119</span>
-                        </div>
-                        <p class="text-xs text-slate-400 font-medium">업체명: 세이브미 | 사업자번호: 852-08-02915</p>
-                        <p class="text-xs text-slate-400 mt-1 font-medium">&copy; {{ date('Y') }} GPS119. All rights reserved.</p>
-                    </div>
-                    <div class="text-xs text-slate-400 font-medium md:text-right">
-                        Made with ❤️ by <a href="" class="text-blue-500 hover:underline">indigo404.com</a>
-                    </div>
-                </div>
-            </div>
-        </footer>
     </div>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    @if ($showTabs)
+        <x-ui.tab-bar :active="$tab" />
+    @endif
+@endif
 </body>
 </html>

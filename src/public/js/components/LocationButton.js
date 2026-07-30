@@ -1,3 +1,5 @@
+// 현재 위치 재조회 버튼 — src/tmp/dispatch.html 의 지도 위 플로팅 버튼 기준.
+// 흰 원 + brand-600 아이콘 + ink-200 링. 바텀시트 위쪽에 떠 있다.
 export default {
     name: 'LocationButton',
     props: {
@@ -12,50 +14,35 @@ export default {
         }
     },
     template: `
-        <div
+        <button
+            type="button"
             @click="handleClick"
-            class="bg-blue-600 hover:bg-blue-700 absolute right-5 top-[-60px] w-10 h-10 rounded-full flex items-center justify-center cursor-pointer shadow-xl transform transition-all duration-300 hover:scale-110 active:scale-95 z-[100]"
+            :disabled="loading"
+            aria-label="현재 위치 다시 가져오기"
+            class="absolute right-4 top-[-60px] z-30 flex h-12 w-12 items-center justify-center rounded-full bg-white text-brand-600 shadow-lg ring-1 ring-ink-200 transition-colors active:bg-ink-50"
         >
-            <div class="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20" v-show="!loading"></div>
-
             <svg
-                v-show="!loading"
-                xmlns="http://www.w3.org/2000/svg"
-                class="icon icon-tabler icon-tabler-focus-2 relative z-10"
-                width="24"
-                height="24"
+                v-if="!loading"
+                class="h-[22px] w-[22px]"
                 viewBox="0 0 24 24"
-                stroke-width="2.5"
-                stroke="#ffffff"
-                fill="none"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                fill="currentColor"
+                aria-hidden="true"
             >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <circle cx="12" cy="12" r=".5" fill="currentColor" />
-                <path d="M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
-                <path d="M12 3l0 2" />
-                <path d="M3 12l2 0" />
-                <path d="M12 19l0 2" />
-                <path d="M19 12l2 0" />
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
             </svg>
 
             <svg
-                v-show="loading"
-                xmlns="http://www.w3.org/2000/svg"
-                class="icon icon-tabler icon-tabler-loader-2 animate-spin relative z-10"
-                width="28"
-                height="28"
+                v-else
+                class="h-[22px] w-[22px] animate-spin"
                 viewBox="0 0 24 24"
-                stroke-width="2.5"
-                stroke="#ffffff"
                 fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
                 stroke-linecap="round"
-                stroke-linejoin="round"
+                aria-hidden="true"
             >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                 <path d="M12 3a9 9 0 1 0 9 9" />
             </svg>
-        </div>
+        </button>
     `
 };

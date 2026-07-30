@@ -53,7 +53,60 @@ enum RequestType: string
     }
 
     /**
-     * 유형 뱃지용 Tailwind 클래스 (기존 Enum 패턴 일관성).
+     * 사용자 화면 아이콘 (x-ui.icon 이름). 신고 상황 버튼·목록 아이콘 공용.
+     */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::ACCIDENT => 'accident',
+            self::BREAKDOWN => 'breakdown',
+            self::OTHER => 'chat',
+            self::EMERGENCY => 'phone',
+        };
+    }
+
+    /**
+     * 사용자 화면 배지 톤 (x-ui.badge 의 tone 프롭).
+     */
+    public function badgeTone(): string
+    {
+        return match ($this) {
+            self::ACCIDENT, self::EMERGENCY => 'danger',
+            self::BREAKDOWN => 'neutral',
+            self::OTHER => 'muted',
+        };
+    }
+
+    /**
+     * 빠른 실행 그리드 셀 톤 (x-ui.action-button 의 tone 프롭).
+     *
+     * 2단계 구분: 긴급전화는 즉시 통화(danger 채움), 사고발생은 접수 요청(danger 연톤),
+     * 고장·기타는 색 없이 중립. (design-system.html "빠른 실행 그리드" 규칙)
+     */
+    public function actionTone(): string
+    {
+        return match ($this) {
+            self::EMERGENCY => 'danger-solid',
+            self::ACCIDENT => 'danger-soft',
+            self::BREAKDOWN, self::OTHER => 'neutral',
+        };
+    }
+
+    /**
+     * 신고 화면 상황 버튼 라벨 — label() 보다 구체적인 행동 문구.
+     */
+    public function actionLabel(): string
+    {
+        return match ($this) {
+            self::ACCIDENT => '사고발생',
+            self::BREAKDOWN => '차량고장',
+            self::OTHER => '기타문의',
+            self::EMERGENCY => '긴급전화',
+        };
+    }
+
+    /**
+     * 유형 뱃지용 Tailwind 클래스 — 관리자 백오피스 전용 구 팔레트.
      */
     public function badgeClasses(): string
     {
