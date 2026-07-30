@@ -1,6 +1,7 @@
 # 사용자 화면 디자인 리뉴얼 — 대상 라우터 목록
 
 작성일: 2026-07-30 / 기준 브랜치: `feature/event-participant-management`
+작업 브랜치: `feature/user-ui-renewal` — **Tier 1~5 전부 완료** (아래 "작업 결과" 참조)
 
 `admin` 미들웨어가 걸린 관리자 백오피스와 API 라우트는 제외하고, **최종 사용자(신고자) + 현장 운영 인력**이 브라우저로 보게 되는 화면만 정리했다.
 GET(화면) 라우트만 대상이며, POST/PATCH/DELETE 는 해당 화면의 폼 액션이라 별도 항목으로 두지 않았다.
@@ -159,14 +160,51 @@ QR 스캔 → 로그인 → 위치 전송 → 상태 추적. 앱의 존재 이�
 6. **`public/offline.html`** — PWA 오프라인 폴백, 별도 스타일.
 7. **`resources/js/control/*`** — 관제 SPA. **범위 밖이지만** 토큰을 공유하면 색이 바뀐다. `@theme` 만 갈면 slate/blue 유틸을 쓰는 관제 화면은 영향 없으나, 기존 유틸을 지우면 깨진다. → **기존 slate/blue 유틸은 남겨두고 신규 토큰을 추가하는 방식**이 안전.
 
-## 권장 작업 순서
+## 작업 순서 (실제 진행 순서)
 
 1. **토큰 + 폰트** — `app.css` 에 `@theme` 로 ink/brand/danger/warning/success 추가, Pretendard 교체. 기존 slate/blue 는 관제·관리자 화면 때문에 유지.
-2. **셸 재작성** — `layouts/app.blade.php`: 헤더 축소 + 하단 탭 바 + 푸터 제거. 서브페이지용 `<x-page-header>` 슬롯 추가.
-3. **공통 컴포넌트 추출** — design-system.html 의 어휘를 Blade 컴포넌트로: 버튼 4종, 배지, 목록 행, KPI 카드, 2x2 액션 그리드, 아이콘 12종(SVG partial).
-4. **Enum 뷰 헬퍼 재작성** — 배지 클래스 구조 변경 (배경 채움 → 테두리 + 텍스트 색).
+2. **셸 재작성** — `layouts/app.blade.php`: 헤더 축소 + 하단 탭 바 + 푸터 제거.
+3. **공통 컴포넌트 추출** — design-system.html 의 어휘를 Blade 컴포넌트로.
+4. **Enum 뷰 헬퍼** — 배지 톤/아이콘 메서드 추가 (기존 클래스 메서드는 관리자용으로 유지).
 5. **Tier 1** — dashboard → request.create(+project, JS 컴포넌트 포함) → request.show.
-6. **Tier 2** — login → register → forgot/reset. (+ 없는 `verify-email`/`two-factor-challenge` 처리 결정)
-7. **Tier 4** — profile 4화면. (푸터 사업자정보 이관 포함)
-8. **Tier 3** — events.join → events.active → events.dispatch(최대 난이도, 시안 없음).
-9. **Tier 5** — 에러·안내 13뷰.
+6. **Tier 2** — login → register → forgot/reset (+ 누락 Fortify 뷰 2개).
+7. **Tier 4** — profile 4화면 (푸터 사업자정보 이관 포함).
+8. **Tier 3** — events.join → events.active → events.dispatch.
+9. **Tier 5** — 에러·안내 뷰.
+
+---
+
+# 작업 결과
+
+## 신설된 것
+
+`resources/views/components/ui/` **16개 컴포넌트** — `icon`(24종 path), `button`, `action-button`, `badge`, `card`, `stat`, `list`, `list-item`, `section`, `input`, `field`, `alert`, `empty`, `page-header`, `tab-bar`, `auth-shell`.
+
+`resources/views/request/_map-screen.blade.php` — `request/create` 와 `create-project` 가 90% 중복이던 마크업의 공용 파티셜.
+
+## 리뉴얼 중 고친 결함
+
+1. **`auth/two-factor-challenge` 뷰 없음 (500 에러)** — `config/fortify.php` 의 `twoFactorAuthentication` 이 켜져 있어 `GET /two-factor-challenge` 라우트는 존재하는데 `FortifyServiceProvider:82` 가 가리키는 뷰 파일이 없었다. 2FA 를 설정한 사용자가 로그인하면 500. 뷰를 만들어 해결.
+2. **`auth/verify-email` 뷰 없음** — 동일 원인(`FortifyServiceProvider:78`). `Features::emailVerification()` 이 주석 처리돼 지금은 라우트가 없지만 켜는 순간 터진다. 뷰를 만들어 뒀다.
+
+## 알아둘 함정 (다음 작업자용)
+
+- **Blade 컴포넌트 태그의 속성값에 `{{ }}` 를 쓰면 안 된다.** 에코가 먼저 컴파일돼 태그 안에 raw PHP 가 남고, 컴포넌트 태그 파서가 그 태그를 통째로 못 읽어 여는 태그만 리터럴로 남는다 → `syntax error, unexpected token "endif"`. Vue 핸들러는 `vue-click` 프롭으로 넘긴다(`x-ui.button`, `x-ui.action-button`). 값이 PHP 식이어야 하면 `:prop="식"` 을 쓸 것.
+- **`x-ui.icon` 의 `class` 는 merge 가 아니라 대체다.** `$attributes->merge(['class' => 'h-5 w-5'])` 로 두면 `h-5 w-5 h-3 w-3` 처럼 충돌 유틸이 함께 출력돼 어느 쪽이 이기는지가 CSS 순서에 좌우된다.
+- **바텀시트는 2겹으로 둔다.** 위치 재조회 버튼이 시트 위로(`top: -60px`) 떠야 하므로 바깥 겹에는 `overflow` 를 두지 않고 스크롤은 안쪽 박스가 맡는다. 한 겹이면 `overflow-y-auto` 가 버튼을 잘라먹는다.
+- **에러·오프라인 화면은 `@vite` 를 쓰지 않는다.** 에셋 파이프라인이나 서버가 망가진 상황에서도 떠야 해서 팔레트 hex 를 인라인 CSS 로 옮겼다 (`errors/minimal.blade.php`, `public/offline.html`).
+- **상대시간은 `->locale('ko')` 를 붙인다.** app locale 이 `en` 이라 그냥 `diffForHumans()` 하면 "9 hours ago" 가 나온다.
+
+## 범위 밖으로 남긴 것
+
+- **관리자 백오피스** `/admin/*` 17개 라우트 + `layouts/admin.blade.php` — slate/blue 팔레트와 Geist 폰트를 그대로 쓴다. 그래서 `app.css` 는 기본 팔레트와 `--font-sans` 를 덮어쓰지 않고 신규 토큰만 추가했고, 사용자 화면은 body 에 `font-app` 을 걸어 Pretendard 를 상속받는다.
+  - 예외: `auth/admin-register.blade.php` 는 인증 껍데기를 공유하는 화면이라 함께 이식했다(옛 셸에 남기면 이 화면만 어긋난다).
+- **웹 관제 SPA** `/control`, `/admin/control` — Vite 번들 Vue, 상황실 대형 모니터용 별도 트랙.
+- **Enum 의 `badgeClasses()`/`dotClass()`** — 관리자 통계 화면이 계속 쓰므로 덮어쓰지 않고 `badgeTone()`/`badgeIcon()` 을 새로 추가했다. 사용자 화면은 새 메서드만 쓴다.
+
+## 남은 정리 후보 (이번에 손대지 않음)
+
+- **`resources/views/home.blade.php` (122줄)** — `view('home')` 호출처가 코드 전체에 없는 데드 파일. 삭제 후보.
+- **`resources/views/errors/layout.blade.php` (53줄)** — `errors::layout` 을 `@extends` 하는 뷰가 없다. Laravel 이 퍼블리시한 미사용 파일. 삭제 후보.
+- **레퍼런스 설정 목록의 "고객센터 문의"·"이용약관·개인정보처리방침"** — 대응 페이지가 없어 프로필 설정 목록에 넣지 않았다. 페이지를 만들면 추가할 자리.
+- **레퍼런스 헤더의 알림 벨** — 알림 목록 화면·API 가 없어 넣지 않았다. 셸 헤더에 `$actions` 슬롯을 뚫어 뒀으니 기능이 생기면 거기에 붙인다.

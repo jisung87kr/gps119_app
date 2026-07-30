@@ -4,30 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>오프라인 - GPS119</title>
+    <link rel="icon" type="image/png" href="/icon-192.png">
+    <!--
+        서비스워커 오프라인 폴백. 네트워크가 없는 상태에서 뜨는 화면이라
+        빌드된 CSS·웹폰트에 의존하지 않고 "Ink + Brand" 팔레트 hex 를 인라인으로 옮겼다.
+    -->
     <style>
-        body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
-               background:#f8fafc; color:#0f172a; font-family:system-ui,-apple-system,sans-serif; }
-        .box { text-align:center; padding:24px; }
-        .pin { width:64px; height:64px; margin:0 auto 16px; background:#2563EB; border-radius:16px;
-               display:flex; align-items:center; justify-content:center; }
-        .pin svg { width:36px; height:36px; color:#fff; }
-        h1 { font-size:20px; font-weight:800; margin:0 0 8px; }
-        p { color:#64748b; font-size:14px; margin:0 0 20px; }
-        button { background:#2563EB; color:#fff; border:0; padding:12px 24px; border-radius:12px;
-                 font-size:15px; font-weight:700; cursor:pointer; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body {
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 40px 24px;
+            background: #FAFAF9;                 /* ink-50 */
+            color: #0E0C0A;                      /* ink-950 */
+            font-family: 'Pretendard', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .box { width: 100%; max-width: 384px; text-align: center; }
+        .mark {
+            width: 64px; height: 64px; margin: 0 auto 24px;
+            background: #0E6E7C;                 /* brand-600 */
+            border-radius: 24px; color: #fff;
+            display: flex; align-items: center; justify-content: center;
+        }
+        h1 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.4; word-break: keep-all; }
+        p {
+            margin: 8px 0 0; font-size: 15px; line-height: 1.7;
+            color: #79746C;                      /* ink-500 */
+            word-break: keep-all;
+        }
+        button {
+            margin-top: 32px; width: 100%;
+            background: #0E6E7C; color: #fff; border: 0;
+            padding: 16px; border-radius: 16px;
+            font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+        }
+        button:active { background: #0A5560; }   /* brand-700 */
     </style>
 </head>
 <body>
     <div class="box">
-        <div class="pin">
-            <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <div class="mark" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
             </svg>
         </div>
         <h1>오프라인 상태입니다</h1>
-        <p>인터넷 연결을 확인한 뒤 다시 시도해 주세요.<br>긴급 시에는 119로 전화하세요.</p>
-        <button onclick="location.reload()">다시 시도</button>
+        <p>인터넷 연결을 확인한 뒤 다시 시도해 주세요.<br>긴급 시에는 119로 바로 전화하세요.</p>
+        <button type="button" onclick="location.reload()">다시 시도</button>
     </div>
 </body>
 </html>

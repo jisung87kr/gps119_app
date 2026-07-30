@@ -1,34 +1,22 @@
-<x-layouts.app>
-    <div class="min-h-screen flex items-center justify-center bg-gray-50 w-full">
-        <div class="max-w-md w-full space-y-8">
-            <div class="text-center">
-                <div class="mx-auto h-24 w-24 bg-red-100 rounded-full flex items-center justify-center">
-                    <svg class="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                </div>
-                <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
-                    회원가입 오류
-                </h2>
-                <p class="mt-2 text-sm text-gray-600">
-                    이미 등록된 사용자 정보입니다.
-                </p>
-                <p class="text-sm text-gray-600">
-                    다른 소셜 계정으로 가입하셨거나, 이미 계정이 존재합니다.
-                </p>
-            </div>
+{{--
+    소셜 로그인 중복 계정 안내 — 미로그인 상태에서도 뜨므로 인증 껍데기를 쓴다.
+--}}
+<x-layouts.app title="GPS119 - 이미 등록된 계정" bare>
+    <x-ui.auth-shell subtitle="이미 등록된 계정입니다">
+        <x-ui.card class="text-center">
+            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-warning-50 text-warning-600">
+                <x-ui.icon name="alert-circle" class="h-8 w-8" />
+            </span>
+            <p class="mt-4 text-lg font-extrabold text-ink-950">가입을 진행할 수 없습니다</p>
+            <p class="mt-2 break-keep text-base leading-relaxed text-ink-500">
+                다른 소셜 계정으로 가입하셨거나 같은 정보의 계정이 이미 있습니다.
+                기존 계정으로 로그인해 주세요.
+            </p>
+        </x-ui.card>
 
-            <div class="space-y-4">
-                <a href="{{ route('login') }}"
-                   class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    로그인 페이지로 이동
-                </a>
-
-                <a href="{{ route('request.create') }}"
-                   class="group relative w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    홈으로 이동
-                </a>
-            </div>
+        <div class="mt-6 space-y-3">
+            <x-ui.button :href="route('login')">로그인 화면으로</x-ui.button>
+            <x-ui.button :href="route('password.request')" variant="secondary">비밀번호 찾기</x-ui.button>
         </div>
-    </div>
+    </x-ui.auth-shell>
 </x-layouts.app>
