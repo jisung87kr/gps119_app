@@ -23,7 +23,37 @@ enum RequestStatus: string
     }
 
     /**
-     * 상태 뱃지용 Tailwind 클래스 (배경/글자/링).
+     * 사용자 화면 배지 톤 (x-ui.badge 의 tone 프롭).
+     *
+     * 디자인 시스템 "Ink + Brand": 배지는 흰 배경 + ink-200 테두리가 기본이고
+     * 색은 아이콘·텍스트에만 쓴다. 그래서 클래스 문자열이 아니라 톤/아이콘만 넘긴다.
+     * (아래 badgeClasses() 는 관리자 백오피스가 계속 쓰는 구 팔레트 — 건드리지 말 것)
+     */
+    public function badgeTone(): string
+    {
+        return match ($this) {
+            self::PENDING => 'warning',
+            self::IN_PROGRESS => 'neutral',
+            self::COMPLETED => 'success',
+            self::CANCELLED => 'muted',
+        };
+    }
+
+    /**
+     * 사용자 화면 배지 아이콘 (x-ui.icon 이름).
+     */
+    public function badgeIcon(): string
+    {
+        return match ($this) {
+            self::PENDING => 'clock',
+            self::IN_PROGRESS => 'ambulance',
+            self::COMPLETED => 'check-circle',
+            self::CANCELLED => 'x-circle',
+        };
+    }
+
+    /**
+     * 상태 뱃지용 Tailwind 클래스 (배경/글자/링) — 관리자 백오피스 전용 구 팔레트.
      */
     public function badgeClasses(): string
     {

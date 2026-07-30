@@ -27,6 +27,30 @@ enum ParticipantStatus: string
     }
 
     /**
+     * 사용자 화면 배지 톤 (x-ui.badge 의 tone 프롭).
+     */
+    public function badgeTone(): string
+    {
+        return match ($this) {
+            self::PENDING => 'warning',
+            self::ACTIVE => 'success',
+            self::LEFT => 'muted',
+        };
+    }
+
+    /**
+     * 사용자 화면 배지 아이콘 (x-ui.icon 이름).
+     */
+    public function badgeIcon(): string
+    {
+        return match ($this) {
+            self::PENDING => 'clock',
+            self::ACTIVE => 'check-circle',
+            self::LEFT => 'x-circle',
+        };
+    }
+
+    /**
      * 활동중 여부.
      */
     public function isActive(): bool

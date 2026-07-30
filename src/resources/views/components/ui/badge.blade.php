@@ -3,7 +3,8 @@
     흰 배경 + ink-200 테두리를 기본으로 하고 색은 아이콘·텍스트에만 쓴다.
     긴급(filled)만 배경까지 채운다.
 
-    tone  : neutral | warning | success | danger | brand
+    tone  : neutral | muted | warning | success | danger | brand
+            (muted 는 취소·거절처럼 힘을 뺄 상태용 — 레퍼런스에 없는 확장)
     size  : md(14px, 기본) | sm(12px)
     filled: 배경 채우기(tone-50) + 테두리 제거 — 긴급 전용
     icon  : x-ui.icon 이름
@@ -18,6 +19,7 @@
 @php
     $textTones = [
         'neutral' => 'text-ink-900',
+        'muted' => 'text-ink-400',
         'warning' => 'text-warning-600',
         'success' => 'text-success-600',
         'danger' => 'text-danger-600',
@@ -26,6 +28,7 @@
 
     $fillTones = [
         'neutral' => 'bg-ink-100',
+        'muted' => 'bg-ink-100',
         'warning' => 'bg-warning-50',
         'success' => 'bg-success-50',
         'danger' => 'bg-danger-50',
