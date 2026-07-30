@@ -36,7 +36,8 @@ class PwaTest extends TestCase
         $this->assertIsArray($manifest);
         $this->assertSame('standalone', $manifest['display']);
         $this->assertSame('/', $manifest['start_url']);
-        $this->assertSame('#2563EB', $manifest['theme_color']);
+        // brand-600 — 사용자 화면 디자인 시스템 "Ink + Brand" 메인 컬러
+        $this->assertSame('#0E6E7C', $manifest['theme_color']);
         $this->assertNotEmpty($manifest['name']);
         $this->assertNotEmpty($manifest['short_name']);
 
