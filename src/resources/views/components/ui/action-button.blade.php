@@ -7,11 +7,17 @@
       tone="danger-soft"  사고발생 — 접수 요청 (danger-50 배경 + danger-200 테두리)
       tone="neutral"      차량고장·기타문의 — 색 없이 중립
 --}}
+{{--
+    vueClick: Vue 클릭 핸들러 식. Blade 컴포넌트 태그의 속성값에 {{ }} 를 쓰면
+    태그 파서가 깨지므로(속성 안에 raw PHP 가 남는다) 속성 대신 프롭으로 받는다.
+    :vue-click="..." 처럼 PHP 식으로 넘길 것.
+--}}
 @props([
     'tone' => 'neutral',
     'icon' => null,
     'href' => null,
     'type' => 'button',
+    'vueClick' => null,
 ])
 
 @php
@@ -33,7 +39,9 @@
         <span class="text-base font-extrabold">{{ $slot }}</span>
     </a>
 @else
-    <button type="{{ $type }}" {{ $attributes->merge(['class' => $classes]) }}>
+    <button type="{{ $type }}"
+            @if ($vueClick) v-on:click="{{ $vueClick }}" @endif
+            {{ $attributes->merge(['class' => $classes]) }}>
         @if ($icon)
             <x-ui.icon :name="$icon" class="h-[26px] w-[26px]" />
         @endif

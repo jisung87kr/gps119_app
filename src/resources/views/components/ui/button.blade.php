@@ -5,6 +5,9 @@
     variant : primary | danger | secondary | ghost
     size    : xl(전폭·18px) | lg(전폭·16px, 기본) | sm(인라인 pill)
     href 를 주면 <a>, 없으면 <button type="{{ $type }}">.
+
+    vueClick: Vue 클릭 핸들러 식. Blade 컴포넌트 태그의 속성값에 {{ }} 를 쓰면
+    태그 파서가 깨지므로(속성 안에 raw PHP 가 남는다) 속성 대신 프롭으로 받는다.
 --}}
 @props([
     'variant' => 'primary',
@@ -12,6 +15,7 @@
     'href' => null,
     'type' => 'button',
     'disabled' => false,
+    'vueClick' => null,
 ])
 
 @php
@@ -45,5 +49,7 @@
 @if ($href && ! $disabled)
     <a href="{{ $href }}" {{ $attributes->merge(['class' => $classes]) }}>{{ $slot }}</a>
 @else
-    <button type="{{ $type }}" @disabled($disabled) {{ $attributes->merge(['class' => $classes]) }}>{{ $slot }}</button>
+    <button type="{{ $type }}" @disabled($disabled)
+            @if ($vueClick) v-on:click="{{ $vueClick }}" @endif
+            {{ $attributes->merge(['class' => $classes]) }}>{{ $slot }}</button>
 @endif
