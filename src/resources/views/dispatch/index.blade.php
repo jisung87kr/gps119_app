@@ -1,121 +1,161 @@
-<x-layouts.app>
+{{--
+    구급대원 지령(출동) 앱 — 시안이 없는 화면이라 design-system.html 어휘로 파생했다.
+    배지 색은 dispatchMeta.js(= App\Enums\DispatchStatus 미러)에서 온다.
+    Vue 화면이라 Blade 컴포넌트를 쓸 수 없는 동적 부분은 클래스를 직접 적었다.
+    스크립트 동작은 기존과 동일.
+--}}
+<x-layouts.app :title="'GPS119 - 지령·출동'" :heading="$project->name" :back="route('events.active', $project->id)">
     <!-- Vue 3 (페이지별 마운트 — 기존 패턴 계승) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- 개인 지령 채널(event.{id}.dispatch.{userId}) 구독용 본인 id -->
     <script>window.__authUserId = {{ auth()->id() }};</script>
 
-    <div class="flex-1 bg-slate-50">
-        <div id="dispatchApp"
-             class="w-full max-w-md mx-auto px-4 py-6"
-             data-project-id="{{ $project->id }}"
-             data-role="{{ $role }}"
-             data-role-label="{{ $roleLabel }}"
-             data-project-name="{{ $project->name }}">
+    <div id="dispatchApp"
+         class="space-y-4"
+         data-project-id="{{ $project->id }}"
+         data-role="{{ $role }}"
+         data-role-label="{{ $roleLabel }}"
+         data-project-name="{{ $project->name }}">
 
-            <!-- 헤더 -->
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2 min-w-0">
-                    <a href="{{ route('events.active', $project->id) }}" class="flex-none p-1.5 -ml-1 rounded-lg text-slate-400 hover:bg-slate-100" title="활동 화면으로">
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
-                    </a>
-                    <div class="min-w-0">
-                        <h1 class="text-lg font-black tracking-tight text-slate-900 truncate">@{{ projectName }}</h1>
-                        <p class="text-xs text-slate-400">@{{ roleLabel }} · 지령 수신 대기</p>
-                    </div>
-                </div>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                      :class="wsState==='ws' ? 'bg-green-100 text-green-700' : (wsState==='polling' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500')">
-                    <span class="w-2 h-2 rounded-full" :class="wsState==='ws' ? 'bg-green-500' : (wsState==='polling' ? 'bg-amber-500' : 'bg-gray-400')"></span>
-                    @{{ wsState==='ws' ? '실시간' : (wsState==='polling' ? '폴링' : '연결중') }}
+        {{-- 역할 + 연결 상태 --}}
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-2">
+                <x-ui.badge :tone="\App\Enums\EventRole::from($role)->badgeTone()"
+                            :icon="\App\Enums\EventRole::from($role)->icon()" size="sm">
+                    {{ $roleLabel }}
+                </x-ui.badge>
+                <span class="truncate text-sm text-ink-400">지령 수신 대기</span>
+            </div>
+
+            <span class="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold"
+                  :class="wsState==='ws' ? 'text-success-600' : (wsState==='polling' ? 'text-warning-600' : 'text-ink-400')">
+                <span class="h-1.5 w-1.5 rounded-full"
+                      :class="wsState==='ws' ? 'bg-success-500' : (wsState==='polling' ? 'bg-warning-500' : 'bg-ink-300')"></span>
+                @{{ wsState==='ws' ? '실시간' : (wsState==='polling' ? '폴링' : '연결중') }}
+            </span>
+        </div>
+
+        {{-- 내 지령 목록 --}}
+        <div v-if="dispatches.length === 0"
+             class="flex flex-col items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-16 text-center">
+            <span class="flex h-12 w-12 items-center justify-center rounded-full bg-ink-100 text-ink-300">
+                <x-ui.icon name="bell" class="h-6 w-6" />
+            </span>
+            <p class="text-sm font-medium text-ink-400">배정된 지령이 없습니다.</p>
+        </div>
+
+        <div v-for="d in dispatches" :key="d.dispatch_id"
+             class="rounded-2xl border border-ink-200 bg-white p-5">
+            <div class="flex items-center justify-between gap-2">
+                <span class="flex min-w-0 items-center gap-2">
+                    <span class="text-base font-extrabold text-ink-950">신고 #@{{ d.request.id }}</span>
+                    <span class="inline-flex shrink-0 items-center rounded-full border border-ink-200 px-2.5 py-1 text-xs font-bold"
+                          :style="{ color: typeColor(d.request.type) }">@{{ typeLabel(d.request.type) }}</span>
                 </span>
+                <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold"
+                      :class="statusBadge(d.status)">@{{ statusLabel(d.status) }}</span>
             </div>
 
-            <!-- 내 지령 목록 -->
-            <div v-if="dispatches.length === 0" class="text-center py-16 text-sm text-slate-400">
-                배정된 지령이 없습니다.
+            <p v-if="d.request.address" class="mt-2.5 flex items-start gap-1.5 break-keep text-base font-bold leading-snug text-ink-950">
+                <x-ui.icon name="pin" class="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger-600" />
+                <span>@{{ d.request.address }}</span>
+            </p>
+
+            {{-- 본인 배정건 신고자 연락처(ADR-0004) — 실시간 수신분만 --}}
+            <p v-if="d.requester" class="mt-1.5 text-sm text-ink-600">
+                @{{ d.requester.name }}
+                <a v-if="d.requester.phone" :href="'tel:'+d.requester.phone"
+                   class="ml-1 font-bold text-brand-600 underline underline-offset-2">@{{ d.requester.phone }} · 전화</a>
+            </p>
+
+            <p v-if="d.note" class="mt-1.5 text-sm text-ink-400">메모: @{{ d.note }}</p>
+
+            {{-- 전이 버튼: 현재 상태의 allowedTransitions 만 --}}
+            <div class="mt-4 flex gap-2.5">
+                <button v-if="primaryAction(d.status)" type="button"
+                        v-on:click="transition(d, primaryAction(d.status))" :disabled="busy[d.dispatch_id]"
+                        class="min-h-[56px] flex-1 rounded-2xl bg-brand-600 px-4 text-base font-bold text-white shadow-sm transition-colors active:bg-brand-700 disabled:cursor-not-allowed disabled:bg-ink-100 disabled:text-ink-400 disabled:shadow-none">
+                    @{{ actionLabel(primaryAction(d.status)) }}
+                </button>
+                <button v-if="canReject(d.status)" type="button" v-on:click="openReject(d)"
+                        :disabled="busy[d.dispatch_id]"
+                        class="min-h-[56px] rounded-2xl border-2 border-danger-200 px-4 text-sm font-bold text-danger-600 transition-colors active:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    거절
+                </button>
+                <button v-if="d.status !== 'rejected'" type="button" v-on:click="navi(d)"
+                        class="min-h-[56px] rounded-2xl border-2 border-ink-200 px-4 text-sm font-bold text-ink-900 transition-colors active:bg-ink-50">
+                    길안내
+                </button>
             </div>
 
-            <div v-for="d in dispatches" :key="d.dispatch_id"
-                 class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-3">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="flex items-center gap-2">
-                        <span class="text-sm font-bold">신고 #@{{ d.request.id }}</span>
-                        <span class="text-xs px-1.5 py-0.5 rounded-full" :style="{ backgroundColor: typeColor(d.request.type)+'22', color: typeColor(d.request.type) }">@{{ typeLabel(d.request.type) }}</span>
-                    </span>
-                    <span class="text-[11px] px-2 py-0.5 rounded-full font-medium" :class="statusBadge(d.status)">@{{ statusLabel(d.status) }}</span>
-                </div>
-                <div v-if="d.request.address" class="text-sm text-slate-600 mb-1">📍 @{{ d.request.address }}</div>
-                <!-- 본인 배정건 신고자 연락처(ADR-0004) — 실시간 수신분만 -->
-                <div v-if="d.requester" class="text-sm text-slate-700 mb-1">
-                    @{{ d.requester.name }}
-                    <a v-if="d.requester.phone" :href="'tel:'+d.requester.phone" class="text-blue-600 font-semibold ml-1">@{{ d.requester.phone }} · 전화</a>
-                </div>
-                <div v-if="d.note" class="text-xs text-slate-400 mb-2">메모: @{{ d.note }}</div>
-
-                <!-- 전이 버튼: 현재 상태의 allowedTransitions 만 -->
-                <div class="flex gap-2 mt-3">
-                    <button v-if="primaryAction(d.status)" @click="transition(d, primaryAction(d.status))"
-                            :disabled="busy[d.dispatch_id]"
-                            class="flex-1 py-3 text-base font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                            style="min-height:56px">
-                        @{{ actionLabel(primaryAction(d.status)) }}
-                    </button>
-                    <button v-if="canReject(d.status)" @click="openReject(d)"
-                            :disabled="busy[d.dispatch_id]"
-                            class="px-4 py-3 text-sm font-medium rounded-xl border border-rose-300 text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-                            style="min-height:56px">
-                        거절
-                    </button>
-                    <button v-if="d.status !== 'rejected'" @click="navi(d)"
-                            class="px-4 py-3 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50"
-                            style="min-height:56px">
-                        길안내
-                    </button>
-                </div>
-                <p v-if="errors[d.dispatch_id]" class="text-xs text-rose-600 mt-2">@{{ errors[d.dispatch_id] }}</p>
-            </div>
-
-    <!-- 풀스크린 신규 지령 알림 -->
-    <div v-if="alert.open" id="dispatch-fullscreen-alert"
-         class="fixed inset-0 z-[300] bg-blue-700 text-white flex flex-col items-center justify-center px-6">
-        <div class="animate-pulse text-center">
-            <div class="text-sm font-semibold opacity-80 mb-2">새 지령 배정</div>
-            <div class="text-3xl font-black mb-4" v-if="alert.dispatch">신고 #@{{ alert.dispatch.request.id }}</div>
+            <p v-if="errors[d.dispatch_id]" class="mt-2.5 text-sm font-bold text-danger-600">
+                @{{ errors[d.dispatch_id] }}
+            </p>
         </div>
-        <div v-if="alert.dispatch" class="bg-white text-slate-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="text-sm font-bold" :style="{ color: typeColor(alert.dispatch.request.type) }">@{{ typeLabel(alert.dispatch.request.type) }}</span>
-            </div>
-            <div v-if="alert.dispatch.request.address" class="text-sm text-slate-600 mb-1">📍 @{{ alert.dispatch.request.address }}</div>
-            <div v-if="alert.dispatch.requester" class="text-sm text-slate-700 mb-1">
-                @{{ alert.dispatch.requester.name }}
-                <a v-if="alert.dispatch.requester.phone" :href="'tel:'+alert.dispatch.requester.phone" class="text-blue-600 font-semibold ml-1">@{{ alert.dispatch.requester.phone }}</a>
-            </div>
-            <div v-if="alert.dispatch.note" class="text-xs text-slate-400 mb-3">메모: @{{ alert.dispatch.note }}</div>
-            <button @click="dismissAlert" class="w-full py-3 mt-2 text-base font-bold rounded-xl bg-blue-600 text-white" style="min-height:56px">확인</button>
-        </div>
-    </div>
 
-    <!-- 거절 사유 모달 -->
-    <div v-if="reject.open" class="fixed inset-0 z-[310] flex items-center justify-center bg-black/40 px-4">
-        <div class="bg-white rounded-2xl p-5 w-full max-w-sm">
-            <h3 class="text-base font-bold mb-3">지령 거절</h3>
-            <label v-for="r in rejectPresets" :key="r" class="flex items-center gap-2 py-2 cursor-pointer">
-                <input type="radio" name="reject" :value="r" v-model="reject.reason" class="text-rose-600">
-                <span class="text-sm">@{{ r }}</span>
-            </label>
-            <label class="flex items-center gap-2 py-2 cursor-pointer">
-                <input type="radio" name="reject" value="__custom" v-model="reject.reason" class="text-rose-600">
-                <input v-model="reject.custom" @focus="reject.reason='__custom'" type="text" placeholder="기타 사유"
-                       class="flex-1 text-sm border border-slate-300 rounded-md px-2 py-1.5">
-            </label>
-            <div class="flex gap-2 mt-4">
-                <button @click="closeReject" class="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700">취소</button>
-                <button @click="submitReject" :disabled="!rejectReasonValue"
-                        class="flex-1 py-2.5 text-sm font-bold rounded-xl text-white bg-rose-600 disabled:opacity-50">거절 제출</button>
+        {{-- 풀스크린 신규 지령 알림 --}}
+        <div v-if="alert.open" id="dispatch-fullscreen-alert"
+             class="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-brand-600 px-6 text-white">
+            <div class="animate-pulse text-center">
+                <p class="mb-2 text-sm font-bold text-white/80">새 지령 배정</p>
+                <p v-if="alert.dispatch" class="mb-5 text-3xl font-extrabold">신고 #@{{ alert.dispatch.request.id }}</p>
+            </div>
+
+            <div v-if="alert.dispatch" class="w-full max-w-sm rounded-3xl bg-white p-5 text-ink-950 shadow-2xl">
+                <span class="inline-flex items-center rounded-full border border-ink-200 px-2.5 py-1 text-xs font-bold"
+                      :style="{ color: typeColor(alert.dispatch.request.type) }">
+                    @{{ typeLabel(alert.dispatch.request.type) }}
+                </span>
+
+                <p v-if="alert.dispatch.request.address"
+                   class="mt-2.5 break-keep text-lg font-extrabold leading-snug text-ink-950">
+                    @{{ alert.dispatch.request.address }}
+                </p>
+
+                <p v-if="alert.dispatch.requester" class="mt-1.5 text-sm text-ink-600">
+                    @{{ alert.dispatch.requester.name }}
+                    <a v-if="alert.dispatch.requester.phone" :href="'tel:'+alert.dispatch.requester.phone"
+                       class="ml-1 font-bold text-brand-600 underline underline-offset-2">@{{ alert.dispatch.requester.phone }}</a>
+                </p>
+
+                <p v-if="alert.dispatch.note" class="mt-1.5 text-sm text-ink-400">메모: @{{ alert.dispatch.note }}</p>
+
+                <button type="button" v-on:click="dismissAlert"
+                        class="mt-5 min-h-[56px] w-full rounded-2xl bg-brand-600 text-base font-bold text-white active:bg-brand-700">
+                    확인
+                </button>
             </div>
         </div>
-    </div>
+
+        {{-- 거절 사유 모달 --}}
+        <div v-if="reject.open" class="fixed inset-0 z-[310] flex items-center justify-center bg-ink-950/40 px-5">
+            <div class="w-full max-w-sm rounded-3xl bg-white p-5">
+                <h2 class="text-lg font-extrabold text-ink-950">지령 거절</h2>
+
+                <div class="mt-3 divide-y divide-ink-100">
+                    <label v-for="r in rejectPresets" :key="r"
+                           class="flex cursor-pointer items-center gap-2.5 py-3 text-base text-ink-800">
+                        <input type="radio" name="reject" :value="r" v-model="reject.reason"
+                               class="h-5 w-5 border-ink-300 text-danger-600 focus:ring-danger-200">
+                        <span>@{{ r }}</span>
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2.5 py-3">
+                        <input type="radio" name="reject" value="__custom" v-model="reject.reason"
+                               class="h-5 w-5 shrink-0 border-ink-300 text-danger-600 focus:ring-danger-200">
+                        <input v-model="reject.custom" v-on:focus="reject.reason='__custom'" type="text"
+                               placeholder="기타 사유"
+                               class="min-w-0 flex-1 rounded-xl border-2 border-ink-200 px-3 py-2 text-base text-ink-950 placeholder:text-ink-400 focus:border-brand-600 focus:outline-none">
+                    </label>
+                </div>
+
+                <div class="mt-5 space-y-2.5">
+                    <button type="button" v-on:click="submitReject" :disabled="!rejectReasonValue"
+                            class="w-full rounded-2xl bg-danger-600 py-4 text-base font-bold text-white shadow-sm active:bg-danger-700 disabled:cursor-not-allowed disabled:bg-ink-100 disabled:text-ink-400 disabled:shadow-none">
+                        거절 제출
+                    </button>
+                    <x-ui.button variant="secondary" vue-click="closeReject">취소</x-ui.button>
+                </div>
+            </div>
         </div>
     </div>
 

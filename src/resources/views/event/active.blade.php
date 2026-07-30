@@ -1,90 +1,95 @@
-<x-layouts.app>
+{{--
+    참가자 활동 화면 — 위치 자동공유 토글. 시안이 없는 화면이라
+    design-system.html 어휘로 파생했다. 스크립트 동작은 기존과 동일.
+--}}
+<x-layouts.app :title="'GPS119 - '.$project->name" :heading="$project->name" :back="route('dashboard')">
     <!-- Vue 3 (페이지별 마운트 — 기존 request/create·event/join 패턴 계승) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
-    <div class="flex-1 flex items-start justify-center bg-slate-50 px-4 py-10">
-        <div id="eventActiveApp"
-             class="w-full max-w-md"
-             data-project-id="{{ $project->id }}"
-             data-role="{{ $role }}"
-             data-role-label="{{ $roleLabel }}"
-             data-project-name="{{ $project->name }}">
+    <div id="eventActiveApp"
+         class="space-y-6"
+         data-project-id="{{ $project->id }}"
+         data-role="{{ $role }}"
+         data-role-label="{{ $roleLabel }}"
+         data-project-name="{{ $project->name }}">
 
-            <!-- 헤더 -->
-            <div class="text-center mb-6">
-                <h1 class="text-xl font-black tracking-tight text-slate-900">@{{ projectName }}</h1>
-                <div class="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200">
-                    <span class="text-xs text-slate-400 font-medium">내 역할</span>
-                    <span class="text-sm font-bold text-slate-800">@{{ roleLabel }}</span>
+        {{-- 내 역할 --}}
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold text-ink-500">내 역할</span>
+            <x-ui.badge :tone="\App\Enums\EventRole::from($role)->badgeTone()"
+                        :icon="\App\Enums\EventRole::from($role)->icon()" size="sm">
+                {{ $roleLabel }}
+            </x-ui.badge>
+        </div>
+
+        {{-- 위치 공유 --}}
+        <x-ui.card>
+            <div class="flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                    <p class="text-base font-bold text-ink-950">실시간 위치 공유</p>
+                    <p class="mt-0.5 text-sm leading-relaxed text-ink-500">
+                        상황실이 내 위치를 지도에서 확인합니다.
+                    </p>
                 </div>
+
+                <button type="button" v-on:click="toggle" role="switch" :aria-checked="sharing"
+                        :class="sharing ? 'bg-brand-600' : 'bg-ink-300'"
+                        class="relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-200">
+                    <span :class="sharing ? 'translate-x-5' : 'translate-x-0.5'"
+                          class="inline-block h-6 w-6 translate-y-0.5 transform rounded-full bg-white shadow transition-transform"></span>
+                </button>
             </div>
 
-            <!-- 위치 공유 카드 -->
-            <div class="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-6">
-                <div class="flex items-center justify-between">
+            {{-- 상태 --}}
+            <div class="mt-5 rounded-2xl p-4" :class="sharing ? 'bg-brand-50' : 'bg-ink-50'">
+                <div class="flex items-center gap-2">
+                    <span class="h-2.5 w-2.5 rounded-full"
+                          :class="sharing ? 'animate-pulse bg-brand-600' : 'bg-ink-300'"></span>
+                    <span class="text-sm font-bold" :class="sharing ? 'text-brand-600' : 'text-ink-500'">
+                        @{{ sharing ? '위치 공유 중' : '공유 중지됨' }}
+                    </span>
+                </div>
+
+                <dl v-if="sharing" class="mt-3 grid grid-cols-2 gap-3">
                     <div>
-                        <p class="text-sm font-semibold text-slate-700">실시간 위치 공유</p>
-                        <p class="mt-0.5 text-xs text-slate-400">상황실이 내 위치를 지도에서 확인합니다.</p>
+                        <dt class="text-xs font-bold text-ink-400">전송 횟수</dt>
+                        <dd class="mt-0.5 text-sm font-bold text-ink-950">@{{ sentCount }}</dd>
                     </div>
-                    <!-- 토글 -->
-                    <button @click="toggle" type="button" role="switch" :aria-checked="sharing"
-                            :class="sharing ? 'bg-blue-600' : 'bg-slate-300'"
-                            class="relative inline-flex h-7 w-12 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                        <span :class="sharing ? 'translate-x-5' : 'translate-x-0.5'"
-                              class="inline-block h-6 w-6 transform rounded-full bg-white shadow translate-y-0.5 transition-transform"></span>
-                    </button>
-                </div>
-
-                <!-- 상태 -->
-                <div class="mt-5 rounded-xl p-4"
-                     :class="sharing ? 'bg-blue-50 border border-blue-100' : 'bg-slate-50 border border-slate-100'">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full"
-                              :class="sharing ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'"></span>
-                        <span class="text-sm font-semibold"
-                              :class="sharing ? 'text-blue-700' : 'text-slate-500'">
-                            @{{ sharing ? '위치 공유 중' : '공유 중지됨' }}
-                        </span>
+                    <div>
+                        <dt class="text-xs font-bold text-ink-400">마지막 전송</dt>
+                        <dd class="mt-0.5 text-sm font-bold text-ink-950">@{{ lastSentLabel }}</dd>
                     </div>
-                    <dl v-if="sharing" class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                        <div><dt class="text-slate-400">전송 횟수</dt><dd class="font-semibold text-slate-700">@{{ sentCount }}</dd></div>
-                        <div><dt class="text-slate-400">마지막 전송</dt><dd class="font-semibold text-slate-700">@{{ lastSentLabel }}</dd></div>
-                        <div><dt class="text-slate-400">정확도</dt><dd class="font-semibold text-slate-700">@{{ accuracyLabel }}</dd></div>
-                        <div v-if="bufferedCount"><dt class="text-slate-400">대기 중</dt><dd class="font-semibold text-amber-600">@{{ bufferedCount }}건</dd></div>
-                    </dl>
-                </div>
-
-                <!-- 안내/에러 -->
-                <p v-if="error" class="mt-3 text-sm text-red-600">@{{ error }}</p>
-                <p v-else-if="permission === 'prompt'" class="mt-3 text-xs text-slate-400">
-                    위치 권한을 허용하면 공유가 시작됩니다.
-                </p>
+                    <div>
+                        <dt class="text-xs font-bold text-ink-400">정확도</dt>
+                        <dd class="mt-0.5 text-sm font-bold text-ink-950">@{{ accuracyLabel }}</dd>
+                    </div>
+                    <div v-if="bufferedCount">
+                        <dt class="text-xs font-bold text-ink-400">대기 중</dt>
+                        <dd class="mt-0.5 text-sm font-bold text-warning-600">@{{ bufferedCount }}건</dd>
+                    </div>
+                </dl>
             </div>
 
-            <!-- 다음 단계 -->
-            <div class="mt-5 space-y-2">
-                @if($canDispatch)
-                    {{-- 구급대/자원봉사 구급: 지령·출동 화면이 주 화면 --}}
-                    <a href="{{ route('events.dispatch', $project->id) }}"
-                       class="w-full inline-flex justify-center items-center gap-2 py-3 px-4 text-sm font-bold rounded-xl text-white bg-red-600 hover:bg-red-700 transition shadow-sm shadow-red-600/25">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V5a1 1 0 0 1 1-1h11l3 3v10"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-                        지령·출동 화면
-                    </a>
-                    <a href="{{ route('request.create') }}"
-                       class="w-full inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
-                        구조요청 화면으로
-                    </a>
-                @else
-                    <a href="{{ route('request.create') }}"
-                       class="w-full inline-flex justify-center items-center py-3 px-4 text-sm font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition">
-                        구조요청 화면으로
-                    </a>
-                @endif
-                <a href="{{ route('dashboard') }}"
-                   class="w-full inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
-                    대시보드로
-                </a>
-            </div>
+            {{-- 안내/에러 --}}
+            <p v-if="error" class="mt-3 text-sm font-bold text-danger-600">@{{ error }}</p>
+            <p v-else-if="permission === 'prompt'" class="mt-3 text-sm text-ink-400">
+                위치 권한을 허용하면 공유가 시작됩니다.
+            </p>
+        </x-ui.card>
+
+        {{-- 다음 단계 --}}
+        <div class="space-y-3">
+            @if ($canDispatch)
+                {{-- 구급대/자원봉사 구급: 지령·출동 화면이 주 화면 --}}
+                <x-ui.button :href="route('events.dispatch', $project->id)">
+                    <x-ui.icon name="ambulance" class="h-5 w-5" />
+                    지령·출동 화면
+                </x-ui.button>
+                <x-ui.button :href="route('request.create')" variant="secondary">구조요청 화면으로</x-ui.button>
+            @else
+                <x-ui.button :href="route('request.create')">구조요청 화면으로</x-ui.button>
+            @endif
+            <x-ui.button :href="route('dashboard')" variant="ghost">홈으로</x-ui.button>
         </div>
     </div>
 
