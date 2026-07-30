@@ -5,7 +5,8 @@
 <x-layouts.app title="GPS119 - 신고 상태" bare>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
-    <div id="app" class="flex h-[100dvh] flex-col overflow-hidden bg-ink-50">
+    {{-- 다른 사용자 화면과 같은 폭(max-w-2xl 중앙 정렬) --}}
+    <div id="app" class="mx-auto flex h-[100dvh] max-w-2xl flex-col overflow-hidden bg-ink-50">
         <map-loader v-on:scripts-loaded="initMap"></map-loader>
         <intro-screen :show="showIntro" title="요청 위치 확인 중..."></intro-screen>
 

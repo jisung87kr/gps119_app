@@ -22,7 +22,8 @@
         ]);
 @endphp
 
-<div id="app" class="flex h-[100dvh] flex-col overflow-hidden bg-ink-50">
+{{-- 다른 사용자 화면과 같은 폭(max-w-2xl 중앙 정렬) — 레퍼런스 tmp/dispatch.html 동일 --}}
+<div id="app" class="mx-auto flex h-[100dvh] max-w-2xl flex-col overflow-hidden bg-ink-50">
     <map-loader v-on:scripts-loaded="initMap"></map-loader>
     <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
 
@@ -85,16 +86,18 @@
         </div>
     </div>
 
-    {{-- 주소 검색 오버레이 (Daum 위젯 마운트 지점) --}}
-    <div class="fixed inset-0 z-[100] overflow-auto bg-white" v-show="findAddress">
-        <header class="sticky top-0 flex h-16 items-center justify-between border-b border-ink-200 bg-white px-4">
-            <span class="text-lg font-extrabold text-ink-950">주소 검색</span>
-            <button type="button" v-on:click="findAddress=false" aria-label="닫기"
-                    class="flex h-11 w-11 items-center justify-center rounded-full text-ink-900 active:bg-ink-100">
-                <x-ui.icon name="x-circle" class="h-6 w-6" />
-            </button>
-        </header>
-        <div ref="search_address_element" class="w-full p-4"></div>
+    {{-- 주소 검색 오버레이 (Daum 위젯 마운트 지점) — 본문도 같은 폭으로 --}}
+    <div class="fixed inset-0 z-[100] bg-ink-950/40" v-show="findAddress">
+        <div class="mx-auto flex h-full max-w-2xl flex-col overflow-auto bg-white">
+            <header class="sticky top-0 flex h-16 shrink-0 items-center justify-between border-b border-ink-200 bg-white px-4">
+                <span class="text-lg font-extrabold text-ink-950">주소 검색</span>
+                <button type="button" v-on:click="findAddress=false" aria-label="닫기"
+                        class="flex h-11 w-11 items-center justify-center rounded-full text-ink-900 active:bg-ink-100">
+                    <x-ui.icon name="x-circle" class="h-6 w-6" />
+                </button>
+            </header>
+            <div ref="search_address_element" class="w-full p-4"></div>
+        </div>
     </div>
 
     @include('request._confirm-modal')
