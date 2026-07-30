@@ -18,5 +18,6 @@
 | [0002](0002-event-scoped-roles.md) | 행사 스코프 역할을 `event_participants` pivot으로 분리 | Accepted |
 | [0003](0003-dispatch-state-machine.md) | 신고 배정을 지령(Dispatch) 상태머신으로 전환 | Accepted |
 | [0004](0004-contact-channel-scoping.md) | 실시간 채널의 신고자 연락처 노출 최소화 | Accepted |
+| [0005](0005-all-requests-belong-to-event.md) | 모든 신고는 행사에 소속 — "상시 운영" 기본 행사 흡수 | Accepted |
 
 > 배경 설계는 [`../epics/realtime-dispatch-control/`](../epics/realtime-dispatch-control/) 참조.

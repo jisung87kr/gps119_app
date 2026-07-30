@@ -63,10 +63,23 @@
 
             <!-- 다음 단계 -->
             <div class="mt-5 space-y-2">
-                <a href="{{ route('request.create') }}"
-                   class="w-full inline-flex justify-center items-center py-3 px-4 text-sm font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition">
-                    구조요청 화면으로
-                </a>
+                @if($canDispatch)
+                    {{-- 구급대/자원봉사 구급: 지령·출동 화면이 주 화면 --}}
+                    <a href="{{ route('events.dispatch', $project->id) }}"
+                       class="w-full inline-flex justify-center items-center gap-2 py-3 px-4 text-sm font-bold rounded-xl text-white bg-red-600 hover:bg-red-700 transition shadow-sm shadow-red-600/25">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V5a1 1 0 0 1 1-1h11l3 3v10"/><circle cx="8" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                        지령·출동 화면
+                    </a>
+                    <a href="{{ route('request.create') }}"
+                       class="w-full inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
+                        구조요청 화면으로
+                    </a>
+                @else
+                    <a href="{{ route('request.create') }}"
+                       class="w-full inline-flex justify-center items-center py-3 px-4 text-sm font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition">
+                        구조요청 화면으로
+                    </a>
+                @endif
                 <a href="{{ route('dashboard') }}"
                    class="w-full inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition">
                     대시보드로

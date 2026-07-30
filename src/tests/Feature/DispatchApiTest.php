@@ -57,6 +57,32 @@ class DispatchApiTest extends TestCase
         ]);
     }
 
+    public function test_controller_sees_only_active_event_requests(): void
+    {
+        ['project' => $project, 'controller' => $c] = $this->scenario();
+
+        $pending = RescueRequest::factory()->for(User::factory()->create())->create(['project_id' => $project->id, 'status' => 'pending']);
+        $inProgress = RescueRequest::factory()->for(User::factory()->create())->create(['project_id' => $project->id, 'status' => 'in_progress']);
+        $completed = RescueRequest::factory()->for(User::factory()->create())->create(['project_id' => $project->id, 'status' => 'completed']);
+        $general = RescueRequest::factory()->for(User::factory()->create())->create(['project_id' => null, 'status' => 'pending']);
+
+        Sanctum::actingAs($c);
+        $ids = collect($this->getJson("/api/events/{$project->id}/requests")->assertOk()->json('data'))->pluck('request_id');
+
+        $this->assertTrue($ids->contains($pending->id));       // 대기 포함
+        $this->assertTrue($ids->contains($inProgress->id));    // 진행중 포함
+        $this->assertFalse($ids->contains($completed->id));    // 완료 제외
+        $this->assertFalse($ids->contains($general->id));      // 다른 행사(project null) 제외
+    }
+
+    public function test_non_controller_cannot_list_event_requests(): void
+    {
+        ['project' => $project, 'paramedic' => $p] = $this->scenario();
+        Sanctum::actingAs($p);
+
+        $this->getJson("/api/events/{$project->id}/requests")->assertStatus(403);
+    }
+
     public function test_participant_cannot_dispatch(): void
     {
         ['project' => $project, 'paramedic' => $p, 'request' => $r] = $this->scenario();

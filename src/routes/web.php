@@ -69,6 +69,8 @@ Route::get('/events/{id}/active', function ($id) {
         'project' => $project,
         'role' => $role->value,
         'roleLabel' => $role->label(),
+        // 구급대/자원봉사 구급이면 지령(출동) 화면 진입 링크 노출
+        'canDispatch' => $role->canReceiveDispatch(),
     ]);
 })->middleware(['auth'])->name('events.active');
 
@@ -152,7 +154,16 @@ Route::get('/dashboard', function () {
         ->limit(8)
         ->get();
 
-    return view('dashboard', compact('stats', 'activeRequests', 'recentRequests'));
+    // 참가 중인 행사(활동/지령 화면 진입점) — 운영 인력이 로그인 후 자기 행사로 갈 통로
+    $myEvents = \App\Models\EventParticipant::query()
+        ->where('user_id', $user->id)
+        ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
+        ->with('project:id,name')
+        ->orderByDesc('project_id')
+        ->get()
+        ->filter(fn ($p) => $p->project !== null);
+
+    return view('dashboard', compact('stats', 'activeRequests', 'recentRequests', 'myEvents'));
 })->middleware(['auth'])->name('dashboard');
 
 // Admin routes
@@ -162,6 +173,7 @@ Route::post('/admin/register', [AuthController::class, 'adminRegister']);
 // Admin panel routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/statistics', [\App\Http\Controllers\Admin\AdminController::class, 'statistics'])->name('statistics');
 
     // Member management
     Route::get('/members', [\App\Http\Controllers\Admin\AdminController::class, 'members'])->name('members');
@@ -171,11 +183,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/members/{id}/edit', [\App\Http\Controllers\Admin\AdminController::class, 'memberEdit'])->name('members.edit');
     Route::patch('/members/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'memberUpdate'])->name('members.update');
 
-    // Request management
-    Route::get('/requests', [\App\Http\Controllers\Admin\AdminController::class, 'requests'])->name('requests');
+    // 신고 상세·상태변경 (목록 SPA는 실시간 관제로 대체되어 제거 — ADR-0005 이후)
     Route::get('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestShow'])->name('requests.show');
     Route::patch('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestUpdate'])->name('requests.update');
-    Route::patch('/requests/{id}/quick-update', [\App\Http\Controllers\Admin\AdminController::class, 'requestQuickUpdate'])->name('requests.quick-update');
+
+    // 행사 참가자·역할 관리 (EventRole) — resource projects 보다 먼저 등록해 /{project}/participants 우선 매칭
+    Route::get('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'index'])->name('projects.participants');
+    Route::post('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'store'])->name('projects.participants.store');
+    Route::patch('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'update'])->name('projects.participants.update');
+    Route::delete('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'destroy'])->name('projects.participants.destroy');
 
     // Project management
     Route::resource('projects', \App\Http\Controllers\Admin\ProjectController::class);

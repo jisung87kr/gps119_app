@@ -57,6 +57,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/events/{id}/dispatches', [DispatchApiController::class, 'board'])
         ->middleware('event.role:controller')->name('api.events.dispatches');
 
+    // 관제 초기 로드용 미완료 신고 목록(pending/in_progress)
+    Route::get('/events/{id}/requests', [DispatchApiController::class, 'eventRequests'])
+        ->middleware('event.role:controller')->name('api.events.requests');
+
     // 기록 다운로드 (BE-4.1) — controller/admin, 스트리밍 CSV
     Route::middleware('event.role:controller')->group(function () {
         Route::get('/events/{id}/report/requests.csv', [EventReportController::class, 'requests'])->name('api.events.report.requests');

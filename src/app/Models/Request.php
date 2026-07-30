@@ -46,6 +46,13 @@ class Request extends Model
 
     protected static function booted(): void
     {
+        // ADR-0005: 모든 신고는 행사에 소속. 행사 미지정 신고는 "상시 운영" 기본 행사로 귀속.
+        static::creating(function (Request $request) {
+            if (empty($request->project_id)) {
+                $request->project_id = \App\Models\Project::defaultEvent()->id;
+            }
+        });
+
         static::created(function (Request $request) {
             $request->load('user');
             RequestCreated::dispatch($request);
