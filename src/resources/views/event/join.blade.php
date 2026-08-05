@@ -79,7 +79,7 @@
             </x-ui.card>
         </div>
 
-        {{-- 3단계: 입장 완료(역할 표시) --}}
+        {{-- 3단계: 입장 완료(역할 표시) — active 이면 1.5초 후 자동 이동 --}}
         <div v-else-if="step === 'joined'" class="space-y-6">
             <x-ui.card class="text-center">
                 <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success-50 text-success-600">
@@ -98,12 +98,22 @@
                     <x-ui.icon name="clock" class="mt-px h-[18px] w-[18px] shrink-0" />
                     <span>상황실 승인 대기 중입니다. 승인되면 활동할 수 있습니다.</span>
                 </div>
+
+                {{-- active 일 때 자동 이동 안내 --}}
+                <div v-if="joined.status === 'active'"
+                     class="mt-4 flex items-center justify-center gap-1.5 text-sm text-ink-400">
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                        <path d="M12 3a9 9 0 1 0 9 9" />
+                    </svg>
+                    <span>잠시 후 위치 공유 화면으로 이동합니다…</span>
+                </div>
             </x-ui.card>
 
             <div class="space-y-3">
                 <a v-if="joined.status === 'active'" :href="`/events/${joined.project_id}/active`"
                    class="inline-flex w-full items-center justify-center rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-sm active:bg-brand-700">
-                    위치 공유 시작
+                    바로 이동
                 </a>
                 <x-ui.button :href="route('request.create')" variant="secondary">구조요청 화면으로</x-ui.button>
                 <x-ui.button :href="route('dashboard')" variant="ghost">홈으로</x-ui.button>
@@ -189,6 +199,12 @@
                             project_id: d.project.id,
                         };
                         this.step = 'joined';
+                        // active 참가자면 1.5초 후 위치 공유 화면으로 자동 이동
+                        if (d.participant.status === 'active') {
+                            setTimeout(() => {
+                                window.location.href = `/events/${d.project.id}/active`;
+                            }, 1500);
+                        }
                     } catch (e) {
                         const status = e.response?.status;
                         const msg = e.response?.data?.message || '';

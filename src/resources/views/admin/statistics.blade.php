@@ -99,7 +99,46 @@
             <span class="px-2 py-0.5 text-xs font-medium text-slate-500 bg-slate-100 rounded-full tabular-nums">{{ $project_rows->count() }}개 행사</span>
             <a href="{{ route('admin.projects.index') }}" class="ml-auto text-sm font-medium text-blue-600 hover:text-blue-700">행사 관리 →</a>
         </div>
-        <div class="overflow-x-auto">
+        {{--
+            모바일(<lg)은 카드 리스트. 8열 테이블을 375px 에 밀어넣으면 헤더가
+            「신/고」「대/기」처럼 한 글자씩 세로로 쪼개져 읽을 수 없다.
+        --}}
+        <ul class="divide-y divide-slate-100 lg:hidden">
+            @forelse($project_rows as $p)
+                @php
+                    $rate = $p->req_total > 0 ? round($p->req_completed / $p->req_total * 100) : 0;
+                    $live = $p->end_date && $p->end_date->endOfDay()->isFuture();
+                @endphp
+                <li class="p-4 space-y-3">
+                    <a href="{{ route('admin.projects.show', $p->id) }}" class="flex items-start gap-2">
+                        <span class="mt-1.5 w-1.5 h-1.5 rounded-full flex-none {{ $live ? 'bg-emerald-500' : 'bg-slate-300' }}"></span>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-semibold text-slate-800 break-keep">{{ $p->name }}</span>
+                            <span class="block text-xs text-slate-400">~ {{ $p->end_date?->format('Y-m-d') ?? '기간 미정' }} · 참가자 {{ $p->active_participants }}명</span>
+                        </span>
+                    </a>
+
+                    <dl class="grid grid-cols-5 gap-1 text-center">
+                        <div><dt class="text-[11px] text-slate-400">신고</dt><dd class="text-sm font-semibold tabular-nums text-slate-900">{{ $p->req_total }}</dd></div>
+                        <div><dt class="text-[11px] text-slate-400">대기</dt><dd class="text-sm tabular-nums {{ $p->req_pending > 0 ? 'text-amber-600 font-medium' : 'text-slate-300' }}">{{ $p->req_pending }}</dd></div>
+                        <div><dt class="text-[11px] text-slate-400">진행</dt><dd class="text-sm tabular-nums {{ $p->req_in_progress > 0 ? 'text-indigo-600' : 'text-slate-300' }}">{{ $p->req_in_progress }}</dd></div>
+                        <div><dt class="text-[11px] text-slate-400">완료</dt><dd class="text-sm tabular-nums {{ $p->req_completed > 0 ? 'text-emerald-600' : 'text-slate-300' }}">{{ $p->req_completed }}</dd></div>
+                        <div><dt class="text-[11px] text-slate-400">취소</dt><dd class="text-sm tabular-nums text-slate-400">{{ $p->req_cancelled }}</dd></div>
+                    </dl>
+
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div class="h-full bg-emerald-500 rounded-full" style="width: {{ $rate }}%"></div>
+                        </div>
+                        <span class="w-9 text-right text-xs font-medium tabular-nums text-slate-500">{{ $rate }}%</span>
+                    </div>
+                </li>
+            @empty
+                <li class="px-4 py-14 text-center text-sm text-slate-400">해당 기간에 데이터가 없습니다.</li>
+            @endforelse
+        </ul>
+
+        <div class="hidden lg:block overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-100">

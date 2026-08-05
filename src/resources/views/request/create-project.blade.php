@@ -1,5 +1,6 @@
 {{-- 행사 QR 신고 진입점 — 마크업은 request/_map-screen 공용. --}}
-<x-layouts.app :title="'GPS119 - '.$project->name" bare>
+<x-layouts.app :title="'GPS119 - '.$project->name" bare
+              body-class="h-[100dvh] overflow-hidden overscroll-none">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
     @include('request._map-screen', ['project' => $project])

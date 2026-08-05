@@ -324,7 +324,58 @@
             <div class="px-6 py-4 border-b border-slate-100">
                 <h2 class="text-base font-semibold text-slate-900">구조요청 목록</h2>
             </div>
-            <div class="overflow-x-auto">
+            @php
+                $statusColors = [
+                    'pending' => 'bg-amber-50 text-amber-700',
+                    'in_progress' => 'bg-blue-50 text-blue-700',
+                    'completed' => 'bg-emerald-50 text-emerald-700',
+                    'cancelled' => 'bg-red-50 text-red-700',
+                ];
+                $statusTexts = [
+                    'pending' => '대기중',
+                    'in_progress' => '진행중',
+                    'completed' => '완료',
+                    'cancelled' => '취소됨',
+                ];
+            @endphp
+
+            {{-- 모바일(<lg)은 카드 리스트 — 6열 테이블은 375px 에서 「작업」열이 화면 밖으로 나간다 --}}
+            <ul class="divide-y divide-slate-100 lg:hidden">
+                @forelse($project->requests as $request)
+                    <li class="p-4 space-y-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-slate-900 tabular-nums">#{{ $request->id }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full {{ $statusColors[$request->status->value] ?? 'bg-slate-100 text-slate-600' }}">
+                                {{ $statusTexts[$request->status->value] ?? $request->status->value }}
+                            </span>
+                            <span class="ml-auto text-xs text-slate-400 tabular-nums">{{ $request->created_at->format('Y-m-d H:i') }}</span>
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <dt class="text-slate-400">요청자</dt>
+                                <dd class="mt-0.5 text-slate-800 break-all">
+                                    {{ $request->user->name ?? '알 수 없음' }}
+                                    @if($request->user?->formatted_phone)
+                                        <a href="tel:{{ $request->user->phone }}" class="block text-blue-600 tabular-nums">{{ $request->user->formatted_phone }}</a>
+                                    @endif
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-400">담당자</dt>
+                                <dd class="mt-0.5 text-slate-600 break-all">{{ $request->assignedRescuer->name ?? '미배정' }}</dd>
+                            </div>
+                        </dl>
+
+                        <a href="/admin/requests/{{ $request->id }}"
+                           class="flex h-11 items-center justify-center rounded-xl bg-blue-50 text-sm font-medium text-blue-700 active:bg-blue-100">상세보기</a>
+                    </li>
+                @empty
+                    <li class="px-4 py-14 text-center text-sm text-slate-400">구조요청이 없습니다.</li>
+                @endforelse
+            </ul>
+
+            <div class="hidden lg:block overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-100">
                     <thead class="bg-slate-50/70">
                         <tr>
@@ -347,20 +398,7 @@
                                     <div class="text-sm text-slate-500 tabular-nums">{{ $request->user->formatted_phone ?? '-' }}</div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @php
-                                        $statusColors = [
-                                            'pending' => 'bg-amber-50 text-amber-700',
-                                            'in_progress' => 'bg-blue-50 text-blue-700',
-                                            'completed' => 'bg-emerald-50 text-emerald-700',
-                                            'cancelled' => 'bg-red-50 text-red-700',
-                                        ];
-                                        $statusTexts = [
-                                            'pending' => '대기중',
-                                            'in_progress' => '진행중',
-                                            'completed' => '완료',
-                                            'cancelled' => '취소됨',
-                                        ];
-                                    @endphp
+                                    {{-- $statusColors / $statusTexts 는 카드 리스트와 공유 (상단 @php) --}}
                                     <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full {{ $statusColors[$request->status->value] ?? 'bg-slate-100 text-slate-600' }}">
                                         {{ $statusTexts[$request->status->value] ?? $request->status->value }}
                                     </span>

@@ -27,24 +27,24 @@
         'neutral' => 'border-2 border-ink-200 bg-white text-ink-900 active:bg-ink-50',
     ];
 
-    $classes = 'flex flex-col items-center justify-center gap-1.5 rounded-2xl py-5 transition-colors '
+    $classes = 'flex flex-col items-center justify-center gap-1 rounded-2xl py-3.5 transition-colors '
         .($tones[$tone] ?? $tones['neutral']);
 @endphp
 
 @if ($href)
     <a href="{{ $href }}" {{ $attributes->merge(['class' => $classes]) }}>
         @if ($icon)
-            <x-ui.icon :name="$icon" class="h-[26px] w-[26px]" />
+            <x-ui.icon :name="$icon" class="h-[22px] w-[22px]" />
         @endif
-        <span class="text-base font-extrabold">{{ $slot }}</span>
+        <span class="text-sm font-extrabold">{{ $slot }}</span>
     </a>
 @else
     <button type="{{ $type }}"
             @if ($vueClick) v-on:click="{{ $vueClick }}" @endif
             {{ $attributes->merge(['class' => $classes]) }}>
         @if ($icon)
-            <x-ui.icon :name="$icon" class="h-[26px] w-[26px]" />
+            <x-ui.icon :name="$icon" class="h-[22px] w-[22px]" />
         @endif
-        <span class="text-base font-extrabold">{{ $slot }}</span>
+        <span class="text-sm font-extrabold">{{ $slot }}</span>
     </button>
 @endif

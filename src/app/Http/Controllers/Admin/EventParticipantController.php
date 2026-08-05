@@ -20,12 +20,17 @@ use Illuminate\Validation\Rules\Enum;
  */
 class EventParticipantController extends Controller
 {
-    public function __construct(private EventParticipantService $participants)
-    {
-    }
+    public function __construct(private EventParticipantService $participants) {}
 
     public function index(Project $project)
     {
+        // join_code 는 creating 훅에서 자동 발급되지만, 그 기능 이전에 만들어진
+        // 행사에는 NULL 이 남아 있다. 이 화면은 입장 링크(route(events.join.code))를
+        // 반드시 그리므로 NULL 이면 500 이 난다 — 진입 시 지연 백필한다.
+        if (empty($project->join_code)) {
+            $project->forceFill(['join_code' => Project::generateUniqueJoinCode()])->save();
+        }
+
         $participants = $project->participants()
             ->with('user:id,name,phone')
             // status 우선순위(active→pending→left). FIELD()는 MySQL 전용이라 이식성 위해 CASE 사용.

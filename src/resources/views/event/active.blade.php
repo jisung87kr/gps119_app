@@ -77,6 +77,24 @@
             </p>
         </x-ui.card>
 
+        {{-- 첫 위치 전송 후 자동 이동 카운트다운 (참가자 전용) --}}
+        @unless ($canDispatch)
+        <div v-if="redirecting"
+             class="flex items-center justify-between gap-4 rounded-2xl bg-brand-50 px-4 py-3.5">
+            <div class="flex items-center gap-2 text-sm font-bold text-brand-700">
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <path d="M12 3a9 9 0 1 0 9 9" />
+                </svg>
+                <span>@{{ countdown }}초 후 구조요청 화면으로 이동…</span>
+            </div>
+            <button type="button" v-on:click="cancelRedirect"
+                    class="shrink-0 text-xs font-bold text-brand-500 underline underline-offset-2">
+                취소
+            </button>
+        </div>
+        @endunless
+
         {{-- 다음 단계 --}}
         <div class="space-y-3">
             @if ($canDispatch)
@@ -115,6 +133,10 @@
                     lastAccuracy: null,
                     bufferedCount: 0,
                     error: null,
+                    // 자동 이동 카운트다운
+                    redirecting: false,
+                    countdown: 3,
+                    redirectTimer: null,
                 };
             },
             computed: {
@@ -138,9 +160,31 @@
                     this.lastAccuracy = s.lastAccuracy;
                     this.bufferedCount = s.bufferedCount;
                     this.error = s.error;
+
+                    // 첫 위치 전송 완료 시 카운트다운 시작 (참가자 전용 — canDispatch=false)
+                    @unless ($canDispatch)
+                    if (s.sharing && s.sentCount >= 1 && !this.redirecting && !this.redirectTimer) {
+                        this.redirecting = true;
+                        this.countdown = 3;
+                        this.redirectTimer = setInterval(() => {
+                            this.countdown--;
+                            if (this.countdown <= 0) {
+                                clearInterval(this.redirectTimer);
+                                window.location.href = "{{ route('request.create') }}";
+                            }
+                        }, 1000);
+                    }
+                    @endunless
                 },
                 toggle() {
                     this.sharer.toggle();
+                },
+                cancelRedirect() {
+                    if (this.redirectTimer) {
+                        clearInterval(this.redirectTimer);
+                        this.redirectTimer = null;
+                    }
+                    this.redirecting = false;
                 },
             },
             mounted() {

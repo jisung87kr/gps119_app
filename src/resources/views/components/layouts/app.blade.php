@@ -10,6 +10,11 @@
       tab        하단 탭 강제 지정(home|request|profile). 기본은 라우트명 자동 판별
       bare       헤더·탭바·컨테이너 없이 슬롯만 렌더 (인증/전체화면 지도/에러 화면)
       padded     컨테이너 좌우 패딩(px-5) 적용 여부. 기본 true
+      bodyClass  <body> 높이/스크롤 클래스. 기본 min-h-screen(=100vh, 문서가 늘어남).
+                 전체화면 지도처럼 h-[100dvh] 로 자체 높이를 잡는 화면은
+                 "h-[100dvh] overflow-hidden overscroll-none" 을 넘겨 body 스크롤을
+                 잠근다 — 안 그러면 100vh - 100dvh 만큼 문서가 남아 스크롤되고,
+                 모바일 브라우저 UI 밑으로 바텀시트 하단이 잘려 들어간다.
 
     슬롯:
       $actions   헤더 우측 액션 영역
@@ -23,6 +28,7 @@
     'tab' => null,
     'bare' => false,
     'padded' => true,
+    'bodyClass' => 'min-h-screen',
 ])
 
 <!DOCTYPE html>
@@ -50,7 +56,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-ink-50 font-app text-ink-950 antialiased">
+<body class="{{ $bodyClass }} bg-ink-50 font-app text-ink-950 antialiased">
 @if ($bare)
     {{ $slot }}
 @else
