@@ -35,19 +35,43 @@ enum EventRole: string
     }
 
     /**
-     * 관제 지도 마커 색 (hex).
+     * 관제 지도 마커 색 (hex, 대문자).
+     *
+     * 정본은 control-map-spec.md §2 표다. 이 메서드가 그 정본의 코드상 «단일 출처»이고,
+     * 관제 SPA 는 mapMeta() → data-role-meta 로 «주입받아» 쓴다(JS 에 hex 사본 없음).
+     * 색맹 대비로 색과 함께 아이콘 형태를 병용하므로(§2), 색만 바꾸면 안 된다.
      */
     public function markerColor(): string
     {
         return match ($this) {
-            self::PARTICIPANT => '#6b7280',       // gray-500
-            self::STAFF => '#0ea5e9',             // sky-500
-            self::POLICE => '#1d4ed8',            // blue-700
-            self::VOLUNTEER_COURSE => '#14b8a6',  // teal-500
-            self::VOLUNTEER_MEDIC => '#f59e0b',   // amber-500
-            self::PARAMEDIC => '#ef4444',         // red-500
-            self::CONTROLLER => '#7c3aed',        // violet-600
+            self::PARTICIPANT => '#6B7280',       // gray-500
+            self::STAFF => '#2563EB',             // blue-600
+            self::POLICE => '#1E3A8A',            // blue-900
+            self::VOLUNTEER_COURSE => '#16A34A',  // green-600
+            self::VOLUNTEER_MEDIC => '#F59E0B',   // amber-500
+            self::PARAMEDIC => '#DC2626',         // red-600
+            self::CONTROLLER => '#7C3AED',        // violet-600
         };
+    }
+
+    /**
+     * 관제 지도용 역할 메타 전량 — 뷰가 JS 로 주입하는 페이로드.
+     *
+     * 키 순서 = enum 선언 순서 = 관제 역할 필터 표시 순서(ROLE_ORDER).
+     * 아이콘 «형태»는 SVG path 라 JS(roleMeta.js)가 갖고, 여기서는 색·라벨만 넘긴다.
+     */
+    public static function mapMeta(): array
+    {
+        $meta = [];
+
+        foreach (self::cases() as $role) {
+            $meta[$role->value] = [
+                'label' => $role->label(),
+                'color' => $role->markerColor(),
+            ];
+        }
+
+        return $meta;
     }
 
     /**

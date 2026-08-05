@@ -1,28 +1,61 @@
 // 관제 지도 역할/우선순위 시각 메타 (control-map-spec §2·§6).
 //
-// ⚠ 단일 출처 동기화: 마커색 hex 는 백엔드 App\Enums\EventRole::markerColor() 와
-//   1:1 로 일치시킨다(JS 는 PHP enum 을 호출 못 하므로 미러). 변경 시 양쪽 같이 수정.
-//   기존 admin/requests/index.blade.php 도 상태색을 JS 에 미러하는 동일 패턴.
+// 🔑 역할 라벨·마커색은 **여기에 사본을 두지 않는다.** 서버가 `EventRole::mapMeta()` 를
+//    `#control-app[data-role-meta]` 로 주입하고, main.js 가 마운트 전에 initRoleMeta() 로 채운다.
+//    (예전에는 hex 를 양쪽에 적고 "변경 시 같이 수정" 주석으로 규율에 맡겼는데,
+//     실제로 7개 중 4개가 어긋난 채 운영됐다 — 그래서 미러 자체를 없앴다. mobile-app 에픽 0-8)
+//    JS 가 갖는 것은 PHP 가 알 수 없는 것 하나뿐이다: 아이콘 «형태»(SVG path 이름).
 
-// 역할 표시 순서(필터/현황 패널 공용)
-export const ROLE_ORDER = [
-    'participant', 'staff', 'police',
-    'volunteer_course', 'volunteer_medic', 'paramedic', 'controller',
-];
-
-// 역할 → { label, color, icon } (color-map-spec §2 표 그대로)
-export const ROLE_META = {
-    participant:      { label: '참가자',           color: '#6B7280', icon: 'user' },
-    staff:            { label: '운영진',           color: '#2563EB', icon: 'badge' },
-    police:           { label: '경찰',             color: '#1E3A8A', icon: 'shield' },
-    volunteer_course: { label: '자원봉사자(코스)', color: '#16A34A', icon: 'flag' },
-    volunteer_medic:  { label: '자원봉사자(구급)', color: '#F59E0B', icon: 'plusCircle' },
-    paramedic:        { label: '구급대',           color: '#DC2626', icon: 'plusBold' },
-    controller:       { label: '상황실',           color: '#7C3AED', icon: 'signal' },
+// 역할 → 아이콘 이름 (ICON_PATHS 의 키). 색맹 대비로 색과 병용하는 형태 구분(§2).
+// 서버가 모르는 새 역할이 주입되면 'user' 로 떨어진다.
+export const ROLE_ICONS = {
+    participant: 'user',
+    staff: 'badge',
+    police: 'shield',
+    volunteer_course: 'flag',
+    volunteer_medic: 'plusCircle',
+    paramedic: 'plusBold',
+    controller: 'signal',
 };
 
+// 주입 전에는 비어 있다. import 하는 쪽이 참조를 계속 들고 있으므로
+// «재대입» 하지 않고 in-place 로 채운다(Vue data() 가 잡은 참조가 살아 있어야 함).
+export const ROLE_ORDER = [];
+export const ROLE_META = {};
+
+// 주입이 없을 때의 최후 표시값. 역할별 색이 아니라 «모르는 값»을 뜻하는 회색 하나다.
+const UNKNOWN_ROLE = { label: '알 수 없음', color: '#9CA3AF', icon: 'user' };
+
+/**
+ * 서버가 주입한 역할 메타로 ROLE_ORDER/ROLE_META 를 채운다. 마운트 전에 1회.
+ *
+ * @param {Object} injected - { role: { label, color } } (EventRole::mapMeta())
+ * @returns {boolean} 채웠으면 true
+ */
+export function initRoleMeta(injected) {
+    if (!injected || typeof injected !== 'object') {
+        console.error('[control] data-role-meta 주입 실패 — 역할 색·라벨을 표시할 수 없습니다.');
+        return false;
+    }
+
+    ROLE_ORDER.length = 0;
+    Object.keys(ROLE_META).forEach((k) => delete ROLE_META[k]);
+
+    // 순서는 서버가 준 키 순서(= EventRole 선언 순서)를 그대로 따른다.
+    Object.entries(injected).forEach(([role, meta]) => {
+        ROLE_ORDER.push(role);
+        ROLE_META[role] = {
+            label: meta.label,
+            color: meta.color,
+            icon: ROLE_ICONS[role] || UNKNOWN_ROLE.icon,
+        };
+    });
+
+    return true;
+}
+
 export function roleMeta(role) {
-    return ROLE_META[role] || ROLE_META.participant;
+    return ROLE_META[role] || UNKNOWN_ROLE;
 }
 
 // 신고 우선순위 → { color, blink(ms|null) } (§6 표)

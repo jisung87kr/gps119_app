@@ -17,9 +17,14 @@
     <style>html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;}</style>
 </head>
 <body class="h-full bg-gray-100">
-    {{-- Vue 가 마운트할 루트. 활성 행사 목록을 data-projects 로 전달(1개면 자동선택) --}}
+    {{--
+        Vue 가 마운트할 루트. 활성 행사 목록을 data-projects 로 전달(1개면 자동선택).
+        data-role-meta 는 EventRole 의 라벨·마커색 전량 — JS 가 hex 사본을 갖지 않도록
+        서버가 주입한다(단일 출처: EventRole::markerColor(), control-map-spec §2).
+    --}}
     <div id="control-app"
          data-projects='@json($projects)'
+         data-role-meta='@json(\App\Enums\EventRole::mapMeta())'
          data-selected="{{ $selectedId ?? '' }}"
          data-back-url="{{ $backUrl ?? '' }}"></div>
 </body>

@@ -21,9 +21,9 @@ Capacitor 프로젝트에서 `ios/` 와 `android/` 는 **같은 `capacitor.confi
 - 플러그인 하나를 올릴 때 두 레포에 PR 을 내고 버전을 맞춰야 한다
 - 🔑 **이 코드베이스에는 미러 드리프트가 «지금도» 있다.** 회고가 아니라 열려 있는 증거다.
 
-### 2-1. 🔴 실측 — 색상 미러가 아직 어긋나 있다 (2026-08-05 검토)
+### 2-1. ✅ 실측 — 색상 미러가 어긋나 있었다 → **미러를 없앴다** (2026-08-05 해소)
 
-`roleMeta.js` 와 `EventRole::markerColor()` 는 *"양쪽 같이 수정"* 주석을 달고도 **7개 중 4개**가 다르다.
+`roleMeta.js` 와 `EventRole::markerColor()` 는 *"양쪽 같이 수정"* 주석을 달고도 **7개 중 4개**가 달랐다. 아래가 발견 당시의 실측표다.
 
 | 역할 | `resources/js/control/roleMeta.js` | `app/Enums/EventRole.php::markerColor()` | |
 |---|---|---|---|
@@ -35,11 +35,18 @@ Capacitor 프로젝트에서 `ios/` 와 `android/` 는 **같은 `capacitor.confi
 | **paramedic** | `#DC2626` | `#ef4444` | 🔴 |
 | controller | `#7C3AED` | `#7c3aed` | 일치 |
 
-⚠️ **관제 지도의 구급대 마커 색이 서버가 아는 색과 다른 채로 앱에 실리게 된다.** 앱을 얹으면 스크린샷·심사 자료·매뉴얼까지 이 색을 물고 퍼진다.
+🔍 **정본은 [`control-map-spec §2`](../realtime-dispatch-control/backlog/design/control-map-spec.md) 표였고, 어긋난 쪽은 PHP 였다.** 더 나쁜 것은 `markerColor()` 의 **사용처가 0건**이었다는 점이다 — "PHP 가 단일 출처"라는 주석과 달리, 화면을 그린 실질 출처는 JS 사본이었다.
 
-→ **N0 작업 항목으로 올린다**([`07`](07-roadmap.md) 0-8). 단순히 값을 맞추는 데서 그치지 말고, **PHP 열거형을 단일 출처로 두고 JS 가 그 값을 받아 쓰도록** (뷰에서 주입하든 빌드시 생성하든) 구조를 바꿔야 같은 일이 다시 안 생긴다 — 이 절의 논거가 바로 그것이다.
+✅ **해소 방식(0-8)** — 값 4건을 정본에 맞추는 데서 그치지 않고 **JS 에서 역할 색·라벨 사본을 삭제**했다.
 
-**규율로 두 벌을 맞추는 건 이 팀 규모에서 작동하지 않는다.**
+```
+EventRole::markerColor()  ← 정본(control-map-spec §2)
+   └ mapMeta() → #control-app[data-role-meta] → initRoleMeta() → ROLE_META
+```
+
+JS 에 남은 것은 PHP 가 알 수 없는 **아이콘 형태(SVG path 이름)** 뿐이다. 자동 판정도 남겼다 — `EventRoleMapMetaTest`(주입 경로까지 검사) + `tests/js/roleMeta.test.js`(JS 에 hex 가 다시 생기면 실패).
+
+**규율로 두 벌을 맞추는 건 이 팀 규모에서 작동하지 않는다** — 이 절의 논거가 바로 그것이고, 그래서 «맞추기»가 아니라 «없애기»로 갔다.
 
 플랫폼 분리가 정당한 경우는 «네이티브 코드가 각각 크고 팀이 나뉜 경우»인데, 여기는 **셸이 거의 비어 있다**(URL 열고 플러그인 3개).
 
