@@ -121,6 +121,8 @@ class EventParticipantService
             'status' => $p->status->value,
             'last_lat' => $p->last_lat,
             'last_lng' => $p->last_lng,
+            // 정확도(m). "어디 있는지"만큼 "얼마나 확실한지"가 구조 판단을 바꾼다.
+            'last_accuracy' => $p->last_accuracy,
             'last_seen_at' => $p->last_seen_at?->toISOString(),
             'online' => $p->isOnline($onlineThresholdSeconds),
         ])->all();

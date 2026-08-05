@@ -46,9 +46,12 @@ class LocationService
         $recordedAt = Carbon::parse($data['recorded_at']);
 
         // ① 캐시 즉시 갱신
+        //    last_accuracy 를 같이 저장한다 — 관제가 처음 로드할 때 받는 roster 의
+        //    유일한 정확도 출처다(이후 갱신은 브로드캐스트 페이로드로 들어온다).
         $participant->forceFill([
             'last_lat' => $latitude,
             'last_lng' => $longitude,
+            'last_accuracy' => $accuracy !== null ? (int) $accuracy : null,
             'last_seen_at' => $recordedAt,
         ])->save();
 
