@@ -61,6 +61,21 @@
             @endif
         </x-ui.card>
 
+        {{--
+            관리자 전환 진입점. 관리자는 로그인하면 /admin/dashboard 로 바로 가지만,
+            사용자 화면(홈·신고·프로필)으로 넘어오면 돌아갈 길이 없었다.
+            반대 방향(관리 셸 → 사용자 페이지)은 admin 레이아웃의 아바타 드롭다운에 있다.
+        --}}
+        @if ($user->hasRole('admin'))
+            <x-ui.section title="관리">
+                <x-ui.list>
+                    <x-ui.list-item :href="route('admin.dashboard')" icon="shield"
+                                    title="관리자 화면"
+                                    meta="실시간 관제 · 회원 · 행사 · 통계" />
+                </x-ui.list>
+            </x-ui.section>
+        @endif
+
         {{-- 활동 통계 --}}
         <div @class(['grid gap-3', 'grid-cols-2' => $user->hasRole('rescuer')])>
             <x-ui.stat label="총 구조 요청" :value="$user->requests()->count()" />

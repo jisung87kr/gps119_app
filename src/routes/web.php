@@ -5,8 +5,23 @@ use App\Http\Controllers\Auth\SocialController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
+// 루트는 «이 사람이 여기 온 이유»로 보낸다.
+//
+// 관리자는 관리 셸로. 그 밖의 로그인 사용자는 신고 작성(이 앱의 주 용도)으로.
+// 비로그인은 로그인으로 «직접» 보낸다 — 예전처럼 신고 작성으로 한 번 튕기면
+// auth 미들웨어가 intended=/requests/create 를 세션에 심고, 로그인 직후
+// LoginResponse 의 역할별 착지가 그 intended 에 밀려 무력화된다.
+// (도메인만 치고 들어오는 것이 가장 흔한 진입 경로라 실질적으로 늘 밀렸다.)
 Route::get('/', function () {
-    return redirect()->route('request.create');
+    $user = Auth::user();
+
+    if (! $user) {
+        return redirect()->route('login');
+    }
+
+    return $user->hasRole('admin')
+        ? redirect()->route('admin.dashboard')
+        : redirect()->route('request.create');
 });
 
 Route::get('/requests/create', function () {
