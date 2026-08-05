@@ -28,6 +28,10 @@ GPS119 — an emergency rescue-request web app. A regular user shares their GPS 
 
 Still pending / out of scope: data-retention auto-purge for `location_pings` (Q2 policy undecided), multi-event scale tuning (Q4), and Capacitor/FCM background push. `requests.assigned_rescuer_id`/`responded_at` are legacy (dispatch is now authoritative). Treat the manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`) and the epic backlog as the source of truth for intended UX, and the code for what actually ships.
 
+**Mobile (2026-08-05).** Every user-facing surface is now mobile-responsive, `/control` included — it switches to a full-bleed map + 3-stop snap bottom sheet below `lg`, so the older "PC-only, no responsive branch" notes in `07-web-control.md` / `control-map-spec.md` are superseded. The WebView app (Capacitor + remote URL, two stores) is planned but not started — see `src/docs/epics/mobile-app/`. Its N0 blockers are agreements/legal, not code.
+
+**Tests.** PHP: `docker exec gps119_app-app-1 php artisan test`. JS: `docker exec gps119_app-app-1 npm test` (Vitest, `environment: node`, specs in `src/tests/js/`). JS coverage starts with `locationShare.js`; the control SPA has none and is verified with gstack `browse` instead.
+
 ## Layout & Docker
 
 The Laravel application lives in **`src/`**, not the repo root. The repo root holds only Docker config and manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`, `EPIC-project-management.md`). `src/PROMPT.MD` is the original product spec.

@@ -6,7 +6,8 @@
 
 ## 0. 전제 · 제약
 
-- **PC 대화면 전용.** 태블릿/모바일 관제는 06 축약형(별도). 이 화면은 **최소 1280px**, 기준 설계폭 **1920 / 1440**. 1280 미만은 가로 스크롤 허용(반응형 분기 없음 — 현장 지휘 데스크톱 전제).
+- **기준 설계폭 1920 / 1440.** 아래 스펙은 `lg`(1024px) 이상의 3단 레이아웃 정본이다.
+  🔄 **2026-08-05 갱신 — 「반응형 분기 없음」은 더 이상 사실이 아니다.** `lg` 미만에서는 지도 전체화면 + 3단 스냅 바텀시트로 분기하고, 클러스터 파라미터도 모바일 프로파일(`gridSize 50 / minClusterSize 5`)을 따로 쓴다(`gridSize` 는 화면 픽셀 단위라 1000px 지도의 8% 가 375px 에서는 21% 가 된다). `<meta viewport>` 의 `width=1280` 고정도 제거됐다.
 - **새 디자인시스템 발명 금지.** 기존 톤 계승: `admin/requests/index.blade.php`의 blue-600 primary, WS/폴링 green/amber 인디케이터(35행), `border-l-4` 토스트(14행), `rounded-lg shadow`. 카카오 SDK는 이미 `libraries=services,clusterer,drawing`으로 로드됨(7행) → **clusterer 라이브러리 그대로 사용**.
 - **색만으로 의미 전달 금지(DS-color 결정).** 역할 7종은 **색 + 아이콘 형태** 병용. 아이콘은 Heroicons(outline/solid) 차용, 신규 제작 최소.
 - **Enum 헬퍼에 귀속.** 마커색은 `EventRole::markerColor()`(SPEC-02a), 신고핀 아이콘은 `RequestType::markerIcon()`(SPEC-02c). 화면 코드는 hex를 직접 박지 않고 enum/페이로드 `role`·`type`으로 lookup.
