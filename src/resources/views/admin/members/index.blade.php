@@ -18,7 +18,11 @@
         <!-- Filters -->
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
             <div class="p-4 sm:p-5">
-                <form method="GET" action="{{ route('admin.members') }}" class="flex flex-col sm:flex-row flex-wrap gap-3">
+                {{--
+                    flex-wrap 은 row 방향(sm 이상)에만 건다. flex-col 과 같이 두면
+                    높이가 정해지지 않은 세로 래핑이 되어 버튼 줄이 42px → 62px 로 부풀었다.
+                --}}
+                <form method="GET" action="{{ route('admin.members') }}" class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                     <div class="flex-1 min-w-0 relative">
                         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
                         <input type="text"
@@ -33,10 +37,14 @@
                         <option value="rescuer" {{ request('role') === 'rescuer' ? 'selected' : '' }}>구조대</option>
                     </select>
                     <div class="flex gap-2">
-                        <button type="submit" class="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors font-medium text-sm shadow-sm shadow-blue-600/20">
+                        {{--
+                            button 은 텍스트를 세로 중앙에 두지만 a(block)는 위로 붙는다.
+                            둘 다 늘어나므로 inline-flex + items-center 로 정렬을 맞춘다.
+                        --}}
+                        <button type="submit" class="inline-flex flex-1 items-center justify-center sm:flex-none bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 transition-colors font-medium text-sm shadow-sm shadow-blue-600/20">
                             검색
                         </button>
-                        <a href="{{ route('admin.members') }}" class="flex-1 sm:flex-none text-center bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors font-medium text-sm">
+                        <a href="{{ route('admin.members') }}" class="inline-flex flex-1 items-center justify-center sm:flex-none bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors font-medium text-sm">
                             초기화
                         </a>
                     </div>
