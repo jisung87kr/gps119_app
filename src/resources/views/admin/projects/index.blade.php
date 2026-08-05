@@ -43,9 +43,103 @@
             </div>
         </div>
 
-        <!-- Projects Table -->
+        @php
+            $statusColors = [
+                'pending' => 'bg-amber-50 text-amber-700',
+                'active' => 'bg-emerald-50 text-emerald-700',
+                'completed' => 'bg-slate-100 text-slate-500',
+            ];
+            $statusTexts = ['pending' => '예정', 'active' => '진행중', 'completed' => '완료'];
+            $statusDots = ['pending' => 'bg-amber-500', 'active' => 'bg-emerald-500', 'completed' => 'bg-slate-300'];
+        @endphp
+
+        <!-- Projects -->
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
+            {{--
+                모바일(<lg)은 카드 리스트. 테이블 자연폭이 838px 라 375px 에서는
+                프로젝트명이 글자 단위로 쪼개지고 작업 열이 화면 밖으로 나간다.
+            --}}
+            <ul class="divide-y divide-slate-100 lg:hidden">
+                @forelse($projects as $project)
+                    @php $isLive = $project->is_active && optional($project->start_date)->lte(now()) && optional($project->end_date)->gte(now()); @endphp
+                    <li class="p-4 space-y-3">
+                        <div class="flex items-start gap-2">
+                            <span class="mt-1.5 w-1.5 h-1.5 rounded-full flex-none {{ $statusDots[$project->status] ?? 'bg-slate-300' }}"></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-semibold text-slate-800 break-keep">{{ $project->name }}</div>
+                                @if($project->description)
+                                    <div class="mt-0.5 text-xs text-slate-500 break-keep">{{ Str::limit($project->description, 60) }}</div>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full {{ $statusColors[$project->status] ?? 'bg-slate-100 text-slate-500' }}">
+                                {{ $statusTexts[$project->status] ?? $project->status }}
+                            </span>
+                            @if(!$project->is_active)
+                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-500">비활성</span>
+                            @endif
+                            @if($project->is_default)
+                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-200">기본</span>
+                            @endif
+                            <code class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-mono text-[11px] break-all">{{ $project->slug }}</code>
+                        </div>
+
+                        <dl class="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                                <dt class="text-slate-400">기간</dt>
+                                <dd class="mt-0.5 text-slate-700 tabular-nums">
+                                    {{ $project->start_date->format('Y-m-d') }}<br>
+                                    <span class="text-slate-400">{{ $project->end_date->format('Y-m-d') }}</span>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-400">구조요청</dt>
+                                <dd class="mt-0.5 text-slate-700 tabular-nums">{{ $project->requests_count }}건</dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-400">생성자</dt>
+                                <dd class="mt-0.5 text-slate-500 break-all">{{ $project->creator->name ?? '-' }}</dd>
+                            </div>
+                        </dl>
+
+                        {{-- 3열 그리드 고정 — flex-wrap 으로 두면 카드마다 버튼 줄 수가 달라져 리스트가 들쭉날쭉해진다 --}}
+                        <div class="grid grid-cols-3 gap-2">
+                            @if($isLive)
+                                <a href="{{ route('admin.control', ['project' => $project->id]) }}"
+                                   class="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-50 text-sm font-medium text-emerald-700 active:bg-emerald-100">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>관제
+                                </a>
+                            @endif
+                            <a href="{{ route('admin.projects.show', $project->id) }}"
+                               class="inline-flex h-11 items-center justify-center rounded-xl bg-blue-50 text-sm font-medium text-blue-700 active:bg-blue-100">상세</a>
+                            <a href="{{ route('admin.projects.edit', $project->id) }}"
+                               class="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-700 active:bg-slate-50">수정</a>
+                            <a href="{{ route('admin.projects.export-csv', $project->id) }}"
+                               class="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-600 active:bg-slate-50">CSV</a>
+                            <form action="{{ route('admin.projects.clone', $project->id) }}" method="POST">
+                                @csrf
+                                <button type="submit" onclick="return confirm('이 프로젝트를 복제하시겠습니까?')"
+                                        class="w-full inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-600 active:bg-slate-50">복제</button>
+                            </form>
+                            @unless($project->is_default)
+                                <form action="{{ route('admin.projects.destroy', $project->id) }}" method="POST"
+                                      onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="w-full inline-flex h-11 items-center justify-center rounded-xl border border-red-200 text-sm font-medium text-red-600 active:bg-red-50">삭제</button>
+                                </form>
+                            @endunless
+                        </div>
+                    </li>
+                @empty
+                    <li class="px-4 py-14 text-center text-sm text-slate-400">프로젝트가 없습니다.</li>
+                @endforelse
+            </ul>
+
+            <div class="hidden lg:block overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-100">
                     <thead class="bg-slate-50/70">
                         <tr>
@@ -85,18 +179,7 @@
                                     <div class="text-slate-400">{{ $project->end_date->format('Y-m-d') }}</div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @php
-                                        $statusColors = [
-                                            'pending' => 'bg-amber-50 text-amber-700',
-                                            'active' => 'bg-emerald-50 text-emerald-700',
-                                            'completed' => 'bg-slate-100 text-slate-500',
-                                        ];
-                                        $statusTexts = [
-                                            'pending' => '예정',
-                                            'active' => '진행중',
-                                            'completed' => '완료',
-                                        ];
-                                    @endphp
+                                    {{-- $statusColors / $statusTexts 는 카드 리스트와 공유 (상단 @php) --}}
                                     <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full {{ $statusColors[$project->status] ?? 'bg-slate-100 text-slate-500' }}">
                                         {{ $statusTexts[$project->status] ?? $project->status }}
                                     </span>

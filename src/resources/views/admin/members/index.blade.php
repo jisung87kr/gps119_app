@@ -44,9 +44,71 @@
             </div>
         </div>
 
-        <!-- Members Table -->
+        <!-- Members -->
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
+            {{--
+                모바일(<lg)은 카드 리스트. 테이블은 자연폭이 836px 라 375px 화면에서는
+                가로 스크롤 없이는 「작업」 열(상세보기·수정)에 아예 도달할 수 없다.
+            --}}
+            <ul class="divide-y divide-slate-100 lg:hidden">
+                @forelse($members as $member)
+                    <li class="p-4 space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="grid place-items-center w-10 h-10 rounded-full bg-blue-600 text-white text-sm font-semibold flex-none">{{ mb_substr($member->name, 0, 1) }}</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-semibold text-slate-800 break-all">{{ $member->name }}</div>
+                                @if($member->email)
+                                    <div class="text-xs text-slate-400 break-all">{{ $member->email }}</div>
+                                @endif
+                            </div>
+                            <div class="flex flex-wrap justify-end gap-1 flex-none">
+                                @if($member->hasRole('admin'))
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자</span>
+                                @endif
+                                @if($member->hasRole('rescuer'))
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">구조대</span>
+                                @endif
+                                @if(!$member->hasAnyRole(['admin', 'rescuer']))
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">사용자</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <dl class="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                                <dt class="text-slate-400">연락처</dt>
+                                <dd class="mt-0.5 text-slate-700 tabular-nums">
+                                    @if($member->formatted_phone)
+                                        {{-- 구조 도메인이라 명단에서 바로 전화 거는 동선이 실제로 쓰인다 --}}
+                                        <a href="tel:{{ $member->phone }}" class="text-blue-600 hover:text-blue-700">{{ $member->formatted_phone }}</a>
+                                    @else
+                                        -
+                                    @endif
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-400">구조요청</dt>
+                                <dd class="mt-0.5 text-slate-700 tabular-nums">{{ $member->requests_count }}건</dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-400">가입일</dt>
+                                <dd class="mt-0.5 text-slate-500 tabular-nums">{{ $member->created_at->format('Y-m-d') }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="flex gap-2">
+                            <a href="{{ route('admin.members.show', $member->id) }}"
+                               class="flex-1 inline-flex h-11 items-center justify-center rounded-xl bg-blue-50 text-sm font-medium text-blue-700 active:bg-blue-100">상세보기</a>
+                            <a href="{{ route('admin.members.edit', $member->id) }}"
+                               class="flex-1 inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-700 active:bg-slate-50">수정</a>
+                        </div>
+                    </li>
+                @empty
+                    <li class="px-4 py-14 text-center text-sm text-slate-400">검색된 회원이 없습니다.</li>
+                @endforelse
+            </ul>
+
+            <div class="hidden lg:block overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-100">
                     <thead class="bg-slate-50/70">
                         <tr>

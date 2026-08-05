@@ -124,27 +124,39 @@
                     @endif
                 </div>
 
-                {{-- 역할·상태 변경 폼 --}}
-                <form action="{{ route('admin.projects.participants.update', [$project->id, $p->user_id]) }}" method="POST" class="flex items-center gap-2">
-                    @csrf @method('PATCH')
-                    <select name="role" class="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
-                        @foreach($roles as $role)
-                            <option value="{{ $role->value }}" @selected($p->role === $role)>{{ $role->label() }}</option>
-                        @endforeach
-                    </select>
-                    <select name="status" class="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
-                        @foreach($statuses as $status)
-                            <option value="{{ $status->value }}" @selected($p->status === $status)>{{ $status->label() }}</option>
-                        @endforeach
-                    </select>
-                    <button type="submit" class="px-3 py-2 text-sm font-medium text-blue-600 border border-slate-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors">저장</button>
-                </form>
+                {{--
+                    역할·상태 변경 + 제외를 한 덩어리로 묶는다. 모바일에서는 셀렉트를
+                    한 줄(각 50%), 저장·제외를 그 아래 한 줄로 흘린다.
+                    셀렉트에 min-w-0 이 없으면 버튼이 밀려 라벨이 「저/장」으로 세로로 쪼개진다.
+                --}}
+                <div class="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto">
+                    {{--
+                        모바일에서는 form 을 display:contents 로 만들어 자식(셀렉트 2개 + 저장)이
+                        바깥 그리드의 셀이 되게 한다 → [역할][상태] / [저장][제외] 2행 2열로 떨어진다.
+                        @csrf·@method 가 만드는 hidden input 은 display:none 이라 셀을 먹지 않는다.
+                    --}}
+                    <form action="{{ route('admin.projects.participants.update', [$project->id, $p->user_id]) }}" method="POST"
+                          class="contents sm:flex sm:items-center sm:gap-2">
+                        @csrf @method('PATCH')
+                        <select name="role" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 sm:w-auto">
+                            @foreach($roles as $role)
+                                <option value="{{ $role->value }}" @selected($p->role === $role)>{{ $role->label() }}</option>
+                            @endforeach
+                        </select>
+                        <select name="status" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 sm:w-auto">
+                            @foreach($statuses as $status)
+                                <option value="{{ $status->value }}" @selected($p->status === $status)>{{ $status->label() }}</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="w-full whitespace-nowrap px-3 py-2 text-sm font-medium text-blue-600 border border-slate-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors sm:w-auto">저장</button>
+                    </form>
 
-                {{-- 제외 --}}
-                <form action="{{ route('admin.projects.participants.destroy', [$project->id, $p->user_id]) }}" method="POST" onsubmit="return confirm('이 참가자를 행사에서 제외하시겠습니까?');">
-                    @csrf @method('DELETE')
-                    <button type="submit" class="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">제외</button>
-                </form>
+                    <form action="{{ route('admin.projects.participants.destroy', [$project->id, $p->user_id]) }}" method="POST"
+                          class="contents sm:block" onsubmit="return confirm('이 참가자를 행사에서 제외하시겠습니까?');">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="w-full whitespace-nowrap px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors sm:w-auto">제외</button>
+                    </form>
+                </div>
             </div>
         @empty
             <div class="px-6 py-14 text-center text-sm text-slate-400">아직 참가자가 없습니다. 위에서 추가하거나, 참가자가 입장 코드로 입장하면 표시됩니다.</div>
