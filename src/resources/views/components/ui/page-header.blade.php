@@ -7,7 +7,9 @@
 --}}
 @props(['heading' => null, 'back' => null])
 
-<header {{ $attributes->merge(['class' => 'sticky top-0 z-30 flex h-16 items-center gap-1 border-b border-ink-200 bg-white px-4']) }}>
+{{-- 고정 높이(h-16)에 패딩을 더하면 border-box 라 내용이 눌린다 → min-h-16 --}}
+<header style="padding-top: env(safe-area-inset-top)"
+        {{ $attributes->merge(['class' => 'sticky top-0 z-30 flex min-h-16 items-center gap-1 border-b border-ink-200 bg-white px-4']) }}>
     @if ($back)
         <a href="{{ $back }}" aria-label="뒤로"
            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-900 active:bg-ink-100">

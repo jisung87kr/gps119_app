@@ -35,7 +35,12 @@
 <html lang="ko" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    {{--
+        viewport-fit=cover 가 없으면 env(safe-area-inset-*) 가 전부 0 이다.
+        하단 탭바(x-ui.tab-bar)가 이미 env(safe-area-inset-bottom) 을 쓰고 있었는데
+        **그동안 한 번도 동작하지 않았다** — 이 한 줄이 빠져 있었기 때문이다.
+    --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {{-- 웹 푸시 구독용 VAPID 공개키. «공개»키라 노출이 정상이다(개인키는 서버에만). --}}
     <meta name="vapid-public-key" content="{{ config('push.vapid.public_key') }}">
@@ -75,7 +80,8 @@
                 @endisset
             </x-ui.page-header>
         @else
-            <header class="flex items-center justify-between px-5 pb-2 pt-6">
+            <header class="flex items-center justify-between px-5 pb-2 pt-6"
+                    style="padding-top: calc(1.5rem + env(safe-area-inset-top))">
                 <a href="{{ auth()->check() ? route('dashboard') : url('/') }}" class="flex items-center gap-2">
                     <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
                         <x-ui.icon name="bolt-outline" class="h-4 w-4" />
