@@ -4,13 +4,23 @@
 // 여기서는 과한 권한 프롬프트 없이 "홈 화면에 추가"만 안내한다.
 // beforeinstallprompt 는 manifest 링크가 있는 참가자 셸(layouts/app)에서만 발생.
 
+import { isNativeApp } from './native/bridge';
+
 const DISMISS_KEY = 'gps119-pwa-install-dismissed';
 
 // 1) 서비스워커 등록 (window load 이후 — 초기 로드 경쟁 방지)
-export function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch((e) => {
+export function registerServiceWorker(env = globalThis) {
+    // 네이티브 셸 안에서는 등록하지 않는다(01 §5).
+    // 셸이 이미 자체 캐시·오프라인 폴백(errorPath)을 갖고 있어 SW 와 «두 겹»이 된다.
+    // 두 겹이면 「어느 쪽 캐시 때문에 옛 화면이 뜨는지」를 추적할 수 없게 되고,
+    // 푸시도 네이티브(FCM)와 SW 웹푸시가 동시에 와서 알림이 두 번 뜬다.
+    if (isNativeApp(env)) {
+        return;
+    }
+
+    if (!('serviceWorker' in env.navigator)) return;
+    env.addEventListener('load', () => {
+        env.navigator.serviceWorker.register('/sw.js').catch((e) => {
             console.warn('[pwa] SW 등록 실패', e);
         });
     });
@@ -54,6 +64,9 @@ function removeBanner() {
 }
 
 export function initInstallOnboarding() {
+    // 이미 앱으로 실행 중이면 「앱 설치」 안내는 무의미하다(혼란만 준다).
+    if (isNativeApp()) return;
+
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault(); // 브라우저 기본 미니바 억제 → 커스텀 배너로 유도
         if (localStorage.getItem(DISMISS_KEY)) return; // 닫기 기억(1회)
