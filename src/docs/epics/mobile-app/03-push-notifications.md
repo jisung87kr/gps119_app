@@ -101,6 +101,24 @@ RequestCreated / DispatchAssigned / DispatchStatusUpdated
 
 **웹뷰 + 원격 URL 방식([01](01-webview-strategy.md))이라 딥링크가 그냥 URL 이면 된다** — 네이티브 라우팅 테이블을 따로 만들 필요가 없다. A안의 부수 이점.
 
+### 🔴 5-1. 그런데 이 규약이 **정작 상황실에게는 동작하지 않는다** (2026-08-05 검토 발견)
+
+위 표의 첫 줄 — 수신자 1순위인 **행사 상황실** — 이 실제로는 깨진다. `?project=` 를 읽는 라우트가 **관리자용 하나뿐**이다.
+
+| 라우트 | `?project=` 처리 | 실제 사용자 |
+|---|---|---|
+| `routes/web.php:207` (`/admin/control`) | ✅ `request('project')` → `selectedId` | 시스템 admin |
+| `routes/web.php:99~122` (`/control`) | 🔴 **읽지 않는다.** `view()` 에 `selectedId` 를 넘기지 않음 | **행사 controller** |
+
+`control/index.blade.php:23` 이 `data-selected="{{ $selectedId ?? '' }}"` 라 **조용히 빈 값**이 되고, `ControlApp.js` 는 `projects[0]` 을 자동 선택한다. 그리고 `_consumeDeepLink()` 는 `selectProject()` **안**에서 실행되므로:
+
+- 행사를 **하나만** 맡은 상황실 → 우연히 맞는다
+- 행사를 **둘 이상** 맡은 상황실 → 🔴 **엉뚱한 행사가 열리고, `?request=` 는 그 행사 목록에 없어 아무 일도 일어나지 않는다.** 실패가 화면에 드러나지도 않는다
+
+🔑 **`EventRole::CONTROLLER` 는 시스템 롤이 보통 `user` 다**(`recipientsFor()` 가 바로 이 사실 때문에 만들어졌다). 즉 **푸시를 가장 먼저 받아야 할 사람이 정확히 딥링크가 없는 쪽**에 있다.
+
+**조치 — N1 산출물에 포함한다.** `/control` 이 `/admin/control` 과 동일하게 `?project=` 를 해석하도록 맞춘다(권한 검사는 기존 로직 유지, 목록에 없는 id 면 무시). 앱 작업 전에, **웹 푸시 단계에서 이미 필요하다.**
+
 ## 6. 미결
 
 | ID | 질문 |
