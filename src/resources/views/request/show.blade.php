@@ -2,7 +2,8 @@
     신고 상태 추적 — 전체화면 지도 + 바텀시트. 시안이 없는 화면이라
     design-system.html 어휘로 파생했다(신고 화면과 같은 시트 구조).
 --}}
-<x-layouts.app title="GPS119 - 신고 상태" bare>
+<x-layouts.app title="GPS119 - 신고 상태" bare
+              body-class="h-[100dvh] overflow-hidden overscroll-none">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
     {{-- 다른 사용자 화면과 같은 폭(max-w-2xl 중앙 정렬) --}}
@@ -18,12 +19,13 @@
             {{-- 바깥 겹은 overflow 없음(위치 버튼이 시트 위로 떠야 함), 스크롤은 안쪽 --}}
             <div id="bottom-sheet"
                  class="absolute inset-x-0 bottom-0 z-20 transition-transform duration-300 ease-out"
-                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.75rem)]'">
+                 {{-- 접힘 높이 = 핸들 행(h-11=44px) + border-t(1px) --}}
+                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
 
                 <location-button :loading="loading" v-on:get-location="getMyLocation"></location-button>
 
-                <div class="max-h-[70vh] overflow-y-auto rounded-t-3xl border-t border-ink-200 bg-white shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)]">
-                    <div class="flex cursor-pointer justify-center py-2.5" v-on:click="toggleSheet"
+                <div class="max-h-[70dvh] overflow-y-auto rounded-t-3xl border-t border-ink-200 bg-white shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)]">
+                    <div class="flex h-11 cursor-pointer items-center justify-center" v-on:click="toggleSheet"
                          role="button" aria-label="패널 펼치기/접기">
                         <span class="h-1.5 w-12 rounded-full bg-ink-200"></span>
                     </div>
