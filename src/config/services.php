@@ -39,6 +39,12 @@ return [
         'client_secret' => env('NAVER_CLIENT_SECRET'),
         'redirect' => env('NAVER_REDIRECT_URI'),
     ],
+    // 운영용 신규 신고 공지(선택). 미설정이면 AnnounceRequestToDiscord 가 조용히 건너뛴다.
+    // env() 를 리스너에서 직접 읽으면 config:cache 시 null 이 되므로 반드시 여기를 경유한다.
+    'discord' => [
+        'webhook_url' => env('DISCORD_WEBHOOK_URL'),
+    ],
+
     'kakao' => [
         'client_id' => env('KAKAO_CLIENT_ID'),
         'client_secret' => env('KAKAO_CLIENT_SECRET'),

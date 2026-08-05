@@ -7,6 +7,7 @@ use App\Models\Request;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -15,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
  *
  * 담당 구급대원 배정/완료 시 신고자에게 담당자 이름·연락처 전달(신고자 본인 채널이라 허용).
  */
-class RequestStatusUpdated implements ShouldBroadcast
+class RequestStatusUpdated implements ShouldBroadcast, ShouldDispatchAfterCommit
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

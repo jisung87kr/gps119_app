@@ -6,6 +6,7 @@ use App\Models\Dispatch;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
  *
  * ADR-0004: 개인 dispatch 채널이므로 신고자 연락처 포함 허용(본인에게만 전달).
  */
-class DispatchAssigned implements ShouldBroadcast
+class DispatchAssigned implements ShouldBroadcast, ShouldDispatchAfterCommit
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

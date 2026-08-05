@@ -10,17 +10,18 @@ use Illuminate\Contracts\Queue\ShouldQueue; // 큐 활성화(워커 가동 중) 
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * 신규 신고 → «누구에게 알릴 것인가»를 정하고 통지한다.
+ *
+ * 이 리스너의 책임은 **수신자 판별 하나**다. 디스코드 공지는 재시도 의미가 달라서
+ * AnnounceRequestToDiscord 로 분리했다 — 한 잡에 묶여 있으면 디스코드 실패가
+ * 이미 성공한 통지를 재발송시킨다(같은 신고로 폰이 두 번 운다).
+ *
+ * 실제 발송(FCM·웹푸시)은 N1 의 PushService 가 붙는 자리다.
+ */
 class NotifyRescuers implements ShouldQueue
 {
-    use InteractsWithQueue; // 큐 활성화: file_get_contents 디스코드 호출이 요청 응답을 막지 않도록
-
-    /**
-     * Create the event listener.
-     */
-    public function __construct()
-    {
-        //
-    }
+    use InteractsWithQueue; // 수신자 조회 + 발송이 요청 응답을 막지 않도록 큐에서 처리
 
     /**
      * Handle the event.
@@ -40,34 +41,6 @@ class NotifyRescuers implements ShouldQueue
 
         foreach ($this->recipientsFor($request) as $recipient) {
             $this->sendNotificationToRescuer($recipient, $request);
-        }
-
-        // 디스코드 알림 (큐에서 실행 — file_get_contents 유지. URL 미설정 시 스킵하여 잡 실패 방지)
-        $url = env('DISCORD_WEBHOOK_URL');
-        $requestUrl = config('app.url').'/requests/'.$request->id;
-        $message = "[{$request->description}] 공유됨\n".
-            "요청자: {$request->user->name}\n".
-            "연락처: {$request->user->formatted_phone}\n".
-            "위치정보: {$request->latitude}/{$request->longitude}\n".
-            "주소: {$request->address}\n".
-            "{$requestUrl}";
-
-        $data = [
-            'content' => "{$message}",
-            'username' => 'gps119 Bot',
-            'avatar_url' => 'https://example.com/avatar.png',
-        ];
-
-        $options = [
-            'http' => [
-                'header' => "Content-Type: application/json\r\n",
-                'method' => 'POST',
-                'content' => json_encode($data),
-            ],
-        ];
-        if (! empty($url)) {
-            $context = stream_context_create($options);
-            file_get_contents($url, false, $context);
         }
 
         Log::info('NotifyRescuers listener completed', [
