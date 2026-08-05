@@ -37,6 +37,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- 웹 푸시 구독용 VAPID 공개키. «공개»키라 노출이 정상이다(개인키는 서버에만). --}}
+    <meta name="vapid-public-key" content="{{ config('push.vapid.public_key') }}">
     <title>{{ $title ?? 'GPS119' }}</title>
 
     {{-- PWA: 설치형 매니페스트 + 테마색(brand-600) + iOS 홈화면 아이콘 --}}

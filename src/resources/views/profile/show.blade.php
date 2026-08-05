@@ -109,6 +109,23 @@
         {{-- 설정 --}}
         <x-ui.section title="설정">
             <x-ui.list>
+                {{--
+                    웹 푸시 토글. 상태 판단·전환은 전부 resources/js/push-toggle.js 가 한다
+                    (브라우저 권한과 서버 등록이 어긋나면 «켜져 있는데 안 온다»가 되므로
+                     화면이 자체 판단을 갖지 않게 한다).
+                --}}
+                <div data-push-section class="flex items-center gap-3 px-4 py-3.5">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-900">
+                        <x-ui.icon name="bell" class="h-[17px] w-[17px]" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-base font-bold text-ink-950">알림 받기</span>
+                        <span data-push-state class="mt-0.5 block text-sm text-ink-400">확인 중…</span>
+                    </span>
+                    <button type="button" data-push-toggle hidden
+                            class="shrink-0 rounded-lg border border-ink-200 px-3 py-1.5 text-sm font-bold text-ink-900 disabled:opacity-50"></button>
+                </div>
+
                 @if (! $user->provider)
                     <x-ui.list-item :href="route('profile.password.edit')" icon="key"
                                     icon-tone="neutral" icon-size="sm" title="비밀번호 변경" />

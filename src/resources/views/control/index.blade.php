@@ -9,6 +9,11 @@
     --}}
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{--
+        웹 푸시 VAPID 공개키. 관제에 «특히» 필요하다 — Reverb 는 이 탭이 떠 있을 때만
+        닿으므로, 탭을 접어두거나 화면을 끄면 신규 신고를 놓친다.
+    --}}
+    <meta name="vapid-public-key" content="{{ config('push.vapid.public_key') }}">
     <title>실시간 관제 - GPS119</title>
 
     {{-- 관제 전용 Vite 번들 SPA (FE-2.1) — app.css로 컴파일된 Tailwind 유틸 로드 --}}
