@@ -154,6 +154,14 @@ export function createLocationSharer(config = {}) {
 
         try {
             await flushBuffer();          // 밀린 실패분 먼저 복구
+            // 복구 중에 429 를 만나 백오프가 걸렸다면 현재 건도 보내지 않는다.
+            // (이 확인이 없으면 서버가 "너무 빠르다"고 한 직후에 한 건을 더 때린다)
+            if (Date.now() < backoffUntil) {
+                pushBuffer(payload);
+                state.error = '전송 속도 조절 중';
+                emit();
+                return;
+            }
             await postPing(payload);
             lastSent = { lat, lng, t: Date.now() };
             state.sentCount += 1;
