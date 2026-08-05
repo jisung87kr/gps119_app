@@ -65,6 +65,14 @@ export default {
         },
     },
 
+    created() {
+        // 비반응 인스턴스 필드 — 구독 해제 대상을 추적한다(선언 위치를 한곳에 모아둔다).
+        this._subscribedProjectId = null;
+        this._locCh = null;
+        this._ctrlCh = null;
+        this._pollTimer = null;
+    },
+
     mounted() {
         // Blade 가 data-projects 로 주입한 활성 행사 목록.
         // 템플릿이 다중 루트라 this.$el은 fragment placeholder(텍스트 노드) → 마운트 컨테이너에서 직접 읽는다.
@@ -224,6 +232,7 @@ export default {
             if (!echo) { this._startPolling(); return; }
 
             const pid = this.selectedProjectId;
+            this._subscribedProjectId = pid; // teardown 이 읽을 단일 출처
             // presence: 위치
             this._locCh = echo.join(`event.${pid}.locations`)
                 .listen('.participant.location', (e) => this._onLocation(e));
@@ -395,21 +404,45 @@ export default {
             return `/api/events/${this.selectedProjectId}/report/${kind}.csv`;
         },
 
+        // WS 폴백. roster 만 돌리면 안 된다 — 신규 신고(.request.created)와 지령 상태
+        // (.dispatch.updated)도 WS 로만 들어오므로, 폴링 중에는 신고가 화면에 아예 안 뜬다.
+        // 구조 도메인에서 "떴는데 못 봄"이 최악의 실패라 세 개를 같이 돌린다.
+        async _poll() {
+            if (!this.hasProject) return;
+            try {
+                await this.fetchRoster(false);
+                await this.fetchRequests();
+                await this.loadBoard();
+            } catch (e) {
+                console.error('[control] 폴백 폴링 실패', e);
+            }
+        },
+
         _startPolling() {
             if (this._pollTimer) return;
             this.wsState = 'polling';
-            this._pollTimer = setInterval(() => this.fetchRoster(false), POLL_INTERVAL_MS);
+            this._pollTimer = setInterval(() => this._poll(), POLL_INTERVAL_MS);
+            this._poll(); // 첫 주기(12초)를 기다리지 않고 즉시 1회
         },
         _stopPolling() {
             if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
         },
 
+        // 구독 해제는 반드시 "실제로 구독한 행사 id"(_subscribedProjectId)를 쓴다.
+        // selectedProjectId 를 읽으면 안 된다 — selectProject() 가 새 id 를 먼저 대입한 뒤
+        // teardown 을 부르므로, 아직 구독하지도 않은 새 채널을 leave 하고 이전 행사 구독이
+        // 살아남는다. event.{id}.control 은 신고자 연락처를 싣기 때문에(ADR-0004)
+        // 이전 행사의 신고가 연락처째로 새 화면에 계속 흘러들어온다.
         _teardownRealtime() {
             this._stopPolling();
-            if (window.Echo && this.selectedProjectId != null) {
-                try { window.Echo.leave(`event.${this.selectedProjectId}.locations`); } catch (e) { /* noop */ }
-                try { window.Echo.leave(`event.${this.selectedProjectId}.control`); } catch (e) { /* noop */ }
+            const pid = this._subscribedProjectId;
+            if (window.Echo && pid != null) {
+                try { window.Echo.leave(`event.${pid}.locations`); } catch (e) { /* noop */ }
+                try { window.Echo.leave(`event.${pid}.control`); } catch (e) { /* noop */ }
             }
+            this._subscribedProjectId = null;
+            this._locCh = null;
+            this._ctrlCh = null;
         },
 
         // ── 역할 필터 ───────────────────────────────────────────
