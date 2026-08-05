@@ -5,7 +5,7 @@
 import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool';
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
-    dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta,
+    dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta, presenceState,
 } from './roleMeta';
 
 const POLL_INTERVAL_MS = 12000;
@@ -185,15 +185,26 @@ export default {
             this.closeAssign();
 
             await this._ensureMap();
-            if (!this.mapReady) return;
 
-            // 새 풀 (클러스터 파라미터는 화면 폭에 따라 다름 — markerPool.CLUSTER_PROFILE 주석 참조)
-            this.pool = new PersonMarkerPool(
-                this.map,
-                this.isMobile ? CLUSTER_PROFILE.mobile : CLUSTER_PROFILE.desktop
-            );
-            this.requestPins = new RequestPinLayer(this.map);
-            this._applyFilterToPool();
+            // 🔑 지도는 «표현»이고 신고 목록·출동 보드·실시간은 «관제 기능»이다.
+            //    예전에는 여기서 `if (!this.mapReady) return;` 로 빠져나가서, 카카오 지도가
+            //    실패하면 목록·보드·실시간 구독·딥링크가 **전부** 죽었다. 화면에는
+            //    「지도를 불러오지 못했습니다」만 뜨고 상황실은 «신고가 없는 것»으로 본다.
+            //    카카오 쿼터 소진은 이 에픽이 이미 리스크로 꼽은 항목인데(09 리스크 표),
+            //    그 파급이 지도에 그치지 않는다는 걸 아무도 추적하지 않았다.
+            //    → 지도가 없으면 «마커만» 없고 나머지는 그대로 돈다.
+            if (this.mapReady) {
+                // 클러스터 파라미터는 화면 폭에 따라 다름 — markerPool.CLUSTER_PROFILE 주석 참조
+                this.pool = new PersonMarkerPool(
+                    this.map,
+                    this.isMobile ? CLUSTER_PROFILE.mobile : CLUSTER_PROFILE.desktop
+                );
+                this.requestPins = new RequestPinLayer(this.map);
+                this._applyFilterToPool();
+            } else {
+                this.pool = null;
+                this.requestPins = null;
+            }
 
             await this.fetchRoster(true);
             await this.fetchRequests();
@@ -257,8 +268,10 @@ export default {
                 );
                 const rows = res.data.data || [];
                 this.roster = rows;
-                rows.forEach((row) => this.pool.upsert(row));
-                if (fit) this.pool.fitBounds();
+                if (this.pool) {
+                    rows.forEach((row) => this.pool.upsert(row));
+                    if (fit) this.pool.fitBounds();
+                }
                 this._refreshCounts();
             } catch (e) {
                 console.error('[control] roster 조회 실패', e);
@@ -277,9 +290,9 @@ export default {
                     { headers: { Accept: 'application/json' } }
                 );
                 const rows = res.data.data || [];
-                rows.forEach((r) => this.requestPins.upsert(r));
+                if (this.requestPins) rows.forEach((r) => this.requestPins.upsert(r));
                 this.requests = rows; // 이미 최신순(desc)
-                this.requestCount = this.requestPins.count();
+                this.requestCount = this._requestCount();
             } catch (e) {
                 console.error('[control] 신고 조회 실패', e);
             }
@@ -348,6 +361,9 @@ export default {
         },
 
         _onLocation(payload) {
+            // 지도가 없으면 그릴 마커도 없다. 실시간 «수신»은 계속돼야 하므로 조용히 지나간다.
+            if (!this.pool) return;
+
             // 좌표만 이동(리렌더 금지). 풀에 없으면(신규 인원) upsert 로 생성.
             const moved = this.pool.move(
                 payload.user_id, payload.latitude, payload.longitude, payload.accuracy ?? null
@@ -377,10 +393,16 @@ export default {
         },
 
         _onRequestCreated(payload) {
-            // 신고 고정핀(클러스터 제외·z100) + 목록 prepend
-            this.requestPins.upsert(payload);
+            // 🔑 목록 갱신이 «먼저»다. 핀은 지도가 있을 때만 — 예전에는 핀부터 찍어서
+            //    지도가 없으면 여기서 터지고 신규 신고가 목록에도 안 올라갔다.
             this.requests.unshift(payload);
-            this.requestCount = this.requestPins.count();
+            if (this.requestPins) this.requestPins.upsert(payload);
+            this.requestCount = this._requestCount();
+        },
+
+        /** 신고 건수 — 지도가 없으면 핀을 셀 수 없으므로 목록 길이로 센다. */
+        _requestCount() {
+            return this.requestPins ? this.requestPins.count() : this.requests.length;
         },
 
         // ── FE-3.3: 지령 배정 패널 ──────────────────────────────
@@ -573,9 +595,29 @@ export default {
         },
 
         _refreshCounts() {
-            if (!this.pool) return;
-            this.roleCounts = this.pool.counts();
-            this.onlineCount = this.pool.onlineTotal();
+            if (this.pool) {
+                this.roleCounts = this.pool.counts();
+                this.onlineCount = this.pool.onlineTotal();
+
+                return;
+            }
+
+            // 지도가 없어도 «인력 현황»은 보여야 한다. 마커 풀 대신 roster 로 직접 센다 —
+            // 예전에는 여기서 그냥 빠져나가 전원 0 명으로 표시됐다.
+            const counts = {};
+            let online = 0;
+
+            this.roster.forEach((row) => {
+                counts[row.role] = counts[row.role] || { online: 0, total: 0 };
+                counts[row.role].total++;
+                if (presenceState(row.last_seen_at) === 'online') {
+                    counts[row.role].online++;
+                    online++;
+                }
+            });
+
+            this.roleCounts = counts;
+            this.onlineCount = online;
         },
 
         roleOnline(role) { return (this.roleCounts[role]?.online) || 0; },
@@ -762,9 +804,10 @@ export default {
       </div>
 
       <div v-if="mapError" class="absolute inset-0 flex items-center justify-center bg-white z-20">
-        <div class="text-center">
-          <p class="text-gray-600 mb-2">지도를 불러오지 못했습니다.</p>
-          <button @click="recenter" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm">새로고침</button>
+        <div class="text-center px-6">
+          <p class="text-gray-700 font-semibold mb-1">지도를 불러오지 못했습니다.</p>
+          <p class="text-gray-500 text-sm mb-3">신고 접수·출동 현황·실시간 수신은 정상 동작합니다.<br class="hidden sm:block">아래 목록에서 계속 관제할 수 있습니다.</p>
+          <button @click="recenter" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm">지도 다시 시도</button>
         </div>
       </div>
 
