@@ -28,8 +28,16 @@ function personPinSvg(role, state) {
     return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
 
+// 클러스터 파라미터는 지도 «픽셀» 기준이라 화면 폭에 따라 의미가 달라진다.
+// gridSize 80 은 1000px 지도에서 폭의 8% 지만 375px 지도에서는 21% — 모바일에서
+// 전 인원이 한 덩어리로 뭉쳐 지도가 조망 기능을 잃는다. 그래서 프로파일을 나눈다.
+export const CLUSTER_PROFILE = {
+    desktop: { minLevel: 5, gridSize: 80, minClusterSize: 10 },
+    mobile: { minLevel: 5, gridSize: 50, minClusterSize: 5 },
+};
+
 export class PersonMarkerPool {
-    constructor(map) {
+    constructor(map, clusterProfile = CLUSTER_PROFILE.desktop) {
         this.map = map;
         this.markers = new Map();   // userId -> { marker, role, state, row }
         this.visibleRoles = new Set(); // 표시 중인 역할
@@ -38,9 +46,10 @@ export class PersonMarkerPool {
         this.clusterer = new kakao.maps.MarkerClusterer({
             map,
             averageCenter: true,
-            minLevel: 5,            // level>=5 클러스터링, <=4 개별(§5)
-            gridSize: 80,
-            minClusterSize: 10,
+            // minLevel: level>=N 클러스터링, 미만은 개별(§5)
+            minLevel: clusterProfile.minLevel,
+            gridSize: clusterProfile.gridSize,
+            minClusterSize: clusterProfile.minClusterSize,
             disableClickZoom: false,
             styles: [{
                 width: '40px', height: '40px',
@@ -180,7 +189,12 @@ export class PersonMarkerPool {
         kakao.maps.event.addListener(marker, 'click', () => iw.open(this.map, marker));
     }
 
-    fitBounds() {
+    /**
+     * 전 인원이 보이도록 맞춘다.
+     * padding: {top,right,bottom,left} px. 모바일 바텀시트가 지도 하단을 가리므로
+     * 그만큼 하단 패딩을 줘야 마커가 시트 밑에 깔리지 않는다.
+     */
+    fitBounds(padding = null) {
         if (this.markers.size === 0) return;
         const bounds = new kakao.maps.LatLngBounds();
         let any = false;
@@ -191,7 +205,12 @@ export class PersonMarkerPool {
                 any = true;
             }
         }
-        if (any) this.map.setBounds(bounds);
+        if (!any) return;
+        if (padding) {
+            this.map.setBounds(bounds, padding.top || 0, padding.right || 0, padding.bottom || 0, padding.left || 0);
+        } else {
+            this.map.setBounds(bounds);
+        }
     }
 }
 
