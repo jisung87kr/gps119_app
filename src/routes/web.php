@@ -149,6 +149,14 @@ Route::get('/control', function () {
     return view('control.index', [
         'projects' => $projects,
         'selectedId' => $selectedId,
+        // 관리자에게만 관리 셸로 돌아가는 백링크를 준다.
+        //
+        // 🔑 푸시 딥링크는 «한 URL 로 두 집단»을 태워야 해서 /control 을 쓴다 —
+        //    신규 신고의 1순위 수신자인 행사 상황실은 시스템 롤이 보통 user 라
+        //    /admin/control 로 보내면 403 을 받는다. 대신 관리자가 알림으로 들어오면
+        //    사이드바 없는 화면에 갇히므로, 여기서 백링크만 채워준다.
+        //    (행사 controller 에게는 주지 않는다 — 그 대시보드는 admin 미들웨어 뒤에 있다.)
+        'backUrl' => $user->hasRole('admin') ? route('admin.dashboard') : null,
     ]);
 })->middleware(['auth'])->name('control');
 

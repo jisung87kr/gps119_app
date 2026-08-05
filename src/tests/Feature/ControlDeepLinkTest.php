@@ -98,6 +98,30 @@ class ControlDeepLinkTest extends TestCase
             ->assertSee('data-selected=""', false);
     }
 
+    public function test_an_admin_gets_a_way_back_to_the_admin_shell(): void
+    {
+        // 푸시 딥링크는 /control 하나로 두 집단을 태운다(상황실은 /admin/control 에서 403).
+        // 그래서 관리자가 알림으로 들어오면 사이드바 없는 화면에 갇힌다 — 백링크로 푼다.
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $this->activeProject('행사 A');
+
+        $this->actingAs($admin)->get('/control')
+            ->assertOk()
+            ->assertSee('data-back-url="'.route('admin.dashboard').'"', false);
+    }
+
+    public function test_an_event_controller_gets_no_admin_back_link(): void
+    {
+        // 짝 테스트. 상황실에게 주면 admin 미들웨어 뒤 403 으로 보내는 링크가 된다.
+        [$user] = $this->controllerOfTwo();
+
+        $this->actingAs($user)->get('/control')
+            ->assertOk()
+            ->assertSee('data-back-url=""', false)
+            ->assertDontSee(route('admin.dashboard'), false);
+    }
+
     public function test_an_admin_gets_the_same_deep_link(): void
     {
         $admin = User::factory()->create();
