@@ -60,10 +60,14 @@ RequestCreated / DispatchAssigned / DispatchStatusUpdated
 | 항목 | 내용 |
 |---|---|
 | **`device_tokens` 테이블** | `user_id`, `token`, `platform(ios/android)`, `app_version`, `last_seen_at`, `revoked_at` |
-| **토큰 등록/해제 API** | `POST /api/devices` · `DELETE /api/devices/{token}`. 앱 실행 시·토큰 갱신 시 |
+| **토큰 등록/해제 API** | `POST /api/devices` (본문에 토큰) · `DELETE /api/devices/current` (본문 또는 인증 주체로 해석). 앱 실행 시·토큰 갱신 시 |
 | **`PushService`** | 발송·실패 처리·**무효 토큰 정리**(FCM 이 `UNREGISTERED` 반환 시 `revoked_at`) |
 | **알림 종류 정의** | 아래 §4 |
 | **사용자별 수신 설정** | 역할에 따라 받고 싶은 알림이 다르다 |
+
+🔴 **FCM 토큰을 URL path 에 넣지 않는다.** `DELETE /api/devices/{token}` 형태는 액세스 로그·리버스 프록시 로그·에러 리포트에 토큰이 그대로 남는다. 토큰은 그 자체로 **해당 기기에 푸시를 보낼 수 있는 자격증명**이다. 본문(body)으로 받거나, 저장 시 해시를 두고 그 id 로 지운다.
+
+⚠️ 같은 이유로 `device_tokens.token` 은 **조회 인덱스를 해시 컬럼에 건다**(원문 토큰은 발송에 필요하므로 보관하되, 검색·로그에는 해시를 쓴다).
 
 🔴 **`sendNotificationToRescuer` 의 TODO 를 `PushService` 호출로 바꾸는 것이 이 에픽의 실질적 산출물**이다. 앱 SDK 연동은 그 다음이다.
 
