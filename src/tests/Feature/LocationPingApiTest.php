@@ -187,4 +187,83 @@ class LocationPingApiTest extends TestCase
 
         $this->assertTrue($participant->refresh()->sharing_location);
     }
+
+    /**
+     * accuracy 가 캐시와 roster 까지 도달해야 한다.
+     *
+     * 회귀 방지: accuracy 는 전송·검증·location_pings 적재·브로드캐스트 페이로드까지
+     * 살아 있었는데 «참가자 캐시»에만 없어서, 관제가 처음 로드할 때 받는 roster 에는
+     * 빠져 있었다. 결과적으로 오차 5m 인 사람과 500m 인 사람이 지도에 같은 점으로 찍혔다.
+     */
+    public function test_accuracy_reaches_cache_and_roster(): void
+    {
+        Queue::fake();
+
+        $project = $this->project();
+        $user = User::factory()->create();
+        $participant = EventParticipant::factory()->create([
+            'project_id' => $project->id, 'user_id' => $user->id,
+            'sharing_location' => true, 'role' => EventRole::PARAMEDIC,
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/events/{$project->id}/location", [
+            'latitude' => 37.5665,
+            'longitude' => 126.9780,
+            'accuracy' => 137,
+            'recorded_at' => now()->subSeconds(2)->toISOString(),
+        ])->assertStatus(202);
+
+        // ① 캐시
+        $this->assertSame(137, $participant->refresh()->last_accuracy);
+
+        // ② roster (관제 최초 로드 경로)
+        $controller = User::factory()->create();
+        EventParticipant::factory()->create([
+            'project_id' => $project->id, 'user_id' => $controller->id,
+            'role' => EventRole::CONTROLLER,
+        ]);
+        Sanctum::actingAs($controller);
+
+        $this->getJson("/api/events/{$project->id}/participants")
+            ->assertOk()
+            ->assertJsonPath('data.0.last_accuracy', 137);
+    }
+
+    /**
+     * 이동 시나리오(분당 12회)가 스로틀에 막히지 않아야 한다.
+     *
+     * 회귀 방지: 예전 `throttle:2,1` 은 "초당 2회"가 아니라 **분당 2회**였고,
+     * locationShare.js 는 이동 중 5초 간격(= 분당 12회)으로 보낸다. 12건 중
+     * 10건이 429 로 버려지면서, 정확도가 가장 필요한 "이동 중"에 정확히
+     * 실패하고 있었다. 정지 상태(30초 하트비트 = 분당 2회)에서만 우연히 맞았다.
+     */
+    public function test_moving_cadence_is_not_throttled(): void
+    {
+        Queue::fake();
+
+        $project = $this->project();
+        $user = User::factory()->create();
+        EventParticipant::factory()->create([
+            'project_id' => $project->id, 'user_id' => $user->id,
+            'sharing_location' => true,
+        ]);
+        Sanctum::actingAs($user);
+
+        // 이동 중 5초 간격 = 1분에 12회
+        for ($i = 0; $i < 12; $i++) {
+            $res = $this->postJson("/api/events/{$project->id}/location", [
+                'latitude' => 37.5665 + ($i * 0.0001),
+                'longitude' => 126.9780,
+                'accuracy' => 8,
+                'recorded_at' => now()->subSeconds(60 - ($i * 5))->toISOString(),
+            ]);
+
+            $this->assertNotSame(
+                429,
+                $res->getStatusCode(),
+                "이동 중 {$i}번째 ping 이 스로틀에 막혔다 — routes/api.php 의 throttle 값을 확인할 것"
+            );
+        }
+    }
 }

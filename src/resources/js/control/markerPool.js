@@ -9,6 +9,20 @@ import { roleMeta, priorityMeta, presenceState, ICON_PATHS } from './roleMeta';
 const Z_PERSON = 10;
 const Z_REQUEST = 100;
 
+// 정확도 경고 임계값(m). 산·코스에서 이 이상 벌어지면 «그 점을 믿고 가면 안 된다».
+const ACCURACY_WARN_M = 50;
+const ACCURACY_BAD_M = 150;
+
+// 정확도 표시 — 값이 없으면 «모름»을 명시한다. 빈칸으로 두면 «정확하다»로 읽힌다.
+function accuracyHtml(acc) {
+    if (acc == null) {
+        return '<div style="color:#9ca3af;margin-top:2px;">정확도 정보 없음</div>';
+    }
+    const color = acc >= ACCURACY_BAD_M ? '#dc2626' : acc >= ACCURACY_WARN_M ? '#d97706' : '#16a34a';
+    const note = acc >= ACCURACY_BAD_M ? ' · 신뢰 낮음' : '';
+    return `<div style="color:${color};margin-top:2px;">오차 반경 ±${acc}m${note}</div>`;
+}
+
 // ── 인원 핀 SVG (둥근 물방울) ───────────────────────────────────────────────
 function personPinSvg(role, state) {
     const meta = roleMeta(role);
@@ -109,10 +123,13 @@ export class PersonMarkerPool {
     }
 
     // 좌표만 이동(participant.location 수신용 경량 경로)
-    move(userId, lat, lng) {
+    // accuracy 는 좌표와 같이 바뀌므로 row 에 반영한다 — 안 하면 인포윈도가
+    // 최초 roster 값에 영원히 고정돼, 이동해도 옛 정확도를 보여준다.
+    move(userId, lat, lng, accuracy) {
         const entry = this.markers.get(userId);
         if (!entry) return false;
         entry.marker.setPosition(new kakao.maps.LatLng(Number(lat), Number(lng)));
+        if (accuracy !== undefined) entry.row.last_accuracy = accuracy;
         return true;
     }
 
@@ -175,18 +192,31 @@ export class PersonMarkerPool {
         if (toAdd.length) this.clusterer.addMarkers(toAdd);
     }
 
-    // 인원 인포윈도 — §7: 연락처 슬롯 없음(이름·역할·online 만)
+    // 인원 인포윈도 — §7: 연락처 슬롯 없음(이름·역할·online·정확도)
+    //
+    // 인포윈도는 생성 시점의 row 를 캡처하므로 매번 새로 그린다. accuracy 는 위치가
+    // 갱신될 때마다 바뀌기 때문에, 열리는 순간의 값을 읽어야 한다.
     _bindInfo(marker, row, state) {
+        const iw = new kakao.maps.InfoWindow({ content: '', removable: true });
+        kakao.maps.event.addListener(marker, 'click', () => {
+            const entry = this.markers.get(row.user_id);
+            const cur = entry ? entry.row : row;
+            const curState = entry ? entry.state : state;
+            iw.setContent(this._infoHtml(cur, curState));
+            iw.open(this.map, marker);
+        });
+    }
+
+    _infoHtml(row, state) {
         const meta = roleMeta(row.role);
         const stLabel = state === 'online' ? '온라인' : state === 'stale' ? '위치지연' : '오프라인';
-        const html =
-            `<div style="padding:8px 10px;min-width:140px;font-size:12px;">` +
+        return `<div style="padding:8px 10px;min-width:140px;font-size:12px;">` +
             `<div style="font-weight:700;margin-bottom:2px;">${escapeHtml(row.name || '이름없음')}</div>` +
             `<div style="color:#555;">` +
             `<span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:${meta.color};margin-right:4px;"></span>` +
-            `${meta.label} · ${stLabel}</div></div>`;
-        const iw = new kakao.maps.InfoWindow({ content: html, removable: true });
-        kakao.maps.event.addListener(marker, 'click', () => iw.open(this.map, marker));
+            `${meta.label} · ${stLabel}</div>` +
+            accuracyHtml(row.last_accuracy) +
+            `</div>`;
     }
 
     /**

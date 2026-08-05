@@ -18,7 +18,7 @@ class EventParticipant extends Model
 
     protected $fillable = [
         'project_id', 'user_id', 'role', 'status',
-        'sharing_location', 'last_lat', 'last_lng', 'joined_at', 'last_seen_at',
+        'sharing_location', 'last_lat', 'last_lng', 'last_accuracy', 'joined_at', 'last_seen_at',
     ];
 
     protected $casts = [

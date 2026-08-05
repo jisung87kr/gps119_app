@@ -31,9 +31,17 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('event.role:controller')->name('api.events.participants.assign');
 
     // 위치 (실시간 관제 — BE-2.1 / SPEC-06b)
-    // ping 수신: active 참가자(역할무관) + rate-limit(초당 1~2). 큐로 적재.
+    // ping 수신: active 참가자(역할무관) + rate-limit. 큐로 적재.
+    //
+    // 🔴 throttle 값 주의: Laravel 문법은 `throttle:최대횟수,분` 이다.
+    //    예전 `throttle:2,1` 은 "초당 2회"가 아니라 **분당 2회**였고, 클라이언트는
+    //    이동 중 5초 간격(분당 12회)으로 보내므로 12건 중 10건이 429 로 버려졌다.
+    //    정지 상태(30초 하트비트 = 분당 2회)에서만 우연히 맞아, 정확도가 가장
+    //    필요한 "이동 중"에 정확히 실패하고 있었다.
+    //    30 = 이동 5초 간격(12) + 실패분 재전송·복수 탭 여유.
+    //    변경 시 locationShare.js 의 MOVE_INTERVAL_MS 와 같이 볼 것.
     Route::post('/events/{id}/location', [LocationApiController::class, 'store'])
-        ->middleware(['event.member', 'throttle:2,1'])->name('api.events.location.store');
+        ->middleware(['event.member', 'throttle:30,1'])->name('api.events.location.store');
     // 관제 roster: controller 만
     Route::get('/events/{id}/participants', [LocationApiController::class, 'participants'])
         ->middleware('event.role:controller')->name('api.events.participants.index');

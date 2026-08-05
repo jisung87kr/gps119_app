@@ -349,7 +349,9 @@ export default {
 
         _onLocation(payload) {
             // 좌표만 이동(리렌더 금지). 풀에 없으면(신규 인원) upsert 로 생성.
-            const moved = this.pool.move(payload.user_id, payload.latitude, payload.longitude);
+            const moved = this.pool.move(
+                payload.user_id, payload.latitude, payload.longitude, payload.accuracy ?? null
+            );
             if (!moved) {
                 this.pool.upsert({
                     user_id: payload.user_id,
@@ -358,6 +360,7 @@ export default {
                     status: 'active',
                     last_lat: payload.latitude,
                     last_lng: payload.longitude,
+                    last_accuracy: payload.accuracy ?? null,
                     last_seen_at: payload.recorded_at,
                 });
             } else {
@@ -367,6 +370,7 @@ export default {
                     entry.row.last_seen_at = payload.recorded_at;
                     entry.row.last_lat = payload.latitude;
                     entry.row.last_lng = payload.longitude;
+                    entry.row.last_accuracy = payload.accuracy ?? null;
                 }
             }
             this._refreshCounts();

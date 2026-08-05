@@ -6,14 +6,20 @@
 // 적응형 주기(05/04):
 //   - 이동(직전 전송 위치에서 MOVE_THRESHOLD_M 초과) → 최소 MOVE_INTERVAL_MS(약 5초) 간격 전송
 //   - 정지 → STATIONARY_INTERVAL_MS(약 30초) 하트비트 전송
-//   백엔드 throttle(2/s)·sharing-off 스킵과 정합.
+//   백엔드 throttle 은 routes/api.php 의 `throttle:30,1`(= 분당 30회)이다.
+//   ⚠️ 예전 주석은 "백엔드 throttle(2/s)와 정합"이라 적혀 있었으나 실제 백엔드는
+//      분당 2회였다(Laravel 문법이 `최대횟수,분`). 이동 중 12건 중 10건이 429 로
+//      버려지고 있었다. 값을 바꿀 때는 반드시 양쪽을 같이 볼 것.
 //
-// 견고성(경량): 전송 실패분은 작은 버퍼(최대 2개)에 보관 후 다음 전송 시 복구 전송.
+// 견고성(경량): 전송 실패분은 작은 버퍼에 보관 후 다음 전송 시 복구 전송.
+//   429(스로틀)는 "지금 너무 빠르다"는 뜻이라 즉시 재시도하면 더 악화된다 →
+//   백오프 창 동안 전송을 건너뛴다(버퍼에는 남겨 다음 창에서 복구).
 
 const MOVE_THRESHOLD_M = 10;        // 이동 판정 거리
 const MOVE_INTERVAL_MS = 5000;      // 이동 중 최소 전송 간격
 const STATIONARY_INTERVAL_MS = 30000; // 정지 중 하트비트 간격
-const MAX_BUFFER = 2;               // 오프라인 실패 버퍼 상한
+const MAX_BUFFER = 12;              // 실패 버퍼 상한(이동 1분치)
+const THROTTLE_BACKOFF_MS = 20000;  // 429 수신 시 전송 중단 창
 
 const GEO_OPTIONS = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
@@ -62,6 +68,7 @@ export function createLocationSharer(config = {}) {
     let watchId = null;
     let lastSent = null;   // {lat,lng,t}
     let buffer = [];       // 실패 payload 보관
+    let backoffUntil = 0;  // 429 백오프 만료 시각(ms epoch). 0 이면 백오프 아님
 
     function emit() { onChange({ ...state }); }
 
@@ -84,8 +91,15 @@ export function createLocationSharer(config = {}) {
             { headers: { Accept: 'application/json' } });
     }
 
+    // 429(Too Many Requests) 여부. axios 는 e.response.status, fetch 폴백은 e.status.
+    function isThrottled(e) {
+        return (e && (e.response?.status === 429 || e.status === 429)) || false;
+    }
+
     // 적응형: 보낼지 판단
     function shouldSend(lat, lng) {
+        // 백오프 중에는 전송하지 않는다(버퍼에는 계속 쌓여 창이 끝나면 복구된다)
+        if (Date.now() < backoffUntil) return false;
         if (!lastSent) return true;
         const elapsed = Date.now() - lastSent.t;
         const moved = distanceM(lastSent.lat, lastSent.lng, lat, lng);
@@ -100,8 +114,17 @@ export function createLocationSharer(config = {}) {
         buffer = [];
         state.bufferedCount = 0;
         for (const p of pending) {
-            try { await postPing(p); }
-            catch (e) { pushBuffer(p); } // 또 실패하면 다시 보관
+            try {
+                await postPing(p);
+            } catch (e) {
+                pushBuffer(p); // 또 실패하면 다시 보관
+                // 429 면 남은 것도 어차피 막힌다 → 즉시 중단하고 백오프
+                if (isThrottled(e)) {
+                    backoffUntil = Date.now() + THROTTLE_BACKOFF_MS;
+                    pending.slice(pending.indexOf(p) + 1).forEach(pushBuffer);
+                    return;
+                }
+            }
         }
     }
 
@@ -140,7 +163,13 @@ export function createLocationSharer(config = {}) {
         } catch (e) {
             // 조용히 재시도: 버퍼에 보관 후 다음 tick
             pushBuffer(payload);
-            state.error = '전송 지연(재시도 중)';
+            if (isThrottled(e)) {
+                // 서버가 "너무 빠르다"고 했다 — 즉시 재시도하면 악화된다
+                backoffUntil = Date.now() + THROTTLE_BACKOFF_MS;
+                state.error = '전송 속도 조절 중';
+            } else {
+                state.error = '전송 지연(재시도 중)';
+            }
         }
         emit();
     }
