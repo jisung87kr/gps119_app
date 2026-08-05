@@ -62,7 +62,7 @@
 - [ ] `ACCESS_FINE_LOCATION` + `ACCESS_BACKGROUND_LOCATION` + `FOREGROUND_SERVICE_LOCATION` + `POST_NOTIFICATIONS`(13+)
 - [ ] **백그라운드 위치 선언 양식** + 시연 영상
 - [ ] **Data safety** 섹션
-- [ ] 타깃 API 레벨 (매년 상향 — 제출 시점 기준 확인)
+- [ ] **타깃 API 레벨 — `targetSdkVersion` 36 이상**(Android 16). 2026-08-31 부터 **신규 앱·업데이트 모두** 이 기준이고, N4 는 그 이후일 가능성이 높다. 기한 연장(2026-11-01)은 Play Console 신청 사항이지 기본값이 아니다. 매년 상향되므로 **제출 시점에 다시 확인**한다 → <https://developer.android.com/google/play/requirements/target-sdk>
 
 ### 한국 특수사항
 
