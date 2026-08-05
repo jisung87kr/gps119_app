@@ -134,7 +134,22 @@ Route::get('/control', function () {
         }
     }
 
-    return view('control.index', ['projects' => $projects]);
+    // ?project={id} 로 특정 행사를 지정하면 그 행사로 진입한다(푸시 딥링크가 여기 걸린다).
+    //
+    // 🔑 예전에는 /admin/control 만 이 파라미터를 읽었다. 그런데 «행사 상황실»은
+    //    시스템 롤이 그냥 user 인 경우가 흔해서 /control 로 온다 — 즉 딥링크가
+    //    정작 상황실에게만 동작하지 않았다. 행사를 2개 이상 맡으면 «엉뚱한 행사»가
+    //    열려서, 알림을 받고 들어왔는데 다른 현장을 보게 된다.
+    //    관제 권한이 있는 행사 목록 안에서만 고른다(권한 밖 id 는 무시).
+    $selectedId = (int) request('project') ?: null;
+    if ($selectedId && ! $projects->contains('id', $selectedId)) {
+        $selectedId = null;
+    }
+
+    return view('control.index', [
+        'projects' => $projects,
+        'selectedId' => $selectedId,
+    ]);
 })->middleware(['auth'])->name('control');
 
 Route::get('/dashboard', function () {

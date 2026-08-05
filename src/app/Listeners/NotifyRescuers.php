@@ -6,6 +6,8 @@ use App\Enums\EventRole;
 use App\Events\RequestCreated;
 use App\Models\EventParticipant;
 use App\Models\User;
+use App\Services\Push\PushMessage;
+use App\Services\PushService;
 use Illuminate\Contracts\Queue\ShouldQueue; // 큐 활성화(워커 가동 중) — 디스코드/알림을 큐에서 처리
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
@@ -17,11 +19,13 @@ use Illuminate\Support\Facades\Log;
  * AnnounceRequestToDiscord 로 분리했다 — 한 잡에 묶여 있으면 디스코드 실패가
  * 이미 성공한 통지를 재발송시킨다(같은 신고로 폰이 두 번 운다).
  *
- * 실제 발송(FCM·웹푸시)은 N1 의 PushService 가 붙는 자리다.
+ * 발송은 PushService 가 한다(웹푸시 + 앱푸시). 이 리스너는 «누구에게»만 정한다.
  */
 class NotifyRescuers implements ShouldQueue
 {
     use InteractsWithQueue; // 수신자 조회 + 발송이 요청 응답을 막지 않도록 큐에서 처리
+
+    public function __construct(private readonly PushService $push) {}
 
     /**
      * Handle the event.
@@ -39,12 +43,26 @@ class NotifyRescuers implements ShouldQueue
             'description' => $request->description,
         ]);
 
-        foreach ($this->recipientsFor($request) as $recipient) {
-            $this->sendNotificationToRescuer($recipient, $request);
-        }
+        $recipients = $this->recipientsFor($request);
+
+        // 🔴 페이로드에 연락처·상세 주소를 넣지 않는다(ADR-0004). 푸시는 잠금화면에 뜨고
+        //    전송 사업자 서버를 거친다. «무슨 일이 났으니 열어라»까지만 말하고,
+        //    상세는 관제 화면이 인가된 채널로 받아온다.
+        $tally = $this->push->sendToUsers($recipients, new PushMessage(
+            title: '🚨 신규 구조요청',
+            body: ($request->type?->label() ?? '구조요청').' · '.($request->project?->name ?? '상시 운영'),
+            // 딥링크는 행사를 «명시»한다. 상황실이 행사를 2개 이상 맡으면
+            // 행사 없이 열었을 때 엉뚱한 현장이 뜬다.
+            url: '/control?project='.$request->project_id.'&request='.$request->id,
+            data: ['request_id' => $request->id, 'project_id' => $request->project_id],
+            // 같은 신고로 알림이 쌓이지 않게 «대체»된다.
+            tag: 'request-'.$request->id,
+        ));
 
         Log::info('NotifyRescuers listener completed', [
             'request_id' => $request->id,
+            'recipients' => $recipients->count(),
+            'push' => $tally,
         ]);
     }
 
@@ -80,21 +98,6 @@ class NotifyRescuers implements ShouldQueue
 
         // rescuer 이면서 admin 인 사람, 시스템 롤과 행사 역할을 겸한 사람이 두 번 받지 않도록.
         return $recipients->unique('id')->values();
-    }
-
-    /**
-     * Send notification to a specific rescuer.
-     */
-    private function sendNotificationToRescuer(User $rescuer, $request): void
-    {
-        Log::info('Notifying rescuer about new request', [
-            'rescuer_id' => $rescuer->id,
-            'rescuer_name' => $rescuer->name,
-            'request_id' => $request->id,
-        ]);
-
-        // TODO: Implement actual notification logic (email, SMS, push notification, etc.)
-        // For now, we just log the notification
     }
 
     /**

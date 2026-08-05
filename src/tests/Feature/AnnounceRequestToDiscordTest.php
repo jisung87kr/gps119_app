@@ -86,7 +86,7 @@ class AnnounceRequestToDiscordTest extends TestCase
         // 부작용 하나에 리스너 하나. 다시 합치면 이 테스트가 깨진다.
         config(['services.discord.webhook_url' => 'https://discord.test/webhook/abc']);
 
-        (new \App\Listeners\NotifyRescuers)->handle($this->newRequestEvent());
+        app(\App\Listeners\NotifyRescuers::class)->handle($this->newRequestEvent());
 
         Http::assertNothingSent();
     }

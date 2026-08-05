@@ -12,15 +12,20 @@ use App\Models\Request as RescueRequest;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
+use App\Enums\PushDelivery;
+use App\Enums\PushPlatform;
+use App\Models\DeviceToken;
+use App\Services\Push\PushMessage;
+use App\Services\Push\PushSender;
+use App\Services\PushService;
 use Tests\TestCase;
 
 /**
  * NotifyRescuers 수신자 산정.
  *
- * 실제 발송(sendNotificationToRescuer)은 아직 TODO 스텁이라 로그만 남긴다.
- * 그래서 "누구에게 알릴 것인가"는 로그로만 검증 가능하다 — 발송 채널이 붙는 시점에
- * 수신자 집합이 조용히 틀어지지 않도록 여기서 고정해 둔다.
+ * 예전에는 TODO 스텁이 남기는 «로그»로 수신자를 확인했다. N1 에서 실제 발송이
+ * 붙었으므로 이제 «푸시가 실제로 간 사람»으로 판정한다 — 로그는 구현 세부라
+ * 지우면 테스트가 같이 죽지만, 발송 대상은 이 리스너의 «계약»이다.
  */
 class NotifyRescuersRecipientsTest extends TestCase
 {
@@ -32,22 +37,42 @@ class NotifyRescuersRecipientsTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
     }
 
-    /** @return array<int,int> 알림 대상으로 로깅된 user id */
+    /**
+     * @return array<int,int> 실제로 푸시가 간 user id
+     *
+     * 수신자 «판별»만 보려는 것이므로, 등장하는 모든 사용자에게 통로를 하나씩
+     * 붙여 놓고 시작한다. 그래야 「대상에서 빠졌다」와 「구독이 없었다」가 섞이지 않는다.
+     */
     private function notifiedIdsFor(RescueRequest $request): array
     {
-        $ids = [];
+        User::all()->each(fn (User $u) => DeviceToken::factory()->create(['user_id' => $u->id]));
 
-        Log::shouldReceive('info')
-            ->andReturnUsing(function ($message, $context = []) use (&$ids) {
-                if ($message === 'Notifying rescuer about new request') {
-                    $ids[] = $context['rescuer_id'];
-                }
-            });
-        Log::shouldReceive('error')->andReturnNull();
+        $sender = new class implements PushSender
+        {
+            public array $userIds = [];
 
-        (new NotifyRescuers)->handle(new RequestCreated($request));
+            public function supports(PushPlatform $platform): bool
+            {
+                return true;
+            }
 
-        return $ids;
+            public function isConfigured(): bool
+            {
+                return true;
+            }
+
+            public function send(DeviceToken $device, PushMessage $message): PushDelivery
+            {
+                $this->userIds[] = $device->user_id;
+
+                return PushDelivery::DELIVERED;
+            }
+        };
+
+        $listener = new NotifyRescuers(new PushService([$sender]));
+        $listener->handle(new RequestCreated($request->load('user')));
+
+        return $sender->userIds;
     }
 
     /** 행사 신고 → 그 행사의 활동중 상황실(EventRole::CONTROLLER)도 알림 대상이다 */
