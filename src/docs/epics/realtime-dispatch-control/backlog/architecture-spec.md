@@ -436,7 +436,7 @@ ADR-0004: **연락처는 control·개인 dispatch 페이로드에만.** 나머�
 
 - **정정 6 (RequestCreated 채널)**: 기존 `new Channel('requests')` + `PrivateChannel('rescuers')` → `PrivateChannel('event.{projectId}.control')` 단일로 교체(ADR-0004). `broadcastOn()`은 `request.project_id` 필요 → 비행사 신고 처리는 OPEN ISSUE.
 - `ParticipantLocationUpdated`는 한 이벤트가 `broadcastOn()`에서 두 채널을 반환(locations + control). control 구독자는 동일 좌표를 받지만 별도 페이로드 분기 불필요(연락처 미포함이라 동일 payload 안전).
-- 모든 이벤트 `ShouldBroadcast`. 큐 비동기는 `BROADCAST_CONNECTION=reverb` + `queue:work`(04 체크리스트). 현재 `NotifyRescuers`는 동기 — Discord/알림 부수효과는 기존대로 유지하되 control 채널 전환에 맞춰 수신자 산정 변경(전 rescuer → 해당 행사 controller).
+- 모든 이벤트 `ShouldBroadcast`. 큐 비동기는 `BROADCAST_CONNECTION=reverb` + `queue:work`(04 체크리스트). ~~현재 `NotifyRescuers`는 동기~~ → **2026-08-05 현재 큐(`ShouldQueue`)**이고, Discord 부수효과는 `AnnounceRequestToDiscord` 로 분리됐다(재시도 의미가 달라서 — mobile-app N1). 수신자 산정은 「시스템 admin·rescuer + 그 행사의 controller/paramedic/volunteer_medic」이다.
 
 ---
 
