@@ -52,11 +52,20 @@ class RequestService
         return $request;
     }
 
+    /**
+     * 신고 수정.
+     *
+     * 🔴 **좌표는 사후에 바꿀 수 없다.** 신고 좌표는 「신고 시점에 그 사람이 어디 있었나」라는
+     *    사실 기록이고, 구조 기록·행사 리포트·법적 분쟁의 근거가 된다. 사후 수정이 가능하면
+     *    그 기록 전체의 신뢰가 깨진다. 잘못된 좌표는 «고치는» 게 아니라 새 신고로 남긴다.
+     */
     public function updateRequest(Request $request, array $data, User $user): Request
     {
         if (! $user->hasRole('admin') && ! $user->hasRole('rescuer') && ! $request->isOwner($user)) {
             throw new \Exception('Unauthorized to update this request');
         }
+
+        $this->assertCoordinatesUnchanged($request, $data);
 
         $request->update($data);
 
@@ -69,6 +78,40 @@ class RequestService
         }
 
         return $request->fresh(['user', 'assignedRescuer']);
+    }
+
+    /**
+     * 좌표 수정 시도를 막는다.
+     *
+     * 🔑 «조용히 무시»하지 않고 던지는 이유 — 값을 슬쩍 빼버리면 부르는 쪽은 성공 응답을
+     *    받고 좌표가 바뀐 줄 안다. 나중에 「분명히 고쳤는데 왜 그대로냐」로 돌아온다.
+     *
+     * 다만 «같은 값»을 다시 보내는 건 통과시킨다. 클라이언트가 객체 전체를 되돌려보내는
+     * 흔한 패턴에서, 아무것도 바꾸지 않는 요청까지 막을 이유는 없다.
+     *
+     * 🔑 이 검사가 컨트롤러가 아니라 여기 있는 이유 — 현재 API 는 validate() 화이트리스트로
+     *    좌표를 애초에 받지 않아서 «지금은» 안전하다. 하지만 그 안전은 「그 목록에 좌표를
+     *    추가하지 않는다」는 규율에 의존한다. 두 번째 호출자(관리자 화면·콘솔 명령)가 생기면
+     *    조용히 사라지는 종류의 보호다. 불변식은 그것을 소유한 층에 둔다.
+     */
+    private function assertCoordinatesUnchanged(Request $request, array $data): void
+    {
+        foreach (['latitude', 'longitude'] as $column) {
+            if (! array_key_exists($column, $data) || $data[$column] === null) {
+                continue;
+            }
+
+            // decimal:8 캐스팅 때문에 '37.56650000' 과 37.5665 를 비교하게 된다.
+            // 양쪽을 같은 소수 자리로 정규화해서 비교한다.
+            $incoming = number_format((float) $data[$column], 8, '.', '');
+            $current = number_format((float) $request->getOriginal($column), 8, '.', '');
+
+            if ($incoming !== $current) {
+                throw new \RuntimeException(
+                    '신고 좌표는 수정할 수 없습니다. 위치가 잘못됐다면 새 신고로 접수하세요.'
+                );
+            }
+        }
     }
 
     public function cancelRequest(Request $request, User $user): Request

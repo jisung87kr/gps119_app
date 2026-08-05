@@ -61,16 +61,18 @@ WebSocket 없이는 나머지가 무의미. 가장 먼저.
 
 ## 기존 코드 영향 체크리스트
 
-> 2026-08-05 실제 코드와 대조해 표시했다. **6건 중 5건 완료, 1건은 아직 남아 있다.**
-> 전부 미체크로 두면 「무엇이 남았는지」가 목록에서 사라진다.
+> 2026-08-05 실제 코드와 대조해 표시했다. 대조 시점에 5건 완료·1건 미완이었고,
+> 그 1건(좌표 수정 차단)도 같은 날 처리해 **6건 전부 완료**다.
+> 전부 미체크로 두면 「무엇이 남았는지」가 목록에서 사라진다 — 그래서 대조했다.
 
 - [x] `RequestCreated::broadcastOn()` 채널 교체 (`requests`/`rescuers` → `event.{id}.control`)
 - [x] `NotifyRescuers` 큐 재활성 — `ShouldQueue` 적용됨.
       디스코드는 별도 리스너(`AnnounceRequestToDiscord`)로 분리하고 `file_get_contents` → `Http::timeout(5)` 로 교체(mobile-app N1)
 - [x] `RequestApiController::store` `type` 추가 + `project_id` 처리 (`RequestApiController:41,44`)
-- [ ] 🔴 **`RequestService::updateRequest` 좌표 수정 차단 — 아직 안 됨.**
-      `$request->update($data)` 가 `latitude`/`longitude` 를 그대로 통과시킨다.
-      신고 좌표는 «신고 시점의 사실»이라 사후 수정되면 기록의 신뢰가 깨진다
+- [x] `RequestService::updateRequest` 좌표 수정 차단 — **완료(2026-08-05).**
+      값을 조용히 빼지 않고 던진다(빼면 부르는 쪽은 성공으로 알고 「고쳤는데 왜 그대로냐」가 된다).
+      같은 값 재전송은 통과 — 객체 전체를 되돌려보내는 클라이언트 패턴을 막을 이유는 없다.
+      `RequestCoordinatesImmutableTest` 6건
 - [x] `RolePermissionSeeder`는 시스템역할만(행사역할 미포함) — user/rescuer/admin 만 생성
 - [x] `bootstrap/app.php` broadcasting + `event.role`·`event.member` 미들웨어 별칭
 
