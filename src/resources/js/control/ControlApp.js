@@ -624,11 +624,17 @@ export default {
     },
 
     template: `
-<div class="h-[100dvh] w-full grid grid-rows-[56px_1fr] bg-gray-100 text-gray-900"
+<!--
+  헤더 행 높이 = 56px + 상단 safe-area. 앱/홈화면 PWA 는 화면 최상단부터 시작하므로
+  이걸 더하지 않으면 행사 선택 드롭다운이 상태바·다이나믹 아일랜드 밑으로 들어간다.
+  브라우저에서는 env() 가 0 이라 기존과 동일하다.
+-->
+<div class="h-[100dvh] w-full grid grid-rows-[calc(56px+env(safe-area-inset-top))_1fr] bg-gray-100 text-gray-900"
      :style="gridStyle">
 
   <!-- HEADER -->
-  <header class="col-span-2 row-start-1 h-14 bg-white border-b border-gray-200 flex items-center justify-between px-3 lg:px-4 gap-2">
+  <header class="col-span-2 row-start-1 h-full bg-white border-b border-gray-200 flex items-center justify-between px-3 lg:px-4 gap-2"
+          style="padding-top: env(safe-area-inset-top)">
     <div class="flex items-center gap-2 lg:gap-3 min-w-0">
       <a v-if="backUrl" :href="backUrl" class="flex items-center gap-1 pl-1 pr-2 py-1.5 rounded-md hover:bg-gray-100 text-gray-500 text-sm font-medium" title="대시보드로 돌아가기">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -879,7 +885,8 @@ export default {
        있어서 "새 신고 있나?"에 답하려고 시트를 끌어올릴 필요가 없다. -->
   <div v-if="isMobile && hasProject"
        class="fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-gray-200 bg-white shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.18)] transition-[height] duration-200 ease-out"
-       :class="sheetHeightClass">
+       :class="sheetHeightClass"
+       style="padding-bottom: env(safe-area-inset-bottom)">
 
     <!-- 핸들 + 요약 바 (peek 에서 보이는 전부) -->
     <button type="button" @click="cycleSheet"
