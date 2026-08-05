@@ -109,14 +109,58 @@ class RequestCreatedBroadcastTest extends TestCase
         $this->assertSame('request.created', (new RequestCreated($request))->broadcastAs());
     }
 
-    /** Request 생성 시 RequestCreated 이벤트가 dispatch 된다 (booted 훅) */
-    public function test_event_is_dispatched_on_request_creation(): void
+    /**
+     * 접수 흐름(RequestService)이 RequestCreated 를 발행한다.
+     *
+     * 예전엔 Request 모델의 created 훅이 발행했다. 그러면 «행이 저장됐다»와
+     * «구조요청이 접수됐다»가 구분되지 않아, 팩토리·시드가 행을 하나 만들 때마다
+     * 관제 브로드캐스트와 통지가 같이 나갔다. 푸시가 붙으면 시드 한 번에 실제 발송이 된다.
+     */
+    public function test_the_service_dispatches_the_event(): void
+    {
+        Event::fake([RequestCreated::class]);
+        $user = User::factory()->create();
+
+        app(\App\Services\RequestService::class)->createRequest([
+            'latitude' => 37.5665,
+            'longitude' => 126.9780,
+            'address' => '서울특별시 중구 세종대로 110',
+        ], $user);
+
+        Event::assertDispatched(RequestCreated::class);
+    }
+
+    /**
+     * 실제 사용자 경로(HTTP)에서도 발행된다.
+     *
+     * 서비스 단위 테스트만 두면 컨트롤러가 서비스를 우회하도록 바뀌어도 초록불이 뜬다.
+     * 신고 접수는 이 앱의 존재 이유라 «끝에서 끝까지» 한 번은 봐야 한다.
+     */
+    public function test_the_api_endpoint_dispatches_the_event(): void
+    {
+        Event::fake([RequestCreated::class]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->postJson('/api/requests', [
+            'latitude' => 37.5665,
+            'longitude' => 126.9780,
+            'address' => '서울특별시 중구 세종대로 110',
+        ])->assertSuccessful();
+
+        Event::assertDispatched(RequestCreated::class);
+    }
+
+    /**
+     * 반대 방향 — 팩토리로 «행만» 만드는 것은 도메인 사건이 아니다.
+     *
+     * 이 두 테스트는 짝이다. 위 하나만 두면 발행이 모델 훅으로 돌아가도 초록불이 뜬다.
+     */
+    public function test_creating_a_row_directly_does_not_dispatch_the_event(): void
     {
         Event::fake([RequestCreated::class]);
 
-        $owner = User::factory()->create();
-        RescueRequest::factory()->for($owner)->create(['project_id' => null]);
+        RescueRequest::factory()->for(User::factory()->create())->create(['project_id' => null]);
 
-        Event::assertDispatched(RequestCreated::class);
+        Event::assertNotDispatched(RequestCreated::class);
     }
 }

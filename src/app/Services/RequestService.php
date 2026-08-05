@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\RequestStatus;
 use App\Enums\RequestType;
+use App\Events\RequestCreated;
 use App\Models\Request;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
@@ -38,7 +39,17 @@ class RequestService
             'requested_at' => now(),
         ]);
 
-        return Request::create($requestData);
+        $request = Request::create($requestData);
+
+        // 🔑 도메인 이벤트는 «서비스»가 발행한다. 예전에는 Request 모델의 created 훅에
+        //    있었는데, 그러면 «신고가 저장됐다»(DB 사실)와 «구조요청이 접수됐다»(도메인
+        //    사건)를 구분할 수 없다. 팩토리·시드가 행을 하나 만들기만 해도 관제 브로드캐스트와
+        //    통지가 전부 나갔다. 푸시가 붙으면 시드 한 번에 실제 발송이 나가게 된다.
+        //    (모델의 creating 훅에 남아 있는 기본 행사 귀속(ADR-0005)은 «불변식»이라 그대로 둔다 —
+        //     어떤 경로로 만들어도 깨지면 안 되는 것과, 접수 흐름에서만 일어나야 하는 것의 차이다.)
+        RequestCreated::dispatch($request->load('user'));
+
+        return $request;
     }
 
     public function updateRequest(Request $request, array $data, User $user): Request

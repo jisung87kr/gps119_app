@@ -53,10 +53,10 @@ class Request extends Model
             }
         });
 
-        static::created(function (Request $request) {
-            $request->load('user');
-            RequestCreated::dispatch($request);
-        });
+        // ⚠️ 여기에 RequestCreated 발행이 있었다. RequestService::createRequest 로 옮겼다.
+        //    모델 훅은 «행이 저장됐다»만 알 뿐 «구조요청이 접수됐다»와 구분하지 못해서,
+        //    팩토리·시드가 행을 하나 만들 때마다 관제 브로드캐스트와 통지가 같이 나갔다.
+        //    위의 creating 훅은 남는다 — 기본 행사 귀속은 경로와 무관한 «불변식»이다.
     }
 
     public function user(): BelongsTo
