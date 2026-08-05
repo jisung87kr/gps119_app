@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\Push\FcmSender;
+use App\Services\Push\WebPushSender;
+use App\Services\PushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Response;
@@ -14,7 +17,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // 푸시 발송기 조립 (mobile-app N1).
+        // 순서가 곧 우선순위다 — 한 플랫폼을 여러 전송기가 지원하게 되면 앞선 것이 이긴다.
+        // FCM 은 자격증명(N0-4 명의 확정 후)이 생기기 전까지 isConfigured()=false 라
+        // 앱 토큰이 있어도 조용히 건너뛴다.
+        $this->app->singleton(PushService::class, function ($app) {
+            return new PushService([
+                new WebPushSender(
+                    config('push.vapid.public_key'),
+                    config('push.vapid.private_key'),
+                    config('push.vapid.subject'),
+                ),
+                new FcmSender(
+                    config('push.fcm.project_id'),
+                    config('push.fcm.credentials'),
+                ),
+            ]);
+        });
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\DeviceTokenApiController;
 use App\Http\Controllers\Api\DispatchApiController;
 use App\Http\Controllers\Api\EventApiController;
 use App\Http\Controllers\Api\EventReportController;
@@ -20,6 +21,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/requests/{id}', [RequestApiController::class, 'destroy'])->name('api.requests.destroy');
     // 구조대원 배정. 실시간 지령 에픽에서 POST /requests/{id}/dispatch 로 대체 예정(ADR-0003).
     Route::post('/requests/{id}/assign', [RequestApiController::class, 'assignRescuer'])->name('api.requests.assign');
+
+    // 푸시 수신 통로 등록/해제 (mobile-app N1).
+    // 🔴 토큰은 «본문»으로만 받는다 — path 에 넣으면 액세스·프록시·에러 로그에 자격증명이 남는다.
+    Route::post('/devices', [DeviceTokenApiController::class, 'store'])->name('api.devices.store');
+    Route::delete('/devices/current', [DeviceTokenApiController::class, 'destroyCurrent'])->name('api.devices.destroy');
 
     // 행사 입장·참가자 (실시간 관제 — BE-1.2 / SPEC-06b)
     Route::get('/events/{joinCode}', [EventApiController::class, 'show'])->name('api.events.show');
