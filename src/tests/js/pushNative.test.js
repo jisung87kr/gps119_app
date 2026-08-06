@@ -13,7 +13,7 @@ import { pushStatus, enablePush } from '../../resources/js/push.js';
  *
  * 🔑 이 파일이 고정하는 계약 셋:
  *    ① 토큰 «등록»은 웹 JS 가 한다 — 셸이 직접 쏘면 세션 쿠키가 없어 401 이다
- *    ② 토큰을 «기다린 뒤» 등록한다 — register() 는 즉시 반환하고 토큰은 이벤트로 온다
+ *    ② 토큰을 «받은 뒤» 등록한다 — 실패하면 서버에 아무것도 보내지 않는다
  *    ③ 서버 등록이 실패하면 «켜짐»으로 표시하지 않는다 — 알림이 영영 안 온다
  */
 
@@ -24,12 +24,11 @@ function nativeEnv({ receive = 'granted', token = 'fcm-tok-1', fail = false, pla
         checkPermissions: vi.fn(async () => ({ receive })),
         requestPermissions: vi.fn(async () => ({ receive })),
         addListener: vi.fn((name, cb) => { listeners[name] = cb; }),
-        // register() 는 «즉시» 반환하고 토큰은 이벤트로 온다 — 실제 동작 그대로.
-        register: vi.fn(() => {
-            queueMicrotask(() => {
-                if (fail) listeners.registrationError?.({ error: 'no-network' });
-                else listeners.registration?.({ value: token });
-            });
+        // FirebaseMessaging 은 getToken() 이 토큰을 «직접» 돌려준다.
+        getToken: vi.fn(async () => {
+            if (fail) throw new Error('no-network');
+
+            return { token };
         }),
     };
 
@@ -37,8 +36,8 @@ function nativeEnv({ receive = 'granted', token = 'fcm-tok-1', fail = false, pla
         Capacitor: {
             isNativePlatform: () => true,
             getPlatform: () => platform,
-            isPluginAvailable: (n) => n === 'PushNotifications',
-            Plugins: { PushNotifications: plugin },
+            isPluginAvailable: (n) => n === 'FirebaseMessaging',
+            Plugins: { FirebaseMessaging: plugin },
         },
         axios: { post: vi.fn(async () => ({})), delete: vi.fn(async () => ({})) },
         location: { assign: vi.fn() },
@@ -164,7 +163,7 @@ describe('앱 푸시 — 알림 탭 착지(딥링크)', () => {
         const env = nativeEnv();
         initNativePushRouting(env);
 
-        env.__listeners.pushNotificationActionPerformed({
+        env.__listeners.notificationActionPerformed({
             notification: { data: { url: '/control?request=83' } },
         });
 
@@ -175,7 +174,7 @@ describe('앱 푸시 — 알림 탭 착지(딥링크)', () => {
         const env = nativeEnv();
         initNativePushRouting(env);
 
-        env.__listeners.pushNotificationActionPerformed({
+        env.__listeners.notificationActionPerformed({
             notification: { data: { url: 'https://evil.example/steal' } },
         });
 
@@ -186,7 +185,7 @@ describe('앱 푸시 — 알림 탭 착지(딥링크)', () => {
         const env = nativeEnv();
         initNativePushRouting(env);
 
-        env.__listeners.pushNotificationActionPerformed({ notification: { data: {} } });
+        env.__listeners.notificationActionPerformed({ notification: { data: {} } });
 
         expect(env.location.assign).not.toHaveBeenCalled();
     });

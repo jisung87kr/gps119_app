@@ -22,7 +22,11 @@ export function isNativePushSupported(env = globalThis) {
 }
 
 function plugin(env = globalThis) {
-    return env.Capacitor?.Plugins?.PushNotifications ?? null;
+    // ⚠️ FirebaseMessaging 이다. '@capacitor/push-notifications' 는 iOS 에서 «APNs 토큰»을
+    //    주는데, 서버는 iOS 도 FCM 경유를 전제한다(PushPlatform::usesFcm()). APNs 토큰을
+    //    FCM 에 보내면 INVALID_ARGUMENT 가 오고, 서버는 그걸 「죽은 기기」로 읽어
+    //    **살아 있는 아이폰을 폐기**한다 — 알림이 안 오는 데서 끝나지 않는다.
+    return env.Capacitor?.Plugins?.FirebaseMessaging ?? null;
 }
 
 /**
@@ -46,31 +50,6 @@ export async function nativePushStatus(env = globalThis) {
 }
 
 /**
- * 등록 이벤트를 한 번 기다린다.
- *
- * register() 는 즉시 반환하고 토큰은 «이벤트»로 온다. 기다리지 않으면
- * 「켰다」고 표시한 뒤 서버에는 아무것도 안 보내는 상태가 된다.
- */
-function awaitToken(p, timeoutMs = 15000) {
-    return new Promise((resolve, reject) => {
-        let done = false;
-        const finish = (fn, arg) => {
-            if (done) return;
-            done = true;
-            fn(arg);
-        };
-
-        p.addListener('registration', (t) => finish(resolve, t?.value ?? null));
-        p.addListener('registrationError', (e) => finish(reject, new Error(e?.error || 'registration-error')));
-
-        // 응답이 영영 안 오면 버튼이 「처리 중…」에 멈춘다. 시간 제한을 둔다.
-        setTimeout(() => finish(reject, new Error('timeout')), timeoutMs);
-
-        p.register();
-    });
-}
-
-/**
  * 앱 푸시 켜기. 권한 → 등록 → 토큰 수신 → 서버 등록.
  *
  * @returns {Promise<{ok: boolean, reason?: string}>}
@@ -87,9 +66,12 @@ export async function enableNativePush(env = globalThis) {
     if (permission.receive === 'denied') return { ok: false, reason: 'denied' };
     if (permission.receive !== 'granted') return { ok: false, reason: 'dismissed' };
 
+    // 🔑 FirebaseMessaging 은 getToken() 이 «토큰을 직접» 돌려준다.
+    //    (구 플러그인은 register() 후 이벤트를 기다려야 했다 — 안 기다리면
+    //     「켰다」고 표시한 뒤 서버엔 아무것도 안 보낸 상태가 됐다.)
     let token;
     try {
-        token = await awaitToken(p);
+        ({ token } = await p.getToken());
     } catch (e) {
         return { ok: false, reason: 'registration-failed' };
     }
@@ -142,7 +124,7 @@ export function initNativePushRouting(env = globalThis) {
     const p = plugin(env);
     if (!p) return;
 
-    p.addListener('pushNotificationActionPerformed', (action) => {
+    p.addListener('notificationActionPerformed', (action) => {
         const url = action?.notification?.data?.url;
 
         // 외부 주소로 튀지 않게 «같은 오리진의 경로»만 받는다. 페이로드는 서버가

@@ -104,5 +104,9 @@ export const NativeCapability = {
  * 넣을 게 없으면 ①(명시 선언)만으로 판정된다.
  */
 const PLUGIN_FOR = {
-    [NativeCapability.PUSH_TOKEN]: 'PushNotifications',
+    // ⚠️ '@capacitor/push-notifications' 가 아니라 FirebaseMessaging 이다.
+    //    전자는 iOS 에서 «APNs 토큰»을 준다 — 그걸 FCM 에 보내면 INVALID_ARGUMENT 가
+    //    오고, 서버는 그걸 「죽은 기기」로 읽어 **살아 있는 아이폰을 폐기**한다.
+    //    PushPlatform::usesFcm() 이 iOS 도 FCM 경유를 전제하므로 토큰도 FCM 이어야 한다.
+    [NativeCapability.PUSH_TOKEN]: 'FirebaseMessaging',
 };
