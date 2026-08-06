@@ -51,7 +51,11 @@ The app runs in Docker (`docker-compose.yml` at root), **four services** all bui
 - **queue** (`gps119_app-queue-1`) — queue worker (`php artisan queue:work database`) processing broadcasts + the `NotifyRescuers` listener.
 - **db** (`gps119_app-db-1`) — MySQL 8.3.
 
-Host ports: app `9050→80`, Vite `9093`, **Reverb WS `9055→8080`** (dev-direct), MySQL `9052→3306`. The browser connects Echo to `9055` (`VITE_REVERB_PORT=9055`); inside the network the app reaches reverb at host `reverb:8080`. `BROADCAST_CONNECTION=reverb`, `QUEUE_CONNECTION=database`.
+Host ports: app `9050→80` (http) and **`9051→443` (https)**, Vite `9093`, Reverb WS `9055→8080` (dev-direct, legacy), MySQL `9052→3306`. Inside the network the app reaches reverb at host `reverb:8080`. `BROADCAST_CONNECTION=reverb`, `QUEUE_CONNECTION=database`.
+
+**Echo connects over the page's own origin, not a pinned host.** `resources/js/echo.js` derives host/port/scheme from `window.location` (`resolveReverbConfig`, spec `tests/js/echoConfig.test.js`); `VITE_REVERB_*` are *explicit overrides* and are left blank in `.env`. Apache reverse-proxies `/app` on both vhosts, so same-origin always works. The old pinned `VITE_REVERB_HOST` broke twice — once when the laptop's LAN IP changed (build-time constant, so it stayed broken until a rebuild) and again under https (`ws://` on an https page is blocked as mixed content).
+
+**Local HTTPS (`9051`) exists because `navigator.geolocation`, service workers, and web push require a secure context — and `localhost` is the only http exception, private IPs are not.** So a phone or the app shell hitting `http://<LAN IP>:9050` gets geolocation refused *without a permission prompt*, which reads like "unsupported webview" and was once misdiagnosed as exactly that. Certs are mkcert-signed in `docker/apache/certs/` (gitignored); vhosts share `docker/apache/common.conf`. Device CA-trust steps and cert re-issue are in **`docker/apache/README.md`**.
 
 **Run all `artisan`/`composer`/`npm` commands inside the app container**, e.g.:
 
