@@ -7,6 +7,7 @@ import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
     dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta, presenceState,
 } from './roleMeta';
+import { isNativeApp, hasNativeCapability, NativeCapability } from '../native/bridge';
 
 const POLL_INTERVAL_MS = 12000;
 const KAKAO_KEY = '509c2656c00fa9af4782197a888763f6';
@@ -75,6 +76,19 @@ export default {
     computed: {
         hasProject() {
             return this.selectedProjectId != null;
+        },
+
+        // CSV 를 내려받을 수 있는 환경인가 (M-21).
+        //
+        // 🔑 웹뷰는 «파일 다운로드를 기본 처리하지 않는다» — 링크를 눌러도 아무 일도
+        //    일어나지 않고, 오류도 안 난다. 상황실 입장에서는 「눌렀는데 안 받아진다」다.
+        //    그래서 앱에서는 링크 대신 «어디서 받으면 되는지»를 알려 준다.
+        //
+        // 「앱이면 숨김」이 아니라 «그 셸이 다운로드를 아는가»로 판정한다 — 나중에 셸이
+        //    `file-download` 를 지원하면 웹을 다시 배포하지 않아도 링크가 살아난다.
+        //    (웹이 앱보다 최신인 상태가 정상이라는 것 → native/bridge.js)
+        reportsDownloadable() {
+            return ! isNativeApp() || hasNativeCapability(NativeCapability.FILE_DOWNLOAD);
         },
 
         // 모바일에서는 레일을 아예 쓰지 않으므로 항상 0px. 그리드 좌표를 바꾸지 않고
@@ -702,9 +716,17 @@ export default {
           기록 ▾
         </button>
         <div v-if="reportMenu" class="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-20">
-          <a :href="reportUrl('requests')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">신고 기록 CSV</a>
-          <a :href="reportUrl('dispatches')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">지령 기록 CSV</a>
-          <a :href="reportUrl('tracks')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">동선 기록 CSV</a>
+          <template v-if="reportsDownloadable">
+            <a :href="reportUrl('requests')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">신고 기록 CSV</a>
+            <a :href="reportUrl('dispatches')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">지령 기록 CSV</a>
+            <a :href="reportUrl('tracks')" class="block px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">동선 기록 CSV</a>
+          </template>
+          <!-- 링크를 «숨기기»만 하면 기능이 사라진 것으로 읽혀 상황실이 찾아 헤맨다.
+               어디서 받으면 되는지까지 말한다. -->
+          <p v-else class="px-3 py-2 text-xs leading-relaxed text-gray-500 w-48">
+            앱에서는 파일을 내려받을 수 없습니다.<br>
+            <b class="text-gray-700">PC 관제 화면</b>에서 받아 주세요.
+          </p>
         </div>
       </div>
       <span class="text-gray-600 whitespace-nowrap text-xs lg:text-sm">온라인 <b class="text-gray-900">{{ onlineCount }}</b></span>
