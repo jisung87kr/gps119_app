@@ -18,7 +18,11 @@ services:
       - DB_PASSWORD=password
     volumes:
       - ./src:/var/www/html
+      # 공용 조각(common.conf)과 인증서를 vhost 들이 Include 할 수 있게 통째로 올린다.
+      - ./docker/apache:/etc/apache2/gps119:ro
       - ./docker/apache/apache.conf:/etc/apache2/sites-available/000-default.conf
+      # https vhost 는 sites-enabled 에 직접 올린다(a2ensite 없이 활성화)
+      - ./docker/apache/apache-ssl.conf:/etc/apache2/sites-enabled/001-ssl.conf
     networks:
       - gps-network
 

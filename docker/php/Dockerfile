@@ -21,8 +21,9 @@ RUN apt-get update && apt-get install -y \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip soap
 
-# Enable apache modules (rewrite + WebSocket reverse-proxy for Reverb)
-RUN a2enmod rewrite proxy proxy_http proxy_wstunnel headers
+# Enable apache modules (rewrite + WebSocket reverse-proxy for Reverb + 로컬 개발용 TLS)
+# ssl 을 켜야 ports.conf 의 `Listen 443` 이 활성화된다 — 모듈만 빠져도 vhost 가 조용히 안 뜬다.
+RUN a2enmod rewrite proxy proxy_http proxy_wstunnel headers ssl
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

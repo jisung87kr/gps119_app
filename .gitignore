@@ -16,3 +16,6 @@
 /src_bak
 .gstack/
 .DS_Store
+
+# 로컬 개발용 TLS 인증서 — 개인키가 들어간다. 절대 커밋하지 않는다.
+docker/apache/certs/

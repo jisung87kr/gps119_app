@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>위치 진단</title>
+<style>
+  body { font: 15px/1.6 -apple-system, sans-serif; margin: 0; padding: 20px; background: #0b0f14; color: #e6edf3; }
+  h1 { font-size: 17px; margin: 0 0 16px; }
+  .row { padding: 10px 12px; border-radius: 8px; background: #161b22; margin-bottom: 8px; }
+  .k { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .v { font-weight: 600; word-break: break-all; }
+  .ok { color: #3fb950; } .bad { color: #f85149; } .warn { color: #d29922; }
+  button { width: 100%; padding: 14px; font-size: 16px; font-weight: 700; border: 0;
+           border-radius: 10px; background: #1f6feb; color: #fff; margin-top: 12px; }
+</style>
+</head>
+<body>
+<h1>위치 진단 — 보안 컨텍스트 확인</h1>
+
+<div class="row"><div class="k">주소</div><div class="v" id="url"></div></div>
+<div class="row"><div class="k">isSecureContext</div><div class="v" id="secure"></div></div>
+<div class="row"><div class="k">navigator.geolocation</div><div class="v" id="api"></div></div>
+<div class="row"><div class="k">serviceWorker</div><div class="v" id="sw"></div></div>
+<div class="row"><div class="k">결과</div><div class="v" id="result">—</div></div>
+
+<button id="go">현재 위치 요청</button>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const mark = (el, ok, text) => { el.textContent = text; el.className = 'v ' + (ok ? 'ok' : 'bad'); };
+
+  $('url').textContent = location.href;
+  mark($('secure'), window.isSecureContext, String(window.isSecureContext));
+  mark($('api'), 'geolocation' in navigator, ('geolocation' in navigator) ? '있음' : '없음(미지원)');
+  mark($('sw'), 'serviceWorker' in navigator, ('serviceWorker' in navigator) ? '있음' : '없음');
+
+  const request = () => {
+    const out = $('result');
+    out.textContent = '요청 중…'; out.className = 'v warn';
+
+    if (!('geolocation' in navigator)) {
+      mark(out, false, 'navigator.geolocation 자체가 없음 → 진짜 미지원');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (p) => mark(out, true, `성공 ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)} (±${Math.round(p.coords.accuracy)}m)`),
+      (e) => {
+        // code 1=PERMISSION_DENIED 2=POSITION_UNAVAILABLE 3=TIMEOUT
+        mark(out, false, `실패 code=${e.code} — ${e.message || '(메시지 없음)'}`);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  };
+
+  $('go').addEventListener('click', request);
+  // ?auto=1 이거나 앱 웹뷰 안이면 로드 즉시 요청한다
+  // — 시뮬레이터에서 «탭 없이» 판정하기 위한 것.
+  if (new URLSearchParams(location.search).has('auto') || window.Capacitor) request();
+</script>
+</body>
+</html>
