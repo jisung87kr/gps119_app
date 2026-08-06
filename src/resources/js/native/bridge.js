@@ -65,7 +65,20 @@ export function nativeInfo(env = globalThis) {
 export function hasNativeCapability(name, env = globalThis) {
     if (!isNativeApp(env)) return false;
 
-    return nativeInfo(env).capabilities.includes(name);
+    // ① 셸이 «명시적으로» 알린 기능. 플러그인으로 확인할 수 없는 것도 여기로 온다.
+    if (nativeInfo(env).capabilities.includes(name)) return true;
+
+    // ② 플러그인으로 «실측»되는 기능.
+    //
+    // 🔑 이쪽이 더 정확하다. 손으로 관리하는 목록은 «거짓말을 할 수 있다» —
+    //    셸에서 플러그인을 빼고 목록을 안 고치면 웹은 있다고 믿고 부르다 깨진다.
+    //    isPluginAvailable() 은 그 빌드에 «실제로 들어간» 네이티브 플러그인만 참이다.
+    //
+    //    ⚠️ 실제로 셸은 `window.__gps119Native` 를 심은 적이 «없었다»(문서에만 있었다).
+    //       ① 만 있었다면 이 함수는 영원히 false 였다.
+    const plugin = PLUGIN_FOR[name];
+
+    return Boolean(plugin && env.Capacitor?.isPluginAvailable?.(plugin));
 }
 
 /**
@@ -81,4 +94,15 @@ export const NativeCapability = {
     PUSH_TOKEN: 'push-token',
     /** 파일 다운로드 처리 — WKWebView 가 기본 처리하지 않는다 (M-21) */
     FILE_DOWNLOAD: 'file-download',
+};
+
+/**
+ * 기능 ↔ Capacitor 플러그인 대응표.
+ *
+ * 여기 있는 기능은 셸의 «선언»이 없어도 플러그인 존재만으로 판정된다.
+ * 대응 플러그인이 없는 기능(file-download 처럼 셸이 직접 구현하는 것)은 넣지 않는다 —
+ * 넣을 게 없으면 ①(명시 선언)만으로 판정된다.
+ */
+const PLUGIN_FOR = {
+    [NativeCapability.PUSH_TOKEN]: 'PushNotifications',
 };

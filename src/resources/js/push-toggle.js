@@ -22,6 +22,9 @@ const FAILURES = {
     'server-rejected': '알림 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.',
     'server-error': '알림 해제에 실패했습니다. 잠시 후 다시 시도해 주세요.',
     unsupported: '이 브라우저는 알림을 지원하지 않습니다.',
+    // 앱 전용: 권한은 받았는데 FCM/APNs 토큰 발급이 실패했다(네트워크·설정).
+    // 「권한 거부」와 섞으면 사용자가 OS 설정만 뒤지게 된다.
+    'registration-failed': '알림 등록에 실패했습니다. 네트워크를 확인하고 다시 시도해 주세요.',
 };
 
 export function createPushToggle(root, env = globalThis) {
