@@ -59,7 +59,7 @@
 
 | 항목 | 막고 있는 것 |
 |---|---|
-| **FCM 실제 발송** | ✅ **Android 종단 실증 완료** — 토큰 등록 → FCM 200 → 알림 표시 → 탭 → 딥링크 착지. 2026-08-09 에 플러그인 교체 후 **재검증**했고 결함 4건이 더 나왔다(아래 N1-b).<br>✅ **iOS 배선 완료 (2026-08-09)** — M-8 이 개인 명의로 풀려 APNs 키·Firebase 구성·entitlements·Background Modes 까지 붙였다([`03 §6-3`](03-push-notifications.md)).<br>🔴 **iOS 실제 발송은 실기기 대기** — 시뮬레이터는 APNs 토큰을 발급하지 않는다 |
+| ~~**FCM 실제 발송**~~ ✅ **종료 (2026-08-09)** | ✅ Android · ✅ **iOS 실기기까지 완료** — 양쪽 다 토큰 등록 → 발송 → 표시 → 탭 → 딥링크 착지를 실측했다(N1-d). 시뮬레이터가 APNs 토큰을 발급하지 않아 막혀 있던 마지막 항목이었다 |
 | 🔴 **macOS 가 `requireInteraction` 을 무시한다** | 새로 발견(2026-08-05). 관제 PC 가 macOS 면 「지령 알림이 지울 때까지 남는다」가 성립하지 않는다 → [`03 §8-1`](03-push-notifications.md)에 선택지 3안 |
 | 지령 상태 변경 → 상황실 | 긴급도 «중» + digest 설계 미정이라 보류 |
 | 사용자별 수신 설정(M-9) · 야간 정책(M-11) | 미착수. 지금은 «전부 받거나 안 받거나»뿐이고, **admin·rescuer 는 모든 행사의 모든 신고**를 받는다 |
@@ -111,9 +111,43 @@ localNotificationActionPerformed → location = /control?project=8&request=89   
 > 서버는 `delivered` 로 찍힌다 — **기기에 안 온 것을 서버 로그로는 못 가른다.**
 > 앱 푸시가 안 올 때 제일 먼저 볼 곳이 여기다.
 
-> 🔴 **iOS 는 이 변경에 대해 실기기 QA 가 필요하다.** c-2 는 「iOS 는 OS 가 띄운다」를
-> 전제로 «아무것도 안 하는» 선택이라, 전제가 틀리면 iOS 만 조용해진다. 시뮬레이터는
-> APNs 토큰을 발급하지 않아 확인할 수 없다.
+#### ✅ N1-d — 실기기 검증 완료: iOS · Android 양쪽 (2026-08-09)
+
+**M-8 이후 남아 있던 마지막 미검증 항목이 닫혔다.** 시뮬레이터·에뮬레이터로는 확인할 수
+없던 것들이라 여기까지 와야 끝나는 것이었다.
+
+| 기기 | 결과 |
+|---|---|
+| **iPhone 16 Pro (iOS 18.7)** | ✅ 토큰 등록 → APNs 경유 발송 → 알림 표시 → 탭 → 딥링크 착지. **c-2 의 전제가 맞았다** — iOS 는 포그라운드에서도 OS 가 띄우고, 우리는 아무것도 하지 않는다 |
+| **Galaxy A36 (Android 16)** | ✅ 포그라운드 수신 → 로컬 알림 → 탭 → 딥링크 착지 |
+
+Android 실기기 logcat + 서버 로그가 오늘 고친 것 셋을 그대로 짚는다:
+
+```
+17:35:12  schedule {"channelId":"gps119-rescue-v1",
+                    "extra":{"url":"/control?project=8&request=89"}}   ← c-1
+17:37:16  GET /control?project=8&request=89                            ← 딥링크 착지
+17:37:17  addListener notificationReceived                             ← 🔴 c-5
+17:37:17  addListener localNotificationActionPerformed                 ←    관제 화면 배선
+17:37:17  GET /api/requests/89/available-paramedics                    ← c-6 패널 자동 오픈
+```
+
+🔑 **c-5 의 증거가 바로 저 `addListener` 두 줄이다.** 딥링크가 착지한 페이지가 `/control`
+이고, 그 페이지가 리스너를 등록했다는 뜻이다 — 고치기 전이라면 여기서 **0건**이었다.
+
+##### ⚠️ 실기기에서만 나오는 함정 3종
+
+셋 다 **「서버 접근 로그에 아무것도 안 찍힌다」**는 같은 증상으로 나타난다. 그래서
+네트워크·인증서 문제로 오진하기 쉽다. **제일 먼저 「앱이 어느 주소를 보고 있는가」를 본다.**
+
+| # | 함정 | 확인 |
+|---|---|---|
+| 1 | **`npx cap run` 이 `server.url` 을 기본값으로 덮어쓴다.** 내부에서 `cap sync` 를 다시 돌리는데, 환경변수를 안 걸면 `http://localhost:9050` 이 구워진다 — 폰에서 localhost 는 «폰 자신»이다. 반드시 `npm run run:ios` / `run:android:ip` 같은 저장소 스크립트를 쓴다 | 빌드 산출물의 `App.app/capacitor.config.json` · `android/app/src/main/assets/capacitor.config.json` 를 **직접 열어본다** |
+| 2 | **iOS `NSLocalNetworkUsageDescription`** 이 없으면 로컬 네트워크 허가 팝업이 뜨지 않아 영영 못 붙는다. 사파리는 면제라 **「사파리는 되는데 앱만 안 됨」**으로 보인다 | 설정 → 앱 → 「로컬 네트워크」 항목이 있는지 |
+| 3 | **Android 는 `.local`(mDNS)을 못 푼다.** 에뮬레이터는 호스트 DNS 를 빌려 써서 됐던 것이라 여기서 어긋난다 → **LAN IP** 로 붙이고, 인증서 SAN 과 `SANCTUM_STATEFUL_DOMAINS` 에 그 IP 를 넣는다 | `adb shell ping <호스트>.local` |
+
+> 🔑 **Android 는 CA 설치가 필요 없다** — 디버그 빌드가 개발 CA 를 리소스로 품는다
+> (`android/app/src/debug/res/raw/mkcert_ca.pem`). iOS 는 기기에 프로파일 설치 + **완전 신뢰**가 필요하다.
 
 ### N2 — 앱 셸 (최소 동작) — 🟡 착수, 핵심 가설 검증됨 (2026-08-05)
 

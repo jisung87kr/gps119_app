@@ -231,7 +231,7 @@ FCM 토큰을 주므로 `usesFcm()` 의 전제가 실제로 맞게 되고, **서
 멤버십을 요구하고(M-8), Xcode 의 Push Notifications capability 도 유료 팀이 필요하다.
 즉 이 수정은 **「나중에 켤 때 안 깨지도록」 미리 고친 것**이지 실증된 게 아니다.
 
-### ✅ 6-3. iOS 배선 완료 (2026-08-09) — 남은 건 실기기뿐
+### ✅ 6-3. iOS 배선 완료 (2026-08-09) — 실기기까지 확인됐다
 
 M-8 이 개인 명의로 풀리면서 iOS 쪽을 실제로 붙였다.
 
@@ -243,7 +243,7 @@ M-8 이 개인 명의로 풀리면서 iOS 쪽을 실제로 붙였다.
 | `UIBackgroundModes = [remote-notification]` | ✅ |
 | Firebase iOS SDK | ✅ `cap sync ios` 가 SPM 으로 자동 — Firebase 콘솔이 안내하는 「Xcode 에서 직접 추가」는 **하면 안 된다**(이중 링크 + 다음 sync 에 소실) |
 | `DEVELOPMENT_TEAM` | ✅ |
-| **실제 발송** | 🔴 **실기기 필요.** 시뮬레이터는 APNs 토큰을 발급하지 않는다 — Android 처럼 에뮬레이터로 끝나지 않는다 |
+| **실제 발송** | ✅ **iPhone 16 Pro(iOS 18.7) 실기기 완료 (2026-08-09).** 토큰 등록 → 발송 → 표시 → 탭 → 딥링크 착지.<br>시뮬레이터는 APNs 토큰을 발급하지 않아 여기까지 와야 끝나는 항목이었다 — Android 처럼 에뮬레이터로 끝나지 않는다. 실기기에서만 나오는 함정 3종은 [`07 N1-d`](07-roadmap.md) |
 
 ⚠️ **키 ID 와 팀 ID 는 둘 다 10자리 영숫자라 바꿔 넣기 쉽다.** 잘못 넣어도 Firebase
 업로드는 «통과»하고 발송 시점에만 실패한다. 키 ID 는 `.p8` 파일명과 반드시 일치한다.
@@ -332,6 +332,14 @@ M-8 이 개인 명의로 풀리면서 iOS 쪽을 실제로 붙였다.
 > 않는다**(`needsForegroundNotification()` 이 android 에서만 참). 한때 iOS 에서 `alert`
 > 를 빼고 배너로 «통일»했다가 되돌렸다 — 통일이 아니라 **양쪽을 다 나쁘게** 만드는
 > 선택이었다.
+>
+> ✅ **실기기에서 전제가 확인됐다**(iPhone 16 Pro / iOS 18.7, 2026-08-09). 플러그인이
+> `'alert'` → `.alert` 로 매핑하는데 iOS 14+ 에서 deprecated 라 그 부분이 걸렸었다 —
+> 실제로는 `.banner|.list` 로 동작한다.
+>
+> ⚠️ 반대로 **iOS 에도 `notificationReceived` 리스너를 달았다면 알림이 두 번 떴을 것**이다.
+> 플러그인의 `willPresent` 가 OS 표시를 «하면서» 그 이벤트도 같이 쏜다. 플랫폼 분기가
+> 편의가 아니라 필요였다는 뜻이다.
 
 **서버 `tag` 를 알림 id 로 접는다.** LocalNotifications 는 id 가 같으면 대체한다.
 `notificationId(tag)` 로 `request-{id}` → 안정 정수. 안 그러면 포그라운드에서만 같은
