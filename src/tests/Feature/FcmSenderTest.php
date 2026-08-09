@@ -171,4 +171,44 @@ class FcmSenderTest extends TestCase
             return true;
         });
     }
+
+    public function test_🔑_tag_가_있으면_기기에서_대체된다(): void
+    {
+        // tag 는 toWebPayload() 에만 실려 있었다 — 웹은 대체되고 «앱만» 쌓였다.
+        // 리스너들은 최신 것만 남는다고 전제하고 쓴다(NotifyRescuers: request-{id}).
+        // 쌓이면 안드로이드가 그룹으로 묶고, 그룹 요약 줄에는 메시지 extras 가 없어
+        // 그걸 누르면 딥링크가 사라진다 — 대원이 배정 화면 대신 대시보드에 떨어진다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), new PushMessage(
+            '새 구조요청', '사고', '/control?request=7', ['request_id' => 7], 'request-7',
+        ));
+
+        Http::assertSent(function ($request) {
+            $message = $request->data()['message'];
+
+            $this->assertSame('request-7', $message['android']['notification']['tag']);
+            // iOS 는 tag 대신 헤더로 합친다.
+            $this->assertSame('request-7', $message['apns']['headers']['apns-collapse-id']);
+
+            return true;
+        });
+    }
+
+    public function test_tag_가_없으면_해당_블록을_보내지_않는다(): void
+    {
+        // 빈 tag 를 보내면 FCM 이 400 을 준다 — 없으면 «키 자체가 없어야» 한다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), $this->message());
+
+        Http::assertSent(function ($request) {
+            $message = $request->data()['message'];
+
+            $this->assertArrayNotHasKey('android', $message);
+            $this->assertArrayNotHasKey('apns', $message);
+
+            return true;
+        });
+    }
 }

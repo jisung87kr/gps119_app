@@ -59,12 +59,32 @@ final class PushMessage
             $data['url'] = $this->url;
         }
 
-        return [
+        $payload = [
             'notification' => [
                 'title' => $this->title,
                 'body' => $this->body,
             ],
             'data' => $data,
         ];
+
+        // 🔑 여기가 빠져 있어서 **앱 푸시에서는 tag 가 통째로 무시됐다.**
+        //    toWebPayload() 에만 실려 있었으므로 웹은 «대체»되고 앱은 쌓였다 —
+        //    NotifyRescuers 는 tag:'request-{id}', PushDispatchAssigned 는
+        //    tag:'dispatch-{id}' 로 «최신 것만 남는다»를 전제하고 쓴다.
+        //
+        //    쌓이면 안드로이드가 3개 이상을 «그룹»으로 묶는데, 그룹 요약 줄의
+        //    인텐트에는 메시지 extras 가 없다. 그걸 누르면 앱만 열리고 딥링크가
+        //    사라진다 — 지저분함이 아니라 대원이 배정 화면 대신 대시보드에 떨어지는 문제다.
+        //
+        //    ⚠️ `push:test` 는 일부러 매번 «다른» tag 를 쓴다(반복 검증용). 그래서
+        //       그 명령으로는 이 결함이 드러나지 않는다 — 아래 테스트로 고정한다.
+        //
+        //    안드로이드: 같은 tag 면 대체. iOS: apns-collapse-id 가 같은 역할을 한다.
+        if ($this->tag !== null) {
+            $payload['android'] = ['notification' => ['tag' => $this->tag]];
+            $payload['apns'] = ['headers' => ['apns-collapse-id' => $this->tag]];
+        }
+
+        return $payload;
     }
 }

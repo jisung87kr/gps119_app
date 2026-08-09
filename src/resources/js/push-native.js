@@ -125,14 +125,125 @@ export function initNativePushRouting(env = globalThis) {
     if (!p) return;
 
     p.addListener('notificationActionPerformed', (action) => {
-        const url = action?.notification?.data?.url;
+        const url = safePath(action?.notification?.data?.url);
 
-        // 외부 주소로 튀지 않게 «같은 오리진의 경로»만 받는다. 페이로드는 서버가
-        // 넣지만, 신뢰 경계 밖에서 온 값처럼 다루는 편이 안전하다.
-        if (typeof url === 'string' && url.startsWith('/')) {
-            env.location.assign(url);
-        }
+        if (url) env.location.assign(url);
     });
+
+    // 🔴 앱을 «보고 있을 때» 온 푸시는 이 리스너가 없으면 통째로 버려진다.
+    //    실측 로그: `Notifying listeners for event notificationReceived` 직후
+    //    `No listeners found for event notificationReceived`. 시스템 알림도 뜨지
+    //    않는다 — 포그라운드에서는 OS 가 표시를 앱에 «위임»하기 때문이다.
+    //
+    //    구조 앱에서 「대원이 앱을 켜 두고 있었더니 배정을 못 받았다」는 최악이다.
+    //    앱이 열려 있다는 이유로 더 늦게 아는 셈이 된다.
+    p.addListener('notificationReceived', (event) => {
+        const banner = toForegroundBanner(event);
+
+        if (banner) showForegroundBanner(banner, env);
+    });
+}
+
+/**
+ * 같은 오리진의 «경로»만 통과시킨다.
+ *
+ * 페이로드는 서버가 넣지만 신뢰 경계 밖에서 온 값처럼 다룬다. `//evil.example` 은
+ * 스킴 상대 URL 이라 `/` 로 시작하면서도 «다른 호스트»로 나간다 — 그래서 두 번째 문자까지 본다.
+ *
+ * @returns {string|null}
+ */
+export function safePath(url) {
+    if (typeof url !== 'string') return null;
+    if (! url.startsWith('/')) return null;
+    if (url.startsWith('//')) return null;
+
+    return url;
+}
+
+/**
+ * 포그라운드 푸시 → 배너에 필요한 값만. 표시할 게 없으면 null.
+ *
+ * FCM 은 포그라운드에서 notification 블록을 그대로 넘겨준다. 다만 데이터 전용
+ * 메시지도 있을 수 있어 제목이 없으면 data.title 로 물러난다.
+ *
+ * @returns {{title: string, body: string, url: string|null}|null}
+ */
+export function toForegroundBanner(event) {
+    const n = event?.notification ?? event;
+    const title = n?.title ?? n?.data?.title ?? null;
+
+    // 제목도 본문도 없으면 «보여줄 것이 없다». 빈 배너를 띄우면 더 나쁘다.
+    if (typeof title !== 'string' || title === '') return null;
+
+    return {
+        title,
+        body: typeof n?.body === 'string' ? n.body : (n?.data?.body ?? ''),
+        url: safePath(n?.data?.url),
+    };
+}
+
+/** 배너 하나만 유지한다 — 연달아 오면 «대체»한다(알림 tag 와 같은 사고방식). */
+const BANNER_ID = 'gps119-push-banner';
+
+/**
+ * 인앱 배너를 띄운다.
+ *
+ * 인라인 스타일을 쓰는 이유: 이 배너는 어느 페이지에서든 떠야 하는데, 페이지마다
+ * 로드된 CSS 가 다르다. 클래스에 기대면 「어떤 화면에서만 안 보이는」 배너가 된다.
+ *
+ * 🔑 «자동으로 사라지지 않는다.» 배정 알림을 못 보고 지나치는 것보다 거슬리는 편이 낫다.
+ */
+export function showForegroundBanner({ title, body, url }, env = globalThis) {
+    const doc = env.document;
+    if (! doc?.createElement) return;
+
+    doc.getElementById?.(BANNER_ID)?.remove?.();
+
+    const box = doc.createElement('div');
+    box.id = BANNER_ID;
+    box.setAttribute('role', 'alert');
+    box.style.cssText = [
+        'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:2147483647',
+        // iOS 노치·다이내믹 아일랜드 아래로 내린다. 안드로이드에서는 0 이라 영향이 없다.
+        'margin:calc(8px + env(safe-area-inset-top)) 8px 8px',
+        'padding:14px 16px', 'border-radius:16px',
+        'background:#0E6E7C', 'color:#fff',
+        'font-family:Pretendard,ui-sans-serif,system-ui,-apple-system,sans-serif',
+        'box-shadow:0 8px 24px rgba(0,0,0,.28)',
+        'display:flex', 'gap:12px', 'align-items:flex-start',
+    ].join(';');
+
+    const text = doc.createElement('div');
+    text.style.cssText = 'flex:1;min-width:0';
+
+    const h = doc.createElement('div');
+    h.style.cssText = 'font-size:15px;font-weight:800;line-height:1.4;word-break:keep-all';
+    h.textContent = title;
+
+    const p = doc.createElement('div');
+    p.style.cssText = 'margin-top:2px;font-size:13px;line-height:1.5;opacity:.9;word-break:keep-all';
+    p.textContent = body;
+
+    text.append(h, p);
+
+    const close = doc.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', '알림 닫기');
+    close.textContent = '✕';
+    close.style.cssText = 'background:none;border:0;color:inherit;font-size:16px;padding:0 4px;cursor:pointer';
+    close.addEventListener('click', (e) => {
+        e.stopPropagation();
+        box.remove();
+    });
+
+    box.append(text, close);
+
+    if (url) {
+        box.style.cursor = 'pointer';
+        box.addEventListener('click', () => env.location.assign(url));
+    }
+
+    doc.body.appendChild(box);
 }
 
 /** 테스트 전용 — 모듈 상태를 비운다. */

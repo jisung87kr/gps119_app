@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
-    initNativePushRouting, __resetNativePushState,
+    initNativePushRouting, __resetNativePushState, safePath, toForegroundBanner,
 } from '../../resources/js/push-native.js';
 import { pushStatus, enablePush } from '../../resources/js/push.js';
 
@@ -188,6 +188,56 @@ describe('앱 푸시 — 알림 탭 착지(딥링크)', () => {
         env.__listeners.notificationActionPerformed({ notification: { data: {} } });
 
         expect(env.location.assign).not.toHaveBeenCalled();
+    });
+
+    it('🔴 스킴 상대 URL(//다른호스트)도 막는다 — `/` 로 시작하지만 밖으로 나간다', () => {
+        expect(safePath('//evil.example/steal')).toBeNull();
+        expect(safePath('/control?request=83')).toBe('/control?request=83');
+        expect(safePath('https://evil.example')).toBeNull();
+        expect(safePath(undefined)).toBeNull();
+    });
+});
+
+/**
+ * 🔴 앱을 «보고 있을 때» 온 푸시.
+ *
+ * 실측(에뮬레이터 logcat): 포그라운드에서는 OS 가 알림 표시를 앱에 위임하므로
+ * 시스템 알림이 뜨지 않는다. 리스너가 없으면 «아무 일도 일어나지 않는다» —
+ *   Notifying listeners for event notificationReceived
+ *   No listeners found for event notificationReceived
+ * 구조 앱에서 「앱을 켜 두고 있었더니 배정을 더 늦게 알았다」는 뒤집힌 결과다.
+ */
+describe('앱 푸시 — 포그라운드 수신', () => {
+    it('🔑 리스너를 «등록한다» — 없으면 포그라운드 푸시가 통째로 버려진다', () => {
+        const env = nativeEnv();
+        initNativePushRouting(env);
+
+        expect(env.__plugin.addListener).toHaveBeenCalledWith(
+            'notificationReceived', expect.any(Function),
+        );
+    });
+
+    it('제목·본문·딥링크를 뽑는다', () => {
+        expect(toForegroundBanner({
+            notification: { title: '구조 배정', body: '즉시 출동', data: { url: '/dispatch/9' } },
+        })).toEqual({ title: '구조 배정', body: '즉시 출동', url: '/dispatch/9' });
+    });
+
+    it('제목이 없으면 «빈 배너»를 만들지 않는다', () => {
+        expect(toForegroundBanner({ notification: { data: { url: '/x' } } })).toBeNull();
+        expect(toForegroundBanner({})).toBeNull();
+    });
+
+    it('배너의 딥링크에도 같은 경로 검사가 걸린다', () => {
+        expect(toForegroundBanner({
+            notification: { title: 'x', data: { url: 'https://evil.example' } },
+        }).url).toBeNull();
+    });
+
+    it('data 전용 메시지도 표시한다 — notification 블록 없이 올 수 있다', () => {
+        expect(toForegroundBanner({
+            notification: { data: { title: '구조 배정', body: '즉시 출동' } },
+        })).toEqual({ title: '구조 배정', body: '즉시 출동', url: null });
     });
 });
 
