@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
     isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
     initNativePushRouting, __resetNativePushState, safePath,
-    toForegroundNotification, needsForegroundNotification, notificationId,
+    toForegroundNotification, needsForegroundNotification, notificationId, clearAppBadge,
 } from '../../resources/js/push-native.js';
 import { pushStatus, enablePush } from '../../resources/js/push.js';
 
@@ -41,7 +41,7 @@ function fakeDocument() {
 /** Capacitor 셸이 주입한 전역을 흉내낸다. */
 function nativeEnv({
     receive = 'granted', token = 'fcm-tok-1', fail = false, platform = 'android',
-    localNotifications = true, scheduleFails = false,
+    localNotifications = true, scheduleFails = false, badge = true,
 } = {}) {
     const listeners = {};
     const local = localNotifications ? {
@@ -65,19 +65,26 @@ function nativeEnv({
         }),
     };
 
+    const badgePlugin = badge ? { clear: vi.fn(async () => ({})) } : null;
+    const appPlugin = { addListener: vi.fn((name, cb) => { listeners[name] = cb; }) };
+
+    const plugins = { FirebaseMessaging: plugin, App: appPlugin };
+    if (local) plugins.LocalNotifications = local;
+    if (badgePlugin) plugins.Badge = badgePlugin;
+
     return {
         Capacitor: {
             isNativePlatform: () => true,
             getPlatform: () => platform,
             isPluginAvailable: (n) => n === 'FirebaseMessaging',
-            Plugins: local ? { FirebaseMessaging: plugin, LocalNotifications: local }
-                : { FirebaseMessaging: plugin },
+            Plugins: plugins,
         },
         axios: { post: vi.fn(async () => ({})), delete: vi.fn(async () => ({})) },
         location: { assign: vi.fn() },
         document: fakeDocument(),
         __plugin: plugin,
         __local: local,
+        __badge: badgePlugin,
         __listeners: listeners,
     };
 }
@@ -372,6 +379,54 @@ describe('앱 푸시 — 포그라운드 수신', () => {
 
         expect(spec.title).toBe('구조 배정');
         expect(spec.url).toBeNull();
+    });
+});
+
+/**
+ * 앱 아이콘 뱃지 — 숫자는 서버가 정하고(`BadgeCounter` → `aps.badge`), 지우는 건 앱이다.
+ *
+ * 서버 값은 «보낸 시점» 기준이라, 다른 사람이 먼저 처리하거나 본인이 다 처리해도
+ * 다음 푸시가 올 때까지 숫자가 남는다. 앱을 열었다는 것 자체가 「봤다」는 뜻이다.
+ */
+describe('앱 푸시 — 뱃지 지우기', () => {
+    it('🔑 앱이 «열릴 때» 뱃지를 지운다', () => {
+        const env = nativeEnv({ platform: 'ios' });
+        initNativePushRouting(env);
+
+        expect(env.__badge.clear).toHaveBeenCalledTimes(1);
+    });
+
+    it('🔑 백그라운드에서 «돌아올 때»도 지운다 — 페이지가 새로 뜨지 않는다', () => {
+        // 앱 전환으로 복귀하면 웹뷰는 그대로다. 이게 없으면 「앱을 열었는데 숫자가 남아 있다」.
+        const env = nativeEnv({ platform: 'ios' });
+        initNativePushRouting(env);
+
+        env.__listeners.appStateChange({ isActive: true });
+
+        expect(env.__badge.clear).toHaveBeenCalledTimes(2);
+    });
+
+    it('백그라운드로 «나갈 때»는 지우지 않는다', () => {
+        const env = nativeEnv({ platform: 'ios' });
+        initNativePushRouting(env);
+
+        env.__listeners.appStateChange({ isActive: false });
+
+        expect(env.__badge.clear).toHaveBeenCalledTimes(1);
+    });
+
+    it('🔑 플러그인 없는 «구버전 셸»에서도 라우팅은 계속 붙는다', () => {
+        // 뱃지 하나 때문에 푸시 라우팅 전체가 예외로 죽으면 지령을 놓친다.
+        const env = nativeEnv({ platform: 'android', badge: false });
+
+        expect(() => initNativePushRouting(env)).not.toThrow();
+        expect(env.__plugin.addListener).toHaveBeenCalledWith(
+            'notificationActionPerformed', expect.any(Function),
+        );
+    });
+
+    it('웹 브라우저에서는 아무 일도 없다', () => {
+        expect(() => clearAppBadge({})).not.toThrow();
     });
 });
 

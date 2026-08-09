@@ -124,6 +124,12 @@ export function initNativePushRouting(env = globalThis) {
     const p = plugin(env);
     if (!p) return;
 
+    // 앱을 열었다는 것 자체가 「봤다」는 뜻이다. 여기서 안 지우면 숫자가 영영 남는다.
+    clearAppBadge(env);
+    env.Capacitor?.Plugins?.App?.addListener?.('appStateChange', ({ isActive }) => {
+        if (isActive) clearAppBadge(env);
+    });
+
     p.addListener('notificationActionPerformed', (action) => {
         const url = safePath(action?.notification?.data?.url);
 
@@ -169,6 +175,22 @@ export function needsForegroundNotification(env = globalThis) {
 
 function localNotifications(env = globalThis) {
     return env.Capacitor?.Plugins?.LocalNotifications ?? null;
+}
+
+/**
+ * 앱 아이콘 뱃지를 지운다.
+ *
+ * 🔑 **숫자를 정하는 건 서버, 지우는 건 앱이다.**
+ *    서버는 푸시를 보낼 때마다 그 사람의 「봐야 할 미처리 신고」 수를 `aps.badge` 로
+ *    찍는다(`BadgeCounter`). 그런데 그 값은 **보낸 시점 기준**이라, 다른 사람이 먼저
+ *    처리하거나 본인이 다 처리해도 **다음 푸시가 올 때까지 숫자가 그대로 남는다.**
+ *    앱을 열었다는 것 자체가 「봤다」는 뜻이므로 여기서 0 으로 되돌린다.
+ *
+ * ⚠️ 플러그인이 없는 «구버전 셸»에서는 조용히 아무것도 하지 않는다. 뱃지 하나 때문에
+ *    푸시 라우팅 전체가 예외로 죽으면 지령을 놓친다 — 우선순위가 비교가 안 된다.
+ */
+export function clearAppBadge(env = globalThis) {
+    env.Capacitor?.Plugins?.Badge?.clear?.();
 }
 
 /**

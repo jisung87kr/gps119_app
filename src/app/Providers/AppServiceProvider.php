@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Push\BadgeCounter;
 use App\Services\Push\FcmSender;
 use App\Services\Push\WebPushSender;
 use App\Services\PushService;
@@ -32,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
                     config('push.fcm.project_id'),
                     config('push.fcm.credentials'),
                 ),
-            ]);
+            ], $app->make(BadgeCounter::class));
         });
     }
 

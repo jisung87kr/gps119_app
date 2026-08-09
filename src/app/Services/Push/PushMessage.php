@@ -18,6 +18,7 @@ final class PushMessage
      * @param  string|null  $url  탭했을 때 열 앱/웹 경로 (딥링크)
      * @param  array<string, scalar>  $data  앱이 읽을 부가 데이터. 여기에도 연락처 금지.
      * @param  string|null  $tag  같은 tag 의 알림은 기기에서 «대체»된다(중복 알림 방지)
+     * @param  int|null  $badge  앱 아이콘 뱃지 «숫자». null 이면 뱃지를 건드리지 않는다.
      */
     public function __construct(
         public readonly string $title,
@@ -25,7 +26,23 @@ final class PushMessage
         public readonly ?string $url = null,
         public readonly array $data = [],
         public readonly ?string $tag = null,
+        public readonly ?int $badge = null,
     ) {}
+
+    /**
+     * 뱃지 숫자만 바꾼 사본.
+     *
+     * 🔑 **뱃지는 «메시지 내용»이 아니라 «받는 사람의 상태»다.** 그래서 리스너가 만드는
+     *    PushMessage 에는 들어 있지 않고, 발송 직전에 수신자별로 찍힌다
+     *    (`PushService`). 같은 메시지가 여러 사람에게 나가도 숫자는 각자 다르다.
+     *
+     *    이 구조의 이점: **어떤 푸시가 나가든 뱃지가 함께 보정된다.** 뱃지 전용 발송이
+     *    필요 없고, 볼 것이 없어진 사람에게는 0 이 가서 «저절로 지워진다».
+     */
+    public function withBadge(?int $badge): self
+    {
+        return new self($this->title, $this->body, $this->url, $this->data, $this->tag, $badge);
+    }
 
     /**
      * 웹푸시 payload (서비스워커 push 이벤트에서 그대로 읽는다).
@@ -83,6 +100,20 @@ final class PushMessage
         if ($this->tag !== null) {
             $payload['android'] = ['notification' => ['tag' => $this->tag]];
             $payload['apns'] = ['headers' => ['apns-collapse-id' => $this->tag]];
+        }
+
+        // 🔑 iOS 앱 아이콘 뱃지는 **APNs 페이로드의 `aps.badge` 로만** 정해진다.
+        //    Capacitor 의 `presentationOptions: ['badge', …]` 는 「뱃지 갱신을 허용한다」는
+        //    뜻이지 숫자를 만들어 주지 않는다 — 이걸 안 실어서 뱃지가 «아예» 안 떴다
+        //    (실기기 QA 2026-08-09).
+        //
+        //    `0` 도 유효한 값이다(뱃지를 지운다). 그래서 null 검사여야 하고,
+        //    `if ($this->badge)` 로 쓰면 «지우기»가 통째로 사라진다.
+        //
+        //    안드로이드는 여기 대응물이 없다 — 런처가 알림 «개수»로 점·숫자를 알아서
+        //    붙인다. 그래서 이 값은 iOS 전용이다.
+        if ($this->badge !== null) {
+            $payload['apns']['payload']['aps']['badge'] = $this->badge;
         }
 
         return $payload;

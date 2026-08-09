@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\PushDelivery;
 use App\Models\DeviceToken;
 use App\Models\User;
+use App\Services\Push\BadgeCounter;
 use App\Services\Push\PushMessage;
 use App\Services\Push\PushSender;
 use Illuminate\Support\Collection;
@@ -25,7 +26,10 @@ use Illuminate\Support\Facades\Log;
 class PushService
 {
     /** @param  array<int, PushSender>  $senders */
-    public function __construct(private readonly array $senders) {}
+    public function __construct(
+        private readonly array $senders,
+        private readonly ?BadgeCounter $badges = null,
+    ) {}
 
     /**
      * 한 사용자의 모든 기기로 발송.
@@ -36,7 +40,7 @@ class PushService
     {
         return $this->sendToDevices(
             DeviceToken::query()->forUser($user->id)->active()->get(),
-            $message,
+            $this->stamped($message, $user),
         );
     }
 
@@ -48,16 +52,56 @@ class PushService
      */
     public function sendToUsers($users, PushMessage $message): array
     {
-        $ids = collect($users)->pluck('id')->unique()->values();
+        $recipients = collect($users)->unique('id')->values();
 
-        if ($ids->isEmpty()) {
+        if ($recipients->isEmpty()) {
             return $this->emptyTally();
         }
 
-        return $this->sendToDevices(
-            DeviceToken::query()->whereIn('user_id', $ids)->active()->get(),
-            $message,
-        );
+        $devices = DeviceToken::query()
+            ->whereIn('user_id', $recipients->pluck('id'))
+            ->active()
+            ->get()
+            ->groupBy('user_id');
+
+        // 🔑 **사람마다 한 번씩 돈다 — 뱃지 숫자가 수신자별로 다르기 때문이다.**
+        //    예전엔 기기 전체를 한 덩어리로 보냈는데, 그러면 「내가 봐야 할 건수」를
+        //    남의 숫자로 덮어쓰게 된다.
+        $tally = $this->emptyTally();
+
+        foreach ($recipients as $user) {
+            $userDevices = $devices->get($user->id);
+
+            if ($userDevices === null) {
+                continue;
+            }
+
+            foreach ($this->sendToDevices($userDevices, $this->stamped($message, $user)) as $k => $v) {
+                $tally[$k] += $v;
+            }
+        }
+
+        return $tally;
+    }
+
+    /**
+     * 나가기 «직전»에 이 사람의 뱃지 숫자를 찍는다.
+     *
+     * 🔑 뱃지는 메시지 내용이 아니라 **받는 사람의 상태**라서, 리스너가 아니라 여기서
+     *    붙인다. 덕분에 **어떤 푸시가 나가든 뱃지가 함께 보정되고**, 볼 것이 없어진
+     *    사람에게는 0 이 가서 저절로 지워진다 — 뱃지 전용 발송이 필요 없다.
+     *
+     * ⚠️ 이미 뱃지가 지정된 메시지는 건드리지 않는다(부르는 쪽이 명시했다는 뜻).
+     *    `BadgeCounter` 가 없으면(구형 생성자로 만든 인스턴스·테스트) 그냥 통과시킨다 —
+     *    뱃지 때문에 발송이 막히는 일은 없어야 한다.
+     */
+    private function stamped(PushMessage $message, User $user): PushMessage
+    {
+        if ($this->badges === null || $message->badge !== null) {
+            return $message;
+        }
+
+        return $message->withBadge($this->badges->for($user));
     }
 
     /**

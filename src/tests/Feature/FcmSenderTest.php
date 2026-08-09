@@ -195,6 +195,43 @@ class FcmSenderTest extends TestCase
         });
     }
 
+    public function test_🔑_뱃지_숫자가_ap_ns_페이로드에_실린다(): void
+    {
+        // iOS 앱 아이콘 뱃지는 aps.badge 로만 정해진다. Capacitor 의
+        // presentationOptions:['badge',…] 는 «갱신을 허용한다»는 뜻일 뿐이라,
+        // 이걸 안 실으면 뱃지가 «아예» 안 뜬다(실기기 QA 2026-08-09).
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), (new PushMessage(
+            '새 구조요청', '사고', '/control?request=7', [], 'request-7',
+        ))->withBadge(3));
+
+        Http::assertSent(function ($request) {
+            $message = $request->data()['message'];
+
+            $this->assertSame(3, $message['apns']['payload']['aps']['badge']);
+            // tag 블록과 «같은» apns 키를 쓴다 — 한쪽이 다른 쪽을 덮어쓰면 안 된다.
+            $this->assertSame('request-7', $message['apns']['headers']['apns-collapse-id']);
+
+            return true;
+        });
+    }
+
+    public function test_🔑_뱃지_0_은_«지우기»라서_실어야_한다(): void
+    {
+        // `if ($badge)` 로 쓰면 0 이 falsy 라 지우기가 통째로 사라진다.
+        // 볼 것이 없어진 사람의 뱃지가 영영 안 지워진다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), $this->message()->withBadge(0));
+
+        Http::assertSent(function ($request) {
+            $this->assertSame(0, $request->data()['message']['apns']['payload']['aps']['badge']);
+
+            return true;
+        });
+    }
+
     public function test_tag_가_없으면_해당_블록을_보내지_않는다(): void
     {
         // 빈 tag 를 보내면 FCM 이 400 을 준다 — 없으면 «키 자체가 없어야» 한다.
