@@ -130,6 +130,6 @@ gps119_app_mobile/
 
 | ID | 질문 |
 |---|---|
-| M-18 | 신설 레포 소유 계정 (개인 vs 조직) — 스토어 명의(M-8)와 함께 결정 |
+| ~~M-18~~ | ✅ **해소 (2026-08-09)** — 개인 계정 **비공개** 레포로 신설: `jisung87kr/gps119_app_mobile`.<br>M-8(스토어 명의)이 이미 개인으로 풀려 그쪽에 맞췄다. **비공개로 시작한 이유**: 공개→비공개 전환보다 그 반대가 훨씬 안전하다. 조직으로 옮겨야 하면 GitHub 의 소유권 이전으로 히스토리를 유지한 채 옮길 수 있다.<br>⚠️ 자격증명은 전부 gitignore 다(`google-services.json` · `GoogleService-Info.plist` · `*.p8` · `*.keystore` · `mkcert_ca.pem`). 신설 전에 **추적 파일과 히스토리 양쪽**을 훑어 0건을 확인했다 — 한 번 올라가면 히스토리에서 지우기 어렵다 |
 | M-19 | CI 러너 — GitHub Actions macOS 러너 비용 vs 로컬 빌드 |
 | M-20 | `bridge-contract.md` 작성 시점 — N1 착수 전 |
