@@ -1071,7 +1071,11 @@ export default {
   <div v-if="assign.open" class="fixed inset-0 z-[200]" @click.self="closeAssign">
     <div class="absolute inset-0 bg-black/30"></div>
     <div class="absolute top-0 right-0 flex h-[100dvh] w-full flex-col bg-white shadow-2xl sm:w-96">
-      <div class="flex flex-none items-center justify-between border-b border-gray-200 px-4 py-3">
+      <!-- 🔴 top-0 + h-[100dvh] 라 앱/홈화면 PWA 에서는 이 헤더가 «화면 최상단»에 붙는다.
+           상단 safe-area 를 더하지 않으면 제목이 다이나믹 아일랜드에 가린다(아이폰 실측
+           2026-08-09). 하단은 이미 처리돼 있었는데(아래 pb-[calc(...)]) 상단만 빠져 있었다.
+           딥링크로 들어오면 이 패널이 «자동으로» 열리므로 앱에서 가장 먼저 보이는 화면이다. -->
+      <div class="flex flex-none items-center justify-between border-b border-gray-200 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <h3 class="text-base font-bold text-gray-900">지령 배정 — 신고 #{{ assign.request && assign.request.request_id }}</h3>
         <button @click="closeAssign" class="flex h-11 w-11 items-center justify-center text-gray-400 hover:text-gray-600" aria-label="닫기">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
     isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
-    initNativePushRouting, __resetNativePushState, safePath, toForegroundBanner,
+    initNativePushRouting, __resetNativePushState, safePath,
+    toForegroundNotification, needsForegroundNotification, notificationId,
 } from '../../resources/js/push-native.js';
 import { pushStatus, enablePush } from '../../resources/js/push.js';
 
@@ -17,9 +20,39 @@ import { pushStatus, enablePush } from '../../resources/js/push.js';
  *    ③ 서버 등록이 실패하면 «켜짐»으로 표시하지 않는다 — 알림이 영영 안 온다
  */
 
+
+/** showForegroundBanner 폴백 검증용 최소 DOM. Vitest 환경은 node 라 document 가 없다. */
+function fakeDocument() {
+    const make = () => ({
+        style: { cssText: '' },
+        __children: [],
+        setAttribute() {},
+        addEventListener() {},
+        append(...kids) { this.__children.push(...kids); },
+        appendChild(kid) { this.__children.push(kid); },
+        remove() {},
+        set textContent(v) { this.__text = v; },
+        get textContent() { return this.__text; },
+    });
+
+    return { createElement: make, getElementById: () => null, body: make() };
+}
+
 /** Capacitor 셸이 주입한 전역을 흉내낸다. */
-function nativeEnv({ receive = 'granted', token = 'fcm-tok-1', fail = false, platform = 'android' } = {}) {
+function nativeEnv({
+    receive = 'granted', token = 'fcm-tok-1', fail = false, platform = 'android',
+    localNotifications = true, scheduleFails = false,
+} = {}) {
     const listeners = {};
+    const local = localNotifications ? {
+        schedule: vi.fn(async () => {
+            // OS 알림이 꺼져 있으면 플러그인이 이 문구로 «거부»한다.
+            if (scheduleFails) throw new Error('Notifications not enabled on this device');
+
+            return {};
+        }),
+        addListener: vi.fn((name, cb) => { listeners[name] = cb; }),
+    } : null;
     const plugin = {
         checkPermissions: vi.fn(async () => ({ receive })),
         requestPermissions: vi.fn(async () => ({ receive })),
@@ -37,11 +70,14 @@ function nativeEnv({ receive = 'granted', token = 'fcm-tok-1', fail = false, pla
             isNativePlatform: () => true,
             getPlatform: () => platform,
             isPluginAvailable: (n) => n === 'FirebaseMessaging',
-            Plugins: { FirebaseMessaging: plugin },
+            Plugins: local ? { FirebaseMessaging: plugin, LocalNotifications: local }
+                : { FirebaseMessaging: plugin },
         },
         axios: { post: vi.fn(async () => ({})), delete: vi.fn(async () => ({})) },
         location: { assign: vi.fn() },
+        document: fakeDocument(),
         __plugin: plugin,
+        __local: local,
         __listeners: listeners,
     };
 }
@@ -201,15 +237,18 @@ describe('앱 푸시 — 알림 탭 착지(딥링크)', () => {
 /**
  * 🔴 앱을 «보고 있을 때» 온 푸시.
  *
- * 실측(에뮬레이터 logcat): 포그라운드에서는 OS 가 알림 표시를 앱에 위임하므로
- * 시스템 알림이 뜨지 않는다. 리스너가 없으면 «아무 일도 일어나지 않는다» —
+ * 실측(에뮬레이터 logcat): Android 는 포그라운드면 FCM 이 «자동 표시하지 않고» 앱에
+ * 넘긴다. 리스너가 없으면 그대로 증발한다 —
  *   Notifying listeners for event notificationReceived
  *   No listeners found for event notificationReceived
  * 구조 앱에서 「앱을 켜 두고 있었더니 배정을 더 늦게 알았다」는 뒤집힌 결과다.
+ *
+ * 🔑 표시는 «로컬 알림»으로 한다(인앱 배너가 아니라). 인앱 배너는 DOM 이라
+ *    페이지를 옮기면 흔적 없이 사라지지만, 로컬 알림은 iOS 처럼 알림 그늘에 남는다.
  */
 describe('앱 푸시 — 포그라운드 수신', () => {
-    it('🔑 리스너를 «등록한다» — 없으면 포그라운드 푸시가 통째로 버려진다', () => {
-        const env = nativeEnv();
+    it('🔑 Android 는 리스너를 «등록한다» — 없으면 포그라운드 푸시가 통째로 버려진다', () => {
+        const env = nativeEnv({ platform: 'android' });
         initNativePushRouting(env);
 
         expect(env.__plugin.addListener).toHaveBeenCalledWith(
@@ -217,27 +256,159 @@ describe('앱 푸시 — 포그라운드 수신', () => {
         );
     });
 
+    it('🔑 iOS 는 손대지 «않는다» — OS 가 이미 띄우고, 그건 알림 센터에 남는다', () => {
+        const env = nativeEnv({ platform: 'ios' });
+        initNativePushRouting(env);
+
+        const events = env.__plugin.addListener.mock.calls.map(([name]) => name);
+
+        expect(events).toContain('notificationActionPerformed');   // 탭 착지는 양쪽 다 필요
+        expect(events).not.toContain('notificationReceived');
+    });
+
+    it('웹에서는 아무것도 띄우지 않는다', () => {
+        expect(needsForegroundNotification({})).toBe(false);
+    });
+
+    it('🔑 Android 포그라운드 푸시 → «로컬 알림»을 올린다', () => {
+        const env = nativeEnv({ platform: 'android' });
+        initNativePushRouting(env);
+
+        env.__listeners.notificationReceived({
+            notification: {
+                title: '구조 배정', body: '즉시 출동',
+                tag: 'request-9', data: { url: '/control?request=9' },
+            },
+        });
+
+        expect(env.__local.schedule).toHaveBeenCalledTimes(1);
+        const sent = env.__local.schedule.mock.calls[0][0].notifications[0];
+        expect(sent.title).toBe('구조 배정');
+        expect(sent.extra).toEqual({ url: '/control?request=9' });
+        // 셸이 만든 heads-up 채널을 써야 한다. 어긋나면 조용히 기본 채널로 떨어진다.
+        expect(sent.channelId).toBe('gps119-rescue-v1');
+    });
+
+    it('🔑 우리가 올린 알림의 «탭»도 딥링크로 간다 — FCM 이 아니라 로컬 알림 이벤트다', () => {
+        const env = nativeEnv({ platform: 'android' });
+        initNativePushRouting(env);
+
+        env.__listeners.localNotificationActionPerformed({
+            notification: { extra: { url: '/control?request=9' } },
+        });
+
+        expect(env.location.assign).toHaveBeenCalledWith('/control?request=9');
+    });
+
+    it('로컬 알림 탭에도 같은 경로 검사가 걸린다', () => {
+        const env = nativeEnv({ platform: 'android' });
+        initNativePushRouting(env);
+
+        env.__listeners.localNotificationActionPerformed({
+            notification: { extra: { url: '//evil.example' } },
+        });
+
+        expect(env.location.assign).not.toHaveBeenCalled();
+    });
+
+    it('🔑 플러그인 없는 «구버전 셸»에서는 인앱 배너로 떨어진다', () => {
+        // 셸은 스토어 심사를 거쳐 천천히 갱신된다. 구버전 앱에서 아무것도 안 뜨면
+        // 그 대원은 지령을 놓친다 — bridge.js 기능 협상과 같은 이유다.
+        const env = nativeEnv({ platform: 'android', localNotifications: false });
+        initNativePushRouting(env);
+
+        env.__listeners.notificationReceived({
+            notification: { title: '구조 배정', body: '즉시 출동', data: {} },
+        });
+
+        expect(env.document.body.__children).toHaveLength(1);
+    });
+
+    it('🔑 OS 알림이 «꺼져 있어» 로컬 알림이 거부되면 배너로 떨어진다', async () => {
+        // 토큰은 알림 권한 없이도 발급되고 사용자가 나중에 끌 수도 있다 — 서버는 계속 보낸다.
+        // 이걸 안 받으면 화면을 «보고 있는데도» 아무것도 안 뜬다(삼켜진 거부만 남는다).
+        const env = nativeEnv({ platform: 'android', scheduleFails: true });
+        initNativePushRouting(env);
+
+        env.__listeners.notificationReceived({
+            notification: { title: '구조 배정', body: '즉시 출동', data: {} },
+        });
+
+        await vi.waitFor(() => expect(env.document.body.__children).toHaveLength(1));
+    });
+
+    it('같은 tag 는 같은 id 로 접힌다 — 포그라운드에서만 알림이 쌓이지 않게', () => {
+        expect(notificationId('request-9')).toBe(notificationId('request-9'));
+        expect(notificationId('request-9')).not.toBe(notificationId('request-10'));
+        expect(Number.isInteger(notificationId('x'))).toBe(true);
+        expect(notificationId('x')).toBeGreaterThan(0);
+    });
+
     it('제목·본문·딥링크를 뽑는다', () => {
-        expect(toForegroundBanner({
+        const spec = toForegroundNotification({
             notification: { title: '구조 배정', body: '즉시 출동', data: { url: '/dispatch/9' } },
-        })).toEqual({ title: '구조 배정', body: '즉시 출동', url: '/dispatch/9' });
+        });
+
+        expect(spec.title).toBe('구조 배정');
+        expect(spec.body).toBe('즉시 출동');
+        expect(spec.url).toBe('/dispatch/9');
     });
 
-    it('제목이 없으면 «빈 배너»를 만들지 않는다', () => {
-        expect(toForegroundBanner({ notification: { data: { url: '/x' } } })).toBeNull();
-        expect(toForegroundBanner({})).toBeNull();
+    it('제목이 없으면 «빈 알림»을 만들지 않는다', () => {
+        expect(toForegroundNotification({ notification: { data: { url: '/x' } } })).toBeNull();
+        expect(toForegroundNotification({})).toBeNull();
     });
 
-    it('배너의 딥링크에도 같은 경로 검사가 걸린다', () => {
-        expect(toForegroundBanner({
+    it('알림의 딥링크에도 같은 경로 검사가 걸린다', () => {
+        expect(toForegroundNotification({
             notification: { title: 'x', data: { url: 'https://evil.example' } },
         }).url).toBeNull();
     });
 
     it('data 전용 메시지도 표시한다 — notification 블록 없이 올 수 있다', () => {
-        expect(toForegroundBanner({
+        const spec = toForegroundNotification({
             notification: { data: { title: '구조 배정', body: '즉시 출동' } },
-        })).toEqual({ title: '구조 배정', body: '즉시 출동', url: null });
+        });
+
+        expect(spec.title).toBe('구조 배정');
+        expect(spec.url).toBeNull();
+    });
+});
+
+/**
+ * 🔴 «어느 진입점이 이걸 부르는가»를 고정한다.
+ *
+ * 이 저장소에는 Vite 진입점이 둘이다 — `app.js`(Blade 전 화면)와
+ * `control/main.js`(관제 SPA). control/index.blade.php 의 @vite 는 후자만 넣으므로
+ * app.js 에만 배선하면 **관제 화면에서만 푸시 라우팅이 통째로 빠진다.**
+ *
+ * 실제로 그랬다(iOS 실기기 2026-08-09): 관제 화면을 열어 둔 상태에서는 인앱 배너도
+ * 안 뜨고 알림을 «탭»해도 아무 일도 없었다. 상황실이 하루 종일 켜 두는 화면이 거기다.
+ *
+ * 함수 호출을 실행으로 검사할 수 없어(진입점은 import 만으로 DOM·Vue 를 건드린다)
+ * 소스 텍스트로 고정한다 — roleMeta 의 hex 금지 스펙과 같은 방식이다.
+ */
+describe('푸시 라우팅이 «모든» 진입점에 배선돼 있다', () => {
+    /**
+     * ⚠️ 주석을 «반드시» 걷어내고 본다. 처음엔 원문에서 바로 찾았는데, 호출을
+     *    `// initNativePushRouting();` 로 주석 처리해도 텍스트가 남아 테스트가
+     *    통과했다 — 변이로 확인하지 않았으면 못 잡을 뻔했다. 게다가 그 파일의
+     *    설명 주석 자체가 이 함수 이름을 담고 있다.
+     */
+    const codeOf = (path) => readFileSync(
+        fileURLToPath(new URL(`../../resources/js/${path}`, import.meta.url)),
+        'utf8',
+    )
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .map((line) => line.replace(/\/\/.*$/, ''))
+        .join('\n');
+
+    it.each(['app.js', 'control/main.js'])('%s 가 initNativePushRouting 을 부른다', (path) => {
+        const code = codeOf(path);
+
+        expect(code).toMatch(/import\s*\{[^}]*initNativePushRouting[^}]*\}\s*from/);
+        expect(code).toMatch(/^\s*initNativePushRouting\(\s*\);/m);
     });
 });
 

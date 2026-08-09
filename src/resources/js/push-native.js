@@ -130,18 +130,88 @@ export function initNativePushRouting(env = globalThis) {
         if (url) env.location.assign(url);
     });
 
-    // 🔴 앱을 «보고 있을 때» 온 푸시는 이 리스너가 없으면 통째로 버려진다.
-    //    실측 로그: `Notifying listeners for event notificationReceived` 직후
-    //    `No listeners found for event notificationReceived`. 시스템 알림도 뜨지
-    //    않는다 — 포그라운드에서는 OS 가 표시를 앱에 «위임»하기 때문이다.
-    //
-    //    구조 앱에서 「대원이 앱을 켜 두고 있었더니 배정을 못 받았다」는 최악이다.
-    //    앱이 열려 있다는 이유로 더 늦게 아는 셈이 된다.
-    p.addListener('notificationReceived', (event) => {
-        const banner = toForegroundBanner(event);
+    // 🔴 Android 는 앱이 «떠 있으면» FCM 이 알림을 자동 표시하지 않는다. 실측 로그:
+    //    `Notifying listeners for event notificationReceived` 직후
+    //    `No listeners found …` — 리스너가 없으면 그대로 증발한다.
+    //    「대원이 앱을 켜 두고 있었더니 배정을 못 받았다」는 뒤집힌 결과다.
+    if (needsForegroundNotification(env)) {
+        p.addListener('notificationReceived', (event) => {
+            const spec = toForegroundNotification(event);
 
-        if (banner) showForegroundBanner(banner, env);
-    });
+            if (spec) presentForeground(spec, env);
+        });
+
+        // 우리가 «올린» 알림의 탭은 FCM 이 아니라 로컬 알림 쪽으로 온다.
+        // 이걸 빠뜨리면 「포그라운드에서 온 알림만 눌러도 안 움직인다」가 된다.
+        localNotifications(env)?.addListener?.('localNotificationActionPerformed', (action) => {
+            const url = safePath(action?.notification?.extra?.url);
+
+            if (url) env.location.assign(url);
+        });
+    }
+}
+
+/**
+ * 이 플랫폼에서 포그라운드 알림을 «우리가» 띄워야 하는가.
+ *
+ * 🔑 규칙: **OS 가 하는 일은 OS 에 맡기고, 안 하는 것만 보완한다.**
+ *
+ * - iOS: `presentationOptions` 에 `alert` 가 있어 OS 가 띄운다 → 손대지 않는다
+ * - Android: FCM 이 포그라운드에서 «자동 표시하지 않는다» → 앱이 직접 올린다
+ *
+ * ⚠️ 「Android 는 대안이 없다」가 아니다. FCM 이 표시 여부를 앱에 맡기는 설계일 뿐,
+ *    앱이 알림을 올리면 iOS 와 똑같이 «알림 그늘에 남는다». 네이티브 개발도
+ *    필요 없다 — LocalNotifications 플러그인으로 웹 JS 에서 올린다.
+ */
+export function needsForegroundNotification(env = globalThis) {
+    return nativePlatform(env) === 'android';
+}
+
+function localNotifications(env = globalThis) {
+    return env.Capacitor?.Plugins?.LocalNotifications ?? null;
+}
+
+/**
+ * 셸이 만들어 둔 구조 알림 채널.
+ *
+ * ⚠️ **셸의 `MainActivity.createRescueNotificationChannel()` 과 문자열이 같아야 한다.**
+ *    (`android/app/src/main/res/values/notification.xml`) 어긋나면 안드로이드가 조용히
+ *    기본 채널로 떨어뜨려 heads-up 이 사라진다 — 오류는 나지 않는다.
+ */
+const RESCUE_CHANNEL_ID = 'gps119-rescue-v1';
+
+/**
+ * 포그라운드 알림을 실제로 띄운다.
+ *
+ * 🔑 로컬 알림을 «먼저» 시도하고, 안 되면 인앱 배너로 떨어진다. 못 뜨는 길이 둘이다:
+ *
+ *    ① **플러그인이 없는 구버전 셸.** 셸은 스토어 심사를 거쳐 천천히 갱신되므로
+ *       현장에 남아 있다(bridge.js 의 기능 협상과 같은 이유).
+ *    ② **OS 알림이 꺼져 있음.** 그러면 `schedule()` 이 «거부»한다
+ *       (`"Notifications not enabled on this device"`). 토큰은 알림 권한 없이도
+ *       발급되고 사용자가 나중에 권한을 끌 수도 있어서, 서버는 계속 보낸다.
+ *
+ *    ②를 안 받으면 **화면을 «보고 있는데도» 아무것도 안 뜨고** 삼켜진 거부만 남는다.
+ *    배너는 DOM 이라 OS 권한과 무관하게 뜬다 — 정확히 이 경우에 유일하게 남는 수단이다.
+ */
+function presentForeground(spec, env = globalThis) {
+    const ln = localNotifications(env);
+
+    if (! ln?.schedule) {
+        showForegroundBanner(spec, env);
+
+        return;
+    }
+
+    Promise.resolve(ln.schedule({
+        notifications: [{
+            id: spec.id,
+            title: spec.title,
+            body: spec.body,
+            channelId: RESCUE_CHANNEL_ID,
+            extra: { url: spec.url },
+        }],
+    })).catch(() => showForegroundBanner(spec, env));
 }
 
 /**
@@ -161,25 +231,50 @@ export function safePath(url) {
 }
 
 /**
- * 포그라운드 푸시 → 배너에 필요한 값만. 표시할 게 없으면 null.
+ * 포그라운드 푸시 → 띄울 알림에 필요한 값만. 표시할 게 없으면 null.
  *
  * FCM 은 포그라운드에서 notification 블록을 그대로 넘겨준다. 다만 데이터 전용
  * 메시지도 있을 수 있어 제목이 없으면 data.title 로 물러난다.
  *
- * @returns {{title: string, body: string, url: string|null}|null}
+ * @returns {{id: number, title: string, body: string, url: string|null}|null}
  */
-export function toForegroundBanner(event) {
+export function toForegroundNotification(event) {
     const n = event?.notification ?? event;
     const title = n?.title ?? n?.data?.title ?? null;
 
-    // 제목도 본문도 없으면 «보여줄 것이 없다». 빈 배너를 띄우면 더 나쁘다.
+    // 제목도 본문도 없으면 «보여줄 것이 없다». 빈 알림을 띄우면 더 나쁘다.
     if (typeof title !== 'string' || title === '') return null;
 
+    // 서버가 보낸 tag 를 그대로 «대체 키»로 쓴다(PushMessage::$tag). tag 가 없으면
+    // 딥링크 → 제목 순으로 물러난다. 셋 다 없을 일은 위 검사에서 걸러진다.
+    const tag = (typeof n?.tag === 'string' && n.tag) ? n.tag : (n?.data?.url ?? title);
+
     return {
+        id: notificationId(tag),
         title,
         body: typeof n?.body === 'string' ? n.body : (n?.data?.body ?? ''),
         url: safePath(n?.data?.url),
     };
+}
+
+/**
+ * tag → 안정적인 32비트 양의 정수.
+ *
+ * 🔑 LocalNotifications 는 «id» 가 같으면 대체한다. 서버의 tag 규약(같은 신고 =
+ *    같은 tag)을 그대로 잇기 위해 tag 를 id 로 접는다 — 안 그러면 포그라운드에서만
+ *    같은 신고 알림이 쌓이고, 쌓이면 안드로이드가 그룹으로 묶어 «그룹 요약 줄»이
+ *    생긴다. 그 줄에는 extra 가 없어서 누르면 딥링크가 사라진다(2026-08-09 실측).
+ *
+ * 0 은 피한다 — 일부 안드로이드 버전이 id=0 알림을 취소 대상으로 다룬다.
+ */
+export function notificationId(tag) {
+    let hash = 0;
+
+    for (let i = 0; i < tag.length; i += 1) {
+        hash = (Math.imul(hash, 31) + tag.charCodeAt(i)) | 0;
+    }
+
+    return Math.abs(hash) || 1;
 }
 
 /** 배너 하나만 유지한다 — 연달아 오면 «대체»한다(알림 tag 와 같은 사고방식). */
