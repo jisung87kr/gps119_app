@@ -231,11 +231,95 @@ FCM 토큰을 주므로 `usesFcm()` 의 전제가 실제로 맞게 되고, **서
 멤버십을 요구하고(M-8), Xcode 의 Push Notifications capability 도 유료 팀이 필요하다.
 즉 이 수정은 **「나중에 켤 때 안 깨지도록」 미리 고친 것**이지 실증된 게 아니다.
 
+### ✅ 6-3. iOS 배선 완료 (2026-08-09) — 남은 건 실기기뿐
+
+M-8 이 개인 명의로 풀리면서 iOS 쪽을 실제로 붙였다.
+
+| 항목 | 상태 |
+|---|---|
+| APNs 인증 키(`.p8`) 발급 + Firebase 업로드 | ✅ (개발·프로덕션 두 칸 모두) |
+| `GoogleService-Info.plist` → **Resources 빌드 페이즈 등록** | ✅ 번들 반영을 산출물에서 확인 |
+| `App.entitlements` (`aps-environment`) + `CODE_SIGN_ENTITLEMENTS` | ✅ |
+| `UIBackgroundModes = [remote-notification]` | ✅ |
+| Firebase iOS SDK | ✅ `cap sync ios` 가 SPM 으로 자동 — Firebase 콘솔이 안내하는 「Xcode 에서 직접 추가」는 **하면 안 된다**(이중 링크 + 다음 sync 에 소실) |
+| `DEVELOPMENT_TEAM` | ✅ |
+| **실제 발송** | 🔴 **실기기 필요.** 시뮬레이터는 APNs 토큰을 발급하지 않는다 — Android 처럼 에뮬레이터로 끝나지 않는다 |
+
+⚠️ **키 ID 와 팀 ID 는 둘 다 10자리 영숫자라 바꿔 넣기 쉽다.** 잘못 넣어도 Firebase
+업로드는 «통과»하고 발송 시점에만 실패한다. 키 ID 는 `.p8` 파일명과 반드시 일치한다.
+
+## 6-4. 🔴 앱 푸시 종단 재검증에서 나온 결함 4건 (2026-08-09)
+
+플러그인을 `@capacitor-firebase/messaging` 으로 바꾼 뒤 Android 를 다시 밟았다.
+**넷 모두 서버 로그로는 「성공」으로 보인다** — `delivered` 가 찍히고 FCM 은 200 을 준다.
+
+| # | 결함 | 근거(실측) | 상태 |
+|---|---|---|---|
+| ⓐ | **포그라운드 수신이 통째로 버려짐** | logcat: `Notifying listeners for event notificationReceived` → `No listeners found …` | ✅ 수정 |
+| ⓑ | `toFcmPayload()` 가 **`tag` 를 누락** | 페이로드에 `android.notification.tag` 가 없었다 | ✅ 수정 |
+| ⓒ | 상태바 아이콘이 **흰 동그라미** | 스크린샷 | ✅ 수정 |
+| ⓓ | **heads-up 안 됨** | logcat: `Missing Default Notification Channel metadata` | ✅ 수정 |
+
+**ⓐ 가 가장 나쁘다.** 포그라운드에서는 OS 가 표시를 앱에 «위임»하므로 시스템 알림이
+뜨지 않는데, 받는 리스너가 없으면 **아무 일도 일어나지 않는다.** 구조 앱에서
+「대원이 앱을 켜 두고 있었더니 배정을 더 늦게 알았다」는 뒤집힌 결과다.
+→ `notificationReceived` 리스너 + 인앱 배너(자동으로 사라지지 않는다. 놓치는 것보다
+거슬리는 편이 낫다). 배너를 탭하면 같은 딥링크로 간다.
+
+**ⓑ 는 «앱에서만»** 일어났다. `tag` 가 `toWebPayload()` 에만 실려 있어서 웹은 대체되고
+앱만 쌓였다. 리스너들은 최신 것만 남는다고 전제하고 쓴다(`NotifyRescuers`: `request-{id}`).
+→ `android.notification.tag` + `apns.headers.apns-collapse-id`.
+
+> ⚠️ **`push:test` 로는 ⓑ 가 드러나지 않는다.** 반복 검증을 위해 일부러 매번 «다른»
+> tag 를 쓰기 때문이다. 실제로 그 때문에 「알림이 쌓인다」를 결함의 근거로 잘못 들었다.
+> 계약은 `FcmSenderTest` 로 고정했다.
+
+**ⓓ** FCM 기본 채널(Miscellaneous)은 `IMPORTANCE_DEFAULT` 라 화면 위로 뜨지 않는다.
+소리만 나고 상태바에 남으므로 대원이 다른 화면을 보고 있으면 지나간다.
+→ 셸이 `IMPORTANCE_HIGH` 채널(`gps119-rescue-v1`)을 만들고 매니페스트가 그걸 가리킨다.
+**채널 설정은 생성 시점에만 반영된다**(사용자가 끈 걸 앱이 되돌리지 못하게 한 정책)
+— 그래서 id 에 버전을 붙였다.
+
+### 🔑 6-5. 콜드 스타트 딥링크에 «네이티브 코드가 필요 없다» (2026-08-09)
+
+「프로세스가 죽은 상태에서 알림을 탭하면 딥링크가 사라진다」로 한 번 결론냈다가
+**두 번 뒤집혔다.** 기록해 둔다 — 같은 함정을 또 밟기 쉽다.
+
+**진짜 동작은 이렇다:**
+
+```
+14:51:54.755  Notifying listeners for event notificationActionPerformed
+14:51:54.757  No listeners found for event …          ← 리스너가 없어 «보관»된다
+14:52:03.376  addListener notificationActionPerformed  ← 원격 페이지 로드 완료(≈9초)
+14:52:03.385  Notifying listeners for event …          ← 재생 → /control?project=8&request=83
+```
+
+플러그인이 `notifyListeners(…, retainUntilConsumed=true)` 로 발행하므로,
+**원격 URL 을 다 받아오기 전에 이벤트가 와도 버려지지 않는다.**
+`No listeners found` 는 **오류가 아니라 보관됐다는 뜻**이다.
+
+**오진 두 번:**
+
+1. 「플러그인이 런치 인텐트를 안 읽는다」 → 틀렸다. `BridgeActivity.load()` 가
+   `this.onNewIntent(getIntent())` 를 이미 부른다.
+2. 그 진단을 근거로 셸에 폴백을 넣었다 → **원리상 동작할 수 없는 코드였다.**
+   로그 순서가 증거다: `onCreate` 시점의 `getIntent()` 는 `extras=(none)` 이고
+   플러그인 이벤트는 **그 뒤에** 온다(`launchMode=singleTask` 라 payload 는
+   `onNewIntent` 로 따로 온다). 지웠다.
+
+**최초 관찰이 왜 틀렸나:** 눌렀던 것이 **알림 그룹의 «요약 줄»** 이었다.
+요약 줄의 인텐트에는 메시지 extras 가 없어서 앱만 열린다. 그룹을 펼쳐 개별 알림을
+누르면 정상이다. 그리고 **애초에 그룹이 생긴 원인이 ⓑ(tag 누락)** 였다 — 결함 하나가
+다른 결함의 오진을 만든 셈이다.
+
+> 🔑 **교훈**: 「알림을 눌렀다」를 관찰로 쓰려면 **무엇을 눌렀는지**(개별인가 요약인가)를
+> 먼저 확정해야 한다. 화면 좌표로 탭하는 자동화에서는 이게 조용히 어긋난다.
+
 ## 7. 남은 것
 
 | 항목 | 왜 아직인가 |
 |---|---|
-| **FCM 실제 발송** | 명의(M-8) 대기. `FcmSender` 는 `isConfigured()` 가 false 라 조용히 건너뛴다. 액세스 토큰 발급(서비스 계정 JWT)은 «한 번도 실행해보지 못한 인증 코드»를 남기지 않으려고 자격증명이 생긴 뒤로 미뤘다 |
+| ~~**FCM 실제 발송**~~ | ✅ **Android 종단 실증 완료.** 🔴 **iOS 는 실기기 대기** — 배선은 끝났다(§6-3), 시뮬레이터가 APNs 토큰을 안 준다 |
 | ~~브라우저 실제 구독 검증~~ | ✅ **해소 (2026-08-05).** 아래 §8 참조 |
 | **지령 상태 변경 → 상황실 알림** | §4 표에서 긴급도 «중»이고 digest 여지가 있다. 묶는 방식이 정해지지 않아 보류 |
 | **사용자별 수신 설정 (M-9) · 야간 정책 (M-11)** | 위 표 참조 |
