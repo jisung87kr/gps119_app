@@ -52,7 +52,7 @@ Key pieces:
 
 ## Layout & Docker
 
-The Laravel application lives in **`src/`**, not the repo root. The repo root holds only Docker config and manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`, `EPIC-project-management.md`). `src/PROMPT.MD` is the original product spec.
+The Laravel application lives in **`src/`**, not the repo root. The repo root holds only Docker config, the deploy runbook (`DEPLOY.md`), and manuals (`USER_MANUAL.md`, `ADMIN_MANUAL.md`, `EPIC-project-management.md`). `src/PROMPT.MD` is the original product spec.
 
 The app runs in Docker (`docker-compose.yml` at root), **four services** all built from the same `docker/php/Dockerfile` and sharing the `src/` bind-mount at `/var/www/html`:
 - **app** (`gps119_app-app-1`) — PHP/Apache web server. Apache also reverse-proxies WebSocket upgrades (`/app`) to the reverb service.
@@ -65,6 +65,14 @@ Host ports: app `9050→80` (http) and **`9051→443` (https)**, Vite `9093`, Re
 **Echo connects over the page's own origin, not a pinned host.** `resources/js/echo.js` derives host/port/scheme from `window.location` (`resolveReverbConfig`, spec `tests/js/echoConfig.test.js`); `VITE_REVERB_*` are *explicit overrides* and are left blank in `.env`. Apache reverse-proxies `/app` on both vhosts, so same-origin always works. The old pinned `VITE_REVERB_HOST` broke twice — once when the laptop's LAN IP changed (build-time constant, so it stayed broken until a rebuild) and again under https (`ws://` on an https page is blocked as mixed content).
 
 **Local HTTPS (`9051`) exists because `navigator.geolocation`, service workers, and web push require a secure context — and `localhost` is the only http exception, private IPs are not.** So a phone or the app shell hitting `http://<LAN IP>:9050` gets geolocation refused *without a permission prompt*, which reads like "unsupported webview" and was once misdiagnosed as exactly that. Certs are mkcert-signed in `docker/apache/certs/` (gitignored); vhosts share `docker/apache/common.conf`. Device CA-trust steps and cert re-issue are in **`docker/apache/README.md`**.
+
+**Production is a separate compose file, not a profile of the dev one (2026-08-10).** `docker-compose.prod.yml` + `docker/apache/apache-prod.conf` + `deploy.sh`, driven by two env files (`.env.deploy` for compose, `src/.env` from `src/.env.production.example`). Runbook: **`DEPLOY.md`**; the hosting decision and its NCP-migration trigger are **ADR-0006**. Target is a single AWS Lightsail Seoul VM — serverless is structurally impossible here (Reverb daemon + queue worker are always-on) and a foreign region drags in personal-data export obligations for `location_pings`. Notes that bite:
+- Splitting the file is the point: mixing prod into `docker-compose.yml` is exactly how "I thought it was local" becomes a production DB.
+- The prod file **does not publish db/reverb host ports** (dev publishes MySQL on `9052`), sets `restart: unless-stopped` on all four (dev omits it on `app`, so a reboot brings up everything but the web), gates startup on a db healthcheck, and caps log size.
+- **Reverb still has no host port in prod** — Apache proxies `/app` on 443. That is what keeps `resolveReverbConfig` same-origin; publishing it directly reintroduces the pinned `VITE_REVERB_HOST` that broke twice. `VITE_REVERB_*` stay blank in production too.
+- `deploy.sh` is not `git pull`: backup → maintenance → checkout → build → migrate → **restart queue+reverb** (the worker holds loaded classes) → health check. On failure it **stops with maintenance mode still on** rather than serving broken code. It prints `APP_ENV`/`APP_URL`/DB before doing anything.
+- TLS is Let's Encrypt, not the mkcert certs — first issuance must be `--standalone` because the 443 vhost can't start without a cert, yet webroot renewal is served by that same Apache.
+- ⚠️ Unverified: Apache's `${APP_DOMAIN}` env expansion was never run (no Docker daemon at authoring time). Check `apachectl -S` on first boot. **No deploy/rollback rehearsal has happened** — OPS-08 is not closed.
 
 **Run all `artisan`/`composer`/`npm` commands inside the app container**, e.g.:
 

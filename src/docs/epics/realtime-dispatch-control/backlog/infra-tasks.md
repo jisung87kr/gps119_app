@@ -251,6 +251,9 @@
   docker exec gps119_app-app-1 php artisan up
   ```
   > CI는 별도 도입 전이라 본 태스크는 **수동/스크립트 배포 절차 표준화**까지. 자동 CI 파이프라인 도입은 OPEN(OI-B).
+- **진행 (2026-08-10)**: 위 스니펫이 실제 스크립트로 구현됐다 → 저장소 루트 **`deploy.sh`**, 구성은 `docker-compose.prod.yml`·`docker/apache/apache-prod.conf`, 절차 문서는 **`DEPLOY.md`**. 배포 대상은 **ADR-0006**(AWS 서울 단일 VM).
+  스니펫 대비 달라진 점: ① 덤프에 `--single-transaction`(서비스 중 잠금 회피) ② 배포마다 **이전 커밋 SHA + 덤프 경로를 기록**해 `./deploy.sh rollback` 한 명령으로 되돌림 ③ 실패 시 **점검 모드를 켠 채 정지**(깨진 코드로 여는 것 방지) ④ 실행 전 `APP_ENV`/`APP_URL`/DB 를 먼저 출력 — 「로컬인 줄 알고 실서버」 방지.
+  ⚠️ **완료 아님** — 리허설이 남았다. 또한 Apache 의 `${APP_DOMAIN}` 전개는 미검증이라 첫 기동 시 `apachectl -S` 로 확인해야 한다.
 - **완료 검증**: 배포 리허설 1회 — `php artisan migrate:status` 최신, `queue:restart` 후 신규 잡 새 코드로 처리, `reverb:restart` 후 WS 재연결, `/up` 200. 롤백 리허설: `migrate:rollback` + 백업 복원 절차 1회 검증.
 - **의존**: OPS-04, OPS-05, OPS-07.
 - **규모**: M
@@ -355,9 +358,10 @@
 
 | # | 미결 | 막는 OPS 태스크 | 결정 주체 | 비고 |
 |---|------|------------------|-----------|------|
-| **OI-A** | 운영 TLS 인증서 발급·반입 경로(실인증서 vs Let's Encrypt 자동화) | OPS-03 | kang-mansu + PM | 개발은 self-signed로 진행 가능. 운영 도메인 확정 필요 |
+| ~~**OI-A**~~ | ~~운영 TLS 인증서 발급·반입 경로~~ | ~~OPS-03~~ | — | ✅ **해소(2026-08-10)** — Let's Encrypt. 최초 발급 standalone → 갱신 webroot(+deploy-hook). ADR-0006 / `DEPLOY.md` 1-4. 운영 도메인 확정만 남음 |
 | **OI-B** | CI 파이프라인 도입 여부·시점(현재 수동 배포 스크립트) | OPS-08 자동화 | kang-mansu + PM | Q5(OpenAPI)와 별개. 지금은 표준화된 수동 절차로 출시 가능 |
 | **OI-C** | 스토어 배포 계정·앱 서명키·FCM 프로젝트 소유 | OPS-12 | PM + 고객 | 하이브리드 단계(M4) 진입 전 확보 |
+| **OI-D** | **공공(지자체) 영업 진입 시점** — NCP 이전 + CSAP SaaS 심사 착수 트리거 | 신규(인프라 이전) | **PM** | ADR-0006. AWS 서울의 CSAP는 「하」등급이라 개인정보를 다루는 이 앱은 범위 밖 → 공공엔 국내 CSP 필요. **트리거는 「계약 확정」이 아니라 「영업 대상에 넣는 시점」** — 심사가 6개월+ 라 공고 보고 시작하면 늦는다 |
 | **Q4** | **행사 동시 운영 규모** — 단일 Reverb로 충분한가 | OPS-09, OPS-10 발동 임계 | **kang-mansu** | ADR-0001 단일 인스턴스 전제의 유효성. R2와 직결. M2에서 조기 부하검토 권장 |
 | **Q2 / OI-7** | **위치이력 보존기간**(법무) | OPS-11 자동파기 잡 설계 | **PM(법무 자문)** | 미확정 시 OPS-11은 드라이런만. 개인정보 자동파기는 파괴적 작업이라 확정 전 실삭제 금지 |
 | **OI-8(spec)** | 소프트삭제 행사의 pings/participants 정리 정책 | OPS-11 파기 범위 | na-minsik + PM | `projects` SoftDelete vs 자식 `cascadeOnDelete` 불일치 — 파기 잡이 어디까지 청소할지 결정 |

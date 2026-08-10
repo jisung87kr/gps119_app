@@ -19,5 +19,6 @@
 | [0003](0003-dispatch-state-machine.md) | 신고 배정을 지령(Dispatch) 상태머신으로 전환 | Accepted |
 | [0004](0004-contact-channel-scoping.md) | 실시간 채널의 신고자 연락처 노출 최소화 | Accepted |
 | [0005](0005-all-requests-belong-to-event.md) | 모든 신고는 행사에 소속 — "상시 운영" 기본 행사 흡수 | Accepted |
+| [0006](0006-production-hosting-aws-seoul.md) | 운영 배포 대상 — AWS 서울 단일 VM (공공 진입 시 NCP 이전) | Accepted |
 
 > 배경 설계는 [`../epics/realtime-dispatch-control/`](../epics/realtime-dispatch-control/) 참조.
