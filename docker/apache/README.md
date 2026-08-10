@@ -1,5 +1,9 @@
 # 로컬 개발용 HTTPS
 
+> ⚠️ **이 문서는 «로컬 개발용»이다.** 여기의 mkcert 인증서는 운영에 쓰이지 않는다.
+> 운영은 Let's Encrypt 이고 vhost 도 다른 파일(`apache-prod.conf`)이다 — 절차는 루트의 **`DEPLOY.md`**,
+> 결정 배경은 **ADR-0006** 참조.
+
 ## 왜 필요한가
 
 `navigator.geolocation`·서비스워커·웹푸시는 **보안 컨텍스트(secure context)에서만** 동작한다.

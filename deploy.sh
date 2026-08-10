@@ -31,8 +31,14 @@ TARGET_REF=""
 
 # ---------------------------------------------------------------- 출력 헬퍼
 c_red=$'\033[31m'; c_grn=$'\033[32m'; c_ylw=$'\033[33m'; c_dim=$'\033[2m'; c_off=$'\033[0m'
-log()  { printf '%s==>%s %s\n' "$c_grn" "$c_off" "$*"; }
-warn() { printf '%s[!]%s %s\n' "$c_ylw" "$c_off" "$*"; }
+# 🔑 진행 로그는 «전부 stderr» 로 보낸다. stdout 은 함수의 «반환값» 통로다.
+#    backup_db 처럼 값을 돌려주는 함수가 log 를 부르면, DUMP_PATH="$(backup_db)" 가
+#    로그 문장까지 같이 삼켜 .deploy/last-release 에 «ANSI 이스케이프가 섞인 두 줄»이
+#    PREV_DUMP 로 기록된다. 그러면 롤백이 그 파일을 source 하는 순간
+#    「DB: command not found」로 죽는다 — 정작 롤백이 필요한 순간에.
+#    (2026-08-10 리허설에서 실제로 재현됨)
+log()  { printf '%s==>%s %s\n' "$c_grn" "$c_off" "$*" >&2; }
+warn() { printf '%s[!]%s %s\n' "$c_ylw" "$c_off" "$*" >&2; }
 die()  { printf '%s[x]%s %s\n' "$c_red" "$c_off" "$*" >&2; exit 1; }
 
 dc() { docker compose --env-file "$ENV_DEPLOY" -f "$COMPOSE_FILE" "$@"; }
@@ -153,8 +159,18 @@ build_and_migrate() {
 # ---------------------------------------------------------------- rollback
 if [ "$MODE" = "rollback" ]; then
     [ -f "$STATE_FILE" ] || die "$STATE_FILE 이 없다 — 되돌릴 릴리스 기록이 없다."
-    # shellcheck disable=SC1090
-    source "$STATE_FILE"   # PREV_SHA, PREV_DUMP
+    # 🔑 source 하지 않고 «파싱»한다. 상태파일이 어떤 이유로든 깨지면 source 는 그 내용을
+    #    «명령으로 실행»해 버리고, 실패 메시지가 「DB: command not found」 같은 형태라
+    #    정작 급한 순간에 원인을 못 찾는다.
+    PREV_SHA="$(env_get "$STATE_FILE" PREV_SHA)"
+    PREV_DUMP="$(env_get "$STATE_FILE" PREV_DUMP)"
+
+    [ -n "$PREV_SHA" ] || die "$STATE_FILE 에 PREV_SHA 가 없다. 수동 복구가 필요하다."
+    git rev-parse --verify "$PREV_SHA^{commit}" >/dev/null 2>&1 \
+        || die "PREV_SHA 가 유효한 커밋이 아니다: $PREV_SHA"
+    # 백업 정리(14일)가 이 덤프를 이미 지웠을 수 있다 — 그 경우를 «여기서» 분명히 말한다.
+    [ -f "$PREV_DUMP" ] || die "롤백 덤프를 찾을 수 없다: ${PREV_DUMP:-<비어있음>}
+    backups/ 에 남은 덤프로 수동 복원해야 한다:  ls -t $BACKUP_DIR"
     cat <<EOF
   ${c_ylw}롤백은 파괴적이다.${c_off}
    코드   : $(git rev-parse --short HEAD) → ${PREV_SHA:0:7}
