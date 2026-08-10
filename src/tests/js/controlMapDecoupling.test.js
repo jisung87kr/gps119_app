@@ -46,6 +46,7 @@ describe('관제 — 지도 실패와 기능 분리', () => {
             loadBoard: vi.fn(async () => {}),
             _subscribeRealtime: vi.fn(),
             _consumeDeepLink: vi.fn(),
+            recenter: vi.fn(),
         };
     }
 

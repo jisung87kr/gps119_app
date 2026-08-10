@@ -8,6 +8,10 @@ import { roleMeta, priorityMeta, presenceState, ICON_PATHS } from './roleMeta';
 
 const Z_PERSON = 10;
 const Z_REQUEST = 100;
+// 🔑 인포윈도는 «항상» 핀 위에 뜬다. 인포윈도와 CustomOverlay 는 같은 오버레이 페인에서
+//    z 로 겨루는데, 신고핀(z=100)이 기본 인포윈도를 덮어 전화번호·주소를 가렸다.
+//    핀보다 큰 값을 명시적으로 준다 — 기본값에 기대면 SDK 판올림에 다시 깨진다.
+const Z_INFO = 1000;
 
 // 정확도 경고 임계값(m). 산·코스에서 이 이상 벌어지면 «그 점을 믿고 가면 안 된다».
 const ACCURACY_WARN_M = 50;
@@ -197,7 +201,7 @@ export class PersonMarkerPool {
     // 인포윈도는 생성 시점의 row 를 캡처하므로 매번 새로 그린다. accuracy 는 위치가
     // 갱신될 때마다 바뀌기 때문에, 열리는 순간의 값을 읽어야 한다.
     _bindInfo(marker, row, state) {
-        const iw = new kakao.maps.InfoWindow({ content: '', removable: true });
+        const iw = new kakao.maps.InfoWindow({ content: '', removable: true, zIndex: Z_INFO });
         kakao.maps.event.addListener(marker, 'click', () => {
             const entry = this.markers.get(row.user_id);
             const cur = entry ? entry.row : row;
@@ -220,27 +224,25 @@ export class PersonMarkerPool {
     }
 
     /**
-     * 전 인원이 보이도록 맞춘다.
-     * padding: {top,right,bottom,left} px. 모바일 바텀시트가 지도 하단을 가리므로
-     * 그만큼 하단 패딩을 줘야 마커가 시트 밑에 깔리지 않는다.
+     * 인원 좌표로 bounds 를 넓힌다. 하나라도 넣었으면 true.
+     *
+     * 「맞추는」 일은 여기서 하지 않는다 — 지도를 어디에 맞출지는 인원핀만으로 결정되지
+     * 않고 신고핀까지 합쳐야 하는데, 레이어가 각자 setBounds 를 부르면 나중에 부른 쪽이
+     * 앞의 것을 지운다. 경계만 내놓고 합치는 건 ControlApp.recenter 가 한다.
+     *
+     * 화면에서 숨긴(역할 필터 off·오프라인 숨김) 인원은 제외한다 — 안 보이는 점 때문에
+     * 지도가 넓어지면 «보이는 것 전체»를 담는다는 말과 어긋난다.
      */
-    fitBounds(padding = null) {
-        if (this.markers.size === 0) return;
-        const bounds = new kakao.maps.LatLngBounds();
+    extendBounds(bounds) {
         let any = false;
         for (const [, e] of this.markers) {
             const r = e.row;
-            if (r.last_lat != null && r.last_lng != null) {
-                bounds.extend(new kakao.maps.LatLng(Number(r.last_lat), Number(r.last_lng)));
-                any = true;
-            }
+            if (r.last_lat == null || r.last_lng == null) continue;
+            if (!this._shouldShow(e)) continue;
+            bounds.extend(new kakao.maps.LatLng(Number(r.last_lat), Number(r.last_lng)));
+            any = true;
         }
-        if (!any) return;
-        if (padding) {
-            this.map.setBounds(bounds, padding.top || 0, padding.right || 0, padding.bottom || 0, padding.left || 0);
-        } else {
-            this.map.setBounds(bounds);
-        }
+        return any;
     }
 }
 
@@ -292,8 +294,20 @@ export class RequestPinLayer {
             (req.address ? `<div style="color:#888;margin-top:4px;">${escapeHtml(req.address)}</div>` : '') +
             `</div>`;
         const pos = new kakao.maps.LatLng(Number(req.latitude), Number(req.longitude));
-        const iw = new kakao.maps.InfoWindow({ content: infoHtml, removable: true, position: pos });
+        const iw = new kakao.maps.InfoWindow({
+            content: infoHtml, removable: true, position: pos, zIndex: Z_INFO,
+        });
         el.addEventListener('click', () => iw.open(this.map));
+    }
+
+    /** 신고 좌표로 bounds 를 넓힌다. 하나라도 넣었으면 true. */
+    extendBounds(bounds) {
+        let any = false;
+        for (const [, overlay] of this.pins) {
+            bounds.extend(overlay.getPosition());
+            any = true;
+        }
+        return any;
     }
 
     count() {
