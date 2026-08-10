@@ -1,9 +1,12 @@
 {{--
     개인정보처리방침.
 
-    🔴 이 문서는 «코드에서 확인한 실제 수집 항목»으로 작성한 초안이다. 법률 검토를 받지 않았다.
-       공란(<법무 확인 필요>)을 채우고 검토를 받기 전에는 「시행」으로 볼 수 없다.
+    🔴 «코드에서 확인한 실제 수집 항목»으로 작성했고, 법률 검토는 «아직 받지 않았다».
        실제 처리와 어긋난 방침은 그 자체로 위반이므로, 수집 항목·위탁처가 바뀌면 여기도 같이 고친다.
+
+    ⚠️ 보유기간(구조요청 3년 / 위치 이력 6개월 / 확인자료 6개월 / 접속기록 3개월)은 «관례값»이다.
+       법무 검토에서 바뀔 수 있고, 바뀌면 OPS-11(location_pings 자동파기)의 임계값도 같이 바꿔야 한다.
+       지금은 자동파기가 꺼져 있어 실제로는 «무기한 보관»이므로, 여기 적힌 기간과 시스템이 다르다.
 
     근거가 되는 코드:
       users / requests / location_pings / event_participants / device_tokens / sessions 마이그레이션
@@ -151,12 +154,13 @@
             <h2 class="text-lg font-extrabold text-ink-950">5. 보유 및 파기</h2>
             <ul class="list-disc space-y-1 pl-5">
                 <li>회원 정보: 회원 탈퇴 시까지. 탈퇴 시 지체 없이 파기합니다.</li>
-                <li>구조요청 기록: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></li>
-                <li>실시간 위치 이력: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></li>
-                <li>위치정보 이용·제공사실 확인자료: 「위치정보의 보호 및 이용 등에 관한 법률」에 따라 보관합니다.</li>
+                <li>구조요청 기록(위치·연락처 포함): <strong class="text-ink-900">3년</strong>. 사고 경위 확인과 분쟁 대응에 필요한 기간입니다.</li>
+                <li>실시간 위치 이력: <strong class="text-ink-900">6개월</strong>. 행사 종료 후에는 기록 정리 목적으로만 보관합니다.</li>
+                <li>위치정보 이용·제공사실 확인자료: <strong class="text-ink-900">6개월</strong> (「위치정보의 보호 및 이용 등에 관한 법률」에 따른 최소 보관기간)</li>
+                <li>접속 기록(IP·접속 시각): <strong class="text-ink-900">3개월</strong></li>
                 <li>법령이 별도 보존을 정한 경우 그 기간</li>
             </ul>
-            <p>파기 시 전자적 파일은 복구할 수 없는 방법으로 삭제합니다.</p>
+            <p>보유기간이 지난 정보는 지체 없이 파기하며, 전자적 파일은 복구할 수 없는 방법으로 삭제합니다.</p>
         </section>
 
         <section class="space-y-2">
@@ -183,9 +187,13 @@
             <h2 class="text-lg font-extrabold text-ink-950">8. 개인정보 보호책임자</h2>
             <div class="rounded-2xl border border-ink-100 p-4 text-sm">
                 <p>업체명: 세이브미 (사업자등록번호 852-08-02915)</p>
-                <p class="mt-1">책임자: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></p>
-                <p class="mt-1">연락처: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></p>
+                <p class="mt-1">개인정보 보호책임자: 대표자</p>
+                <p class="mt-1">연락처: <a href="mailto:gwamb119@gmail.com" class="text-brand-600 underline underline-offset-2">gwamb119@gmail.com</a></p>
             </div>
+            <p class="text-sm text-ink-500">
+                개인정보 처리와 관련한 문의·불만·피해구제는 위 연락처로 접수해 주시면
+                지체 없이 답변해 드리겠습니다.
+            </p>
             <p class="text-sm text-ink-500">
                 개인정보 침해에 대한 신고·상담은 개인정보침해신고센터(privacy.kisa.or.kr, 국번없이 118),
                 대검찰청 사이버수사과(1301), 경찰청 사이버수사국(182)에 문의하실 수 있습니다.
@@ -198,7 +206,7 @@
                 이 방침이 변경되는 경우 시행일 전에 서비스 화면을 통해 공지합니다.
                 이용자에게 불리한 변경은 최소 30일 전에 알립니다.
             </p>
-            <p class="pt-2 text-sm font-bold text-ink-900">시행일: <span class="rounded bg-warning-50 px-1 text-warning-700">&lt;법무 확인 필요&gt;</span></p>
+            <p class="pt-2 text-sm font-bold text-ink-900">시행일: 2026년 8월 10일</p>
         </section>
 
         <div class="border-t border-ink-100 pt-5">

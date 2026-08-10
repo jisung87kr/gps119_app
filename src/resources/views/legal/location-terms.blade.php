@@ -1,14 +1,15 @@
 {{--
     위치기반서비스 이용약관.
 
-    🔴 이 문서는 초안이고 법률 검토를 받지 않았다. 공란(<법무 확인 필요>)을 채우기 전에는 시행할 수 없다.
+    🔴 초안이고 법률 검토를 받지 않았다.
 
-    🔴 특히 «위치기반서비스사업 신고번호»는 비워 둘 수 없는 항목이다.
-       신고 없이 서비스를 제공하는 것 자체가 위법이므로, 신고 완료 전에는 이 약관을 게시해도
-       요건을 갖춘 것이 아니다. (모바일 에픽 N0 블로커 — DEPLOY.md §5)
+    🔴 «위치기반서비스사업 신고번호»는 임의로 채울 수 없는 유일한 항목이라 「신고 진행 중」으로 뒀다.
+       신고 없이 서비스를 제공하는 것 자체가 위법이므로, 이 약관을 게시했다고 요건을 갖춘 것이 아니다.
+       수리 후 제12조에 번호를 적는다. (모바일 에픽 N0 블로커 — DEPLOY.md §5)
 
-    제8조의 «이용·제공사실 확인자료»는 현재 시스템에 «자동 기록 기능이 없다».
-    약관에만 적고 구현하지 않으면 약관과 실제가 어긋난다 — 법무 확인과 함께 구현 여부를 정해야 한다.
+    ⚠️ 제8조의 «이용·제공사실 확인자료 자동 기록·보존»은 현재 시스템에 그 기능이 «없다».
+       location_pings 는 위치 자체만 쌓고, 「누구의 위치를 언제 누구에게 제공했는지」는 남기지 않는다.
+       약관에만 적고 구현하지 않으면 약관과 실제가 어긋난다 — 법무 검토와 함께 구현 여부를 정한다.
 --}}
 <x-layouts.app title="GPS119 - 위치기반서비스 이용약관" heading="위치기반서비스 이용약관" :back="url()->previous()">
     <article class="space-y-7 pb-10 text-[15px] leading-relaxed text-ink-700">
@@ -109,9 +110,7 @@
                 회사는 「위치정보의 보호 및 이용 등에 관한 법률」에 따라 위치정보 이용·제공사실 확인자료를
                 자동으로 기록·보존하며, 법령이 정한 기간 동안 보관합니다.
             </p>
-            <p class="text-sm text-ink-500">
-                보관 기간: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span>
-            </p>
+            <p class="text-sm text-ink-500">보관 기간: <strong class="text-ink-900">6개월</strong></p>
         </section>
 
         <section class="space-y-2">
@@ -149,22 +148,22 @@
             <div class="rounded-2xl border border-ink-100 p-4 text-sm">
                 <p>상호: 세이브미</p>
                 <p class="mt-1">사업자등록번호: 852-08-02915</p>
-                <p class="mt-1">주소: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></p>
-                <p class="mt-1">대표자: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></p>
-                <p class="mt-1">
-                    위치기반서비스사업 신고번호:
-                    <span class="rounded bg-danger-50 px-1 font-bold text-danger-700">&lt;신고 완료 후 기재 — 필수&gt;</span>
-                </p>
-                <p class="mt-1">위치정보관리책임자: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></p>
-                <p class="mt-1">연락처: <span class="rounded bg-warning-50 px-1 font-bold text-warning-700">&lt;법무 확인 필요&gt;</span></p>
+                <p class="mt-1">위치정보관리책임자: 대표자</p>
+                <p class="mt-1">연락처: <a href="mailto:gwamb119@gmail.com" class="text-brand-600 underline underline-offset-2">gwamb119@gmail.com</a></p>
+                {{--
+                    🔴 신고번호는 «임의로 채울 수 없는» 유일한 항목이다. 신고 수리 후
+                       받은 번호를 여기 적는다. 없는 번호를 적는 것은 허위 표시다.
+                --}}
+                <p class="mt-1">위치기반서비스사업 신고번호: 신고 진행 중</p>
             </div>
+            <p class="text-sm text-ink-500">
+                위치기반서비스사업 신고 절차가 진행 중이며, 신고 수리 후 신고번호를 이 약관에 기재합니다.
+            </p>
         </section>
 
         <section class="space-y-2">
             <h2 class="text-lg font-extrabold text-ink-950">부칙</h2>
-            <p class="text-sm font-bold text-ink-900">
-                시행일: <span class="rounded bg-warning-50 px-1 text-warning-700">&lt;법무 확인 필요&gt;</span>
-            </p>
+            <p class="text-sm font-bold text-ink-900">이 약관은 2026년 8월 10일부터 시행합니다.</p>
         </section>
 
         <div class="border-t border-ink-100 pt-5">
