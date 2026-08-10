@@ -24,6 +24,11 @@ Route::get('/', function () {
         : redirect()->route('request.create');
 });
 
+// 법적 고지 — «비로그인도» 볼 수 있어야 한다. 로그인 화면에서 링크되고,
+// 스토어 심사(Play 데이터 안전)에서 개인정보처리방침 URL 을 «공개»로 요구한다.
+Route::view('/privacy', 'legal.privacy')->name('legal.privacy');
+Route::view('/location-terms', 'legal.location-terms')->name('legal.location-terms');
+
 Route::get('/requests/create', function () {
     if (! Auth::user()->phone) {
         // 회원정보 변경 페이지 리다이렉트

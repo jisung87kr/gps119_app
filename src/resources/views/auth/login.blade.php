@@ -48,5 +48,12 @@
             계정이 없으신가요?
             <a href="{{ route('register') }}" class="font-extrabold text-brand-600 underline underline-offset-2">지금 회원가입</a>
         </p>
+
+        {{-- 위치정보를 다루는 서비스라 «가입 전에» 볼 수 있어야 한다. --}}
+        <p class="mt-6 text-center text-sm leading-relaxed text-ink-400">
+            <a href="{{ route('legal.privacy') }}" class="underline underline-offset-2">개인정보처리방침</a>
+            <span class="px-1.5 text-ink-300">·</span>
+            <a href="{{ route('legal.location-terms') }}" class="underline underline-offset-2">위치기반서비스 이용약관</a>
+        </p>
     </x-ui.auth-shell>
 </x-layouts.app>
