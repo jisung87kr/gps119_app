@@ -3,6 +3,37 @@
 대상: **AWS Lightsail 서울, 단일 인스턴스 + docker compose.**
 관련 태스크: OPS-08(배포 절차), OI-A(운영 TLS 발급 경로).
 
+## 0. 지금 떠 있는 것 (2026-08-10 배포 완료)
+
+**https://gps119.co.kr — 운영 중.** 아래는 §1 을 실제로 수행한 결과다.
+
+| | |
+|---|---|
+| 인스턴스 | Lightsail `gps119-prod` · Ubuntu 22.04 · 4GB/2vCPU(`medium_3_0`) · `ap-northeast-2a` |
+| 고정 IP | `3.39.62.2` (도메인 A 레코드 연결, 가비아) |
+| 방화벽 | 22 · 80 · 443 만. **3306·8080 은 열지 않음** |
+| 접속 | `ssh gps119` (맥 `~/.ssh/config`, 키 `~/.ssh/id_ed25519_gps119`) |
+| 코드 | `/home/ubuntu/gps119_app` — `deploy.sh` 때문에 **detached HEAD 가 정상**이다 |
+| TLS | Let's Encrypt. 최초 standalone → **갱신 webroot 로 전환 완료**(dry-run 통과) |
+| swap | 2GB (`/swapfile`, `vm.swappiness=10`) |
+| 자동 백업 | DB 덤프 크론 매일 **04:10 KST** + Lightsail 스냅샷 매일 **05:00 KST** |
+
+**검증한 것** — https `/up` 200, 80→443 301, `/app` WebSocket 101(`X-Powered-By: Laravel Reverb`),
+HSTS·nosniff·Referrer-Policy, 지도(카카오 도메인 등록 확인), 네이버 로그인 302,
+그리고 **재부팅 복귀**(다운타임 약 30초, 컨테이너 4개 자동 기동, 데이터 보존).
+
+⚠️ **재부팅 시에는 `depends_on: service_healthy` 가 적용되지 않는다.** 그건 `compose up`
+때만 동작하고, 도커 데몬이 부팅 시 컨테이너를 되살릴 땐 순서 보장이 없다. 실측에서 큐 워커가
+MySQL 보다 먼저 떠 두 번 죽었다가 `restart: unless-stopped` 로 붙었다(`RestartCount=2`).
+자기치유가 정상 동작한 것이라 조치는 불필요하지만, **재부팅 직후 수십 초 동안 푸시·Discord
+통지가 지연된다**(유실은 아니다 — database 큐라 쌓였다가 처리된다).
+
+**관리자 계정은 `admin@admin.com` 이 아니다.** 시더가 만든 뒤 운영자가 자기 계정으로 바꿨다.
+기본 비밀번호가 아님은 확인했다.
+
+**아직 안 채운 값** — `KAKAO_CLIENT_ID/SECRET`(카카오 로그인 미사용), `DISCORD_WEBHOOK_URL`.
+비어 있으면 해당 기능만 조용히 꺼진다(의도된 동작).
+
 > 상시 스테이징 서버는 두지 않는다. 배포 전 검증은 로컬 도커(운영과 동일 구성)로 하고,
 > 배포 리허설·부하테스트(OPS-10)는 **운영 스냅샷에서 임시 인스턴스를 복제해 쓰고 지운다.**
 
@@ -41,12 +72,32 @@
 
 ### 1-2. 도커 · 코드
 
+🔑 **도커는 «공식 저장소»에서 받는다.** 배포판 패키지(`docker.io` + `docker-compose-v2`)는
+우분투 버전에 따라 compose v2 가 없어서, 이 문서의 `docker compose ...` 명령이 통째로
+안 먹는다. 실제 운영기(22.04)가 그 경우였다.
+
 ```bash
-sudo apt update && sudo apt install -y docker.io docker-compose-v2 git certbot
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg git certbot
+
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
 sudo usermod -aG docker $USER && newgrp docker
 
-git clone <repo> ~/gps119_app && cd ~/gps119_app
+git clone https://github.com/jisung87kr/gps119_app.git ~/gps119_app && cd ~/gps119_app
 ```
+
+⚠️ `usermod` 는 **다시 로그인해야 반영된다.** 안 하면 `docker` 명령마다 permission denied 다.
+크론도 마찬가지라 — 백업 크론이 「등록은 됐는데 매일 빈 파일만 남기는」 상태가 될 수 있다(§4).
 
 **swap 2GB 를 먼저 잡는다.** `deploy.sh` 가 컨테이너 안에서 `npm run build`(Vite + Tailwind 4)
 를 돌리는데, 4GB 인스턴스에서는 여기서 OOM 으로 죽을 수 있다. 죽으면 배포가 **점검 모드를
@@ -178,15 +229,26 @@ crontab -e
 
 ---
 
-## 5. 코드 밖에서 해야 하는 것 (배포 전 체크)
+## 5. 코드 밖에서 해야 하는 것 (2026-08-10 기준)
 
-- [ ] **카카오 개발자 콘솔** — 플랫폼에 운영 도메인 등록. 안 하면 지도가 통째로 안 뜬다
-- [ ] **네이버/카카오 로그인** — Redirect URI 를 운영 도메인으로 등록 + `src/.env` 반영
-- [ ] **APNs 운영 인증키** / FCM 프로젝트 설정
-- [ ] **앱 셸 재빌드** — `~/Dev/gps119_app_mobile` 의 `server.url` 을 운영 도메인으로 바꾸고
-      재빌드 → 스토어 재제출. 원격 URL 방식이라 도메인이 바뀌면 앱도 다시 나가야 한다
-- [ ] **위치정보사업 신고** (N0 블로커) · 개인정보처리방침 · 위치기반서비스 이용약관
-- [ ] `admin@admin.com` 초기 비밀번호 변경
+- [x] **카카오 개발자 콘솔** — 운영 도메인 등록 완료. 지도 키는 **소스에 하드코딩**돼 있어
+      (`resources/js/control/ControlApp.js`, `public/js/components/MapLoader.js` — 같은 값 2벌)
+      운영/개발 키를 나눌 수 없다. 그 앱의 허용 도메인에 추가하는 방식뿐이다.
+      확인법: `curl -H "Referer: https://gps119.co.kr/" "https://dapi.kakao.com/v2/maps/sdk.js?appkey=<키>"`
+      → 등록됐으면 200, 아니면 **401**
+- [x] **네이버 로그인** — Redirect URI `https://gps119.co.kr/auth/naver/callback` + `src/.env` 반영.
+      카카오 로그인은 **사용하지 않는다**(로그인 화면에도 버튼이 없다)
+- [x] **FCM** — Firebase 프로젝트 `gps119`, 서비스 계정 JSON 을 서버
+      `src/storage/app/fcm-service-account.json`(`600 www-data`)에 배치. 웹 푸시(VAPID)도 생성 완료
+- [x] `admin` 계정 초기 비밀번호 변경
+- [ ] **앱 셸 스토어 제출** — 셸 쪽은 준비 끝났다(운영 URL 빌드 경로 + 업로드 키 서명,
+      `gps119_app_mobile` PR #1). **콘솔 제출만 남았다.** 원격 URL 방식이라 도메인이 바뀌면
+      앱도 다시 나가야 한다
+- [ ] 🔴 **위치정보사업 신고** (N0 블로커) · 개인정보처리방침 · 위치기반서비스 이용약관
+      — **Play 제출에서 실제로 막힌다.** 개인정보처리방침 URL 이 «필수 입력»이고,
+      데이터 안전(Data safety) 섹션의 위치 수집 신고 내용이 방침과 어긋나면 반려된다
+- [ ] **실기기 푸시 종단 검증(운영 서버 대상)** — 지금까지 앱 푸시는 개발 서버로만 검증됐다.
+      운영은 FCM 설정만 넣었을 뿐 실제 토큰이 등록된 적이 없다
 
 ## 6. 아직 안 한 것 (의도적으로 남긴 것)
 
@@ -203,5 +265,12 @@ crontab -e
   **실패 경로도 확인했다** — Vite 빌드가 깨지는 릴리스를 일부러 배포해, 스크립트가 중단되고
   점검 모드가 «켜진 채»로 남아 사용자에게 503 이 나가는 것(깨진 코드가 열리지 않는 것),
   그리고 안내대로 `./deploy.sh rollback` 을 치면 직전 릴리스로 복구되고 점검 모드가 풀리는 것까지.
-  **아직 안 한 것: 실제 인스턴스에서의 리허설.** Let's Encrypt 실발급, 실도메인 DNS,
-  4GB 메모리에서의 빌드, 재부팅 복귀는 로컬로 대체되지 않는다 — 첫 행사 전에 임시 인스턴스로 1회 돌린다
+  로컬로 대체되지 않던 것(실발급 TLS·실도메인 DNS·4GB 빌드·재부팅 복귀)은 **2026-08-10 실제
+  배포에서 전부 통과했다.** → §0. **OPS-08 종료.** 남은 건 `deploy.sh` 를 «운영기에서» 한 번도
+  돌려본 적이 없다는 것뿐이다(최초 설치는 §1 수동 절차라 스크립트를 거치지 않는다).
+  다음 배포가 그 첫 실행이 된다 — 백업이 자동으로 뜨고 실패해도 점검 모드로 멈추므로 위험은
+  낮지만, **첫 실행은 사용자가 없는 시간에** 하는 게 좋다.
+- 🔴 **백업이 전부 같은 AWS 계정·같은 리전에 있다.** 덤프·스냅샷 모두 그렇다. 디스크 장애는
+  막지만 계정 사고나 리전 장애는 못 막는다. §4 의 S3 반출은 아직 안 했다 — 유료 고객이
+  붙으면 닫아야 할 구멍이다
+- **모니터링·알림 없음.** 서비스가 죽어도 알려주는 게 없다. 지금은 사람이 열어봐야 안다

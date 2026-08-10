@@ -16,7 +16,7 @@
 | OPS-0.1 (Reverb·도커 WS·Apache 프록시) | OPS-01, OPS-02, OPS-03 | 0 |
 | OPS-0.2 (큐 워커·supervisor·데몬 감시) | OPS-04, OPS-05, OPS-06 | 0 |
 | (Phase 0 구성·시크릿) | OPS-07 | 0 |
-| (Phase 0 배포 절차) | OPS-08 | 0 |
+| (Phase 0 배포 절차) | ~~OPS-08~~ ✅ | 0 |
 | OPS-4.1 (Redis 스케일·보존정책) | OPS-09, OPS-10, OPS-11 | 4 |
 | OPS-4.2 (하이브리드·부하/배터리 관측) | OPS-12 | 4 |
 | (카카오 쿼터 관측 — R7) | OPS-13 | 2 |
@@ -253,7 +253,11 @@
   > CI는 별도 도입 전이라 본 태스크는 **수동/스크립트 배포 절차 표준화**까지. 자동 CI 파이프라인 도입은 OPEN(OI-B).
 - **진행 (2026-08-10)**: 위 스니펫이 실제 스크립트로 구현됐다 → 저장소 루트 **`deploy.sh`**, 구성은 `docker-compose.prod.yml`·`docker/apache/apache-prod.conf`, 절차 문서는 **`DEPLOY.md`**. 배포 대상은 **ADR-0006**(AWS 서울 단일 VM).
   스니펫 대비 달라진 점: ① 덤프에 `--single-transaction`(서비스 중 잠금 회피) ② 배포마다 **이전 커밋 SHA + 덤프 경로를 기록**해 `./deploy.sh rollback` 한 명령으로 되돌림 ③ 실패 시 **점검 모드를 켠 채 정지**(깨진 코드로 여는 것 방지) ④ 실행 전 `APP_ENV`/`APP_URL`/DB 를 먼저 출력 — 「로컬인 줄 알고 실서버」 방지.
-  ⚠️ **완료 아님** — 리허설이 남았다. 또한 Apache 의 `${APP_DOMAIN}` 전개는 미검증이라 첫 기동 시 `apachectl -S` 로 확인해야 한다.
+- **✅ 완료 (2026-08-10)** — 리허설 2회 + 실제 운영 배포까지 끝났다. **https://gps119.co.kr 운영 중** (인벤토리는 `DEPLOY.md` §0).
+  - **로컬 리허설**: 격리 프로젝트(`-p`)에 저장소를 복제해 `deploy.sh` 를 무수정 실행 — 배포·롤백(코드 복귀 + DB 복원, 마커 행 소멸 확인)·**실패 경로**(빌드가 깨지는 릴리스를 일부러 배포 → 점검 모드 유지 + 503 → 안내대로 롤백해 복구) 전부 통과.
+  - **실기 배포**: 실발급 TLS, 실도메인 DNS, 4GB 빌드, **재부팅 복귀**(다운타임 약 30초, 컨테이너 4개 자동 기동, 데이터 보존) 통과. Apache `${APP_DOMAIN}` 전개도 확인됨(두 vhost + 인증서 경로).
+  - **여기서 잡은 결함**: ① 🔴 **롤백이 전혀 동작하지 않았다** — `DUMP_PATH="$(backup_db)"` 가 `log` 의 stdout 까지 캡처해 상태파일의 `PREV_DUMP` 가 ANSI 섞인 로그 문장이 됐고, `source` 가 `DB: command not found` 로 죽었다. 즉 **롤백이 필요한 순간에만** 실패하는 상태였다. `log`/`warn` 을 stderr 로 보내고, 상태파일을 `source` 대신 파싱하며, `PREV_SHA`/`PREV_DUMP` 를 선검증하도록 고쳤다. ② 🔴 ACME `<Directory>` 의 `Options None` 이 mod_rewrite 를 막아(AH00670) **Let's Encrypt 갱신 경로가 403** 이었다 — 방어가 방어 대상을 막던 경우. ③ `VITE_REVERB_APP_KEY` 가 빈 값이라 **실시간 전멸**(증상은 「계속 연결중」뿐). ④ 런북 1-5 의 `key:generate`/`composer install` 순서, ⑤ `db:seed --force` 누락(비대화형에서 조용히 취소 → 관리자 계정 미생성).
+  - ⚠️ **남은 것**: `deploy.sh` 를 «운영기에서» 돌려본 적은 없다(최초 설치는 수동 §1 경로). 다음 배포가 첫 실행이다.
 - **완료 검증**: 배포 리허설 1회 — `php artisan migrate:status` 최신, `queue:restart` 후 신규 잡 새 코드로 처리, `reverb:restart` 후 WS 재연결, `/up` 200. 롤백 리허설: `migrate:rollback` + 백업 복원 절차 1회 검증.
 - **의존**: OPS-04, OPS-05, OPS-07.
 - **규모**: M
