@@ -12,6 +12,10 @@ import { isNativeApp, hasNativeCapability, NativeCapability } from '../native/br
 const POLL_INTERVAL_MS = 12000;
 const KAKAO_KEY = '509c2656c00fa9af4782197a888763f6';
 
+// 전체보기가 파고들 수 있는 최대 배율(카카오는 숫자가 작을수록 확대).
+// 핀이 한 점뿐일 때 setBounds 가 여기까지 붙어버려 주변 지형이 사라지는 것을 막는다.
+const MIN_FIT_LEVEL = 4;
+
 export default {
     data() {
         return {
@@ -220,9 +224,14 @@ export default {
                 this.requestPins = null;
             }
 
-            await this.fetchRoster(true);
+            await this.fetchRoster();
             await this.fetchRequests();
             await this.loadBoard();
+
+            // 초기 조망은 인원핀·신고핀이 «모두» 올라온 뒤에 잡는다.
+            // 예전에는 roster 직후에 맞춰서 신고핀이 경계 계산에 아예 들어가지 못했다.
+            this.recenter();
+
             this._subscribeRealtime();
             this._consumeDeepLink();
         },
@@ -272,7 +281,10 @@ export default {
         },
 
         // ── roster(폴백·초기로드) ───────────────────────────────
-        async fetchRoster(fit = false) {
+        // 조망(recenter)은 여기서 하지 않는다 — 폴링도 이 함수를 부르는데, 그때마다
+        // 지도가 튀면 관제사가 보고 있던 화면을 12초마다 빼앗긴다. 조망은 진입 시
+        // 한 번(selectProject)과 「전체보기」 버튼에서만.
+        async fetchRoster() {
             if (!this.hasProject) return;
             this.loadingRoster = true;
             try {
@@ -284,7 +296,6 @@ export default {
                 this.roster = rows;
                 if (this.pool) {
                     rows.forEach((row) => this.pool.upsert(row));
-                    if (fit) this.pool.fitBounds();
                 }
                 this._refreshCounts();
             } catch (e) {
@@ -543,7 +554,7 @@ export default {
         async _poll() {
             if (!this.hasProject) return;
             try {
-                await this.fetchRoster(false);
+                await this.fetchRoster();
                 await this.fetchRequests();
                 await this.loadBoard();
             } catch (e) {
@@ -639,16 +650,38 @@ export default {
 
         toggleRail() { this.railCollapsed = !this.railCollapsed; },
 
-        // 전체보기. 모바일은 시트가 지도 하단을 가리므로 그만큼 아래 패딩을 준다
-        // (안 그러면 마커가 시트 밑에 깔려 "전체 보기"가 전체를 안 보여준다).
+        // 전체보기 = 지도 중심·배율을 «핀이 그리는 경계»에 맞춘다.
+        //
+        // 🔑 인원핀과 신고핀을 «같은» 경계에 넣는다. 예전에는 인원핀만 맞춰서, 인원이
+        //    한 명도 없는 행사(대부분의 초기 상태)면 경계 자체가 안 잡혀 지도가 서울시청
+        //    기본 좌표에 머물렀다 — 신고가 강원도에 찍혀 있어도 화면 밖이다.
         recenter() {
-            if (!this.pool) return;
-            if (!this.isMobile) { this.pool.fitBounds(); return; }
+            if (!this.map) return;
+            const bounds = new kakao.maps.LatLngBounds();
+            let any = false;
+            if (this.pool && this.pool.extendBounds(bounds)) any = true;
+            if (this.requestPins && this.requestPins.extendBounds(bounds)) any = true;
+            if (!any) return; // 핀이 하나도 없으면 기본 중심을 그대로 둔다
+
+            const p = this._mapPadding();
+            this.map.setBounds(bounds, p.top, p.right, p.bottom, p.left);
+
+            // 핀이 하나거나 서로 붙어 있으면 setBounds 가 최대 배율까지 파고들어
+            // «여기가 어디인지»를 잃는다(주변 지형지물이 화면에서 사라진다).
+            if (typeof this.map.getLevel === 'function' && this.map.getLevel() < MIN_FIT_LEVEL) {
+                this.map.setLevel(MIN_FIT_LEVEL);
+            }
+        },
+
+        // 지도에서 «가려지는» 만큼의 여백. 모바일은 바텀시트가 하단을 덮으므로
+        // 그만큼 아래를 비워야 핀이 시트 밑에 깔리지 않는다.
+        _mapPadding() {
+            if (!this.isMobile) return { top: 24, right: 24, bottom: 24, left: 24 };
             const h = window.innerHeight || 0;
             const bottom = this.sheetSnap === 'full' ? Math.round(h * 0.9)
                 : this.sheetSnap === 'half' ? Math.round(h * 0.45)
                     : 96;
-            this.pool.fitBounds({ top: 24, right: 24, bottom: bottom + 24, left: 24 });
+            return { top: 24, right: 24, bottom: bottom + 24, left: 24 };
         },
 
         // 핸들 탭 = 조망 → 인지 → 상세 → 조망 순환.
