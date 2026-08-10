@@ -7,6 +7,15 @@
 //    한쪽만 남으면 조용히 알림이 안 온다 — 구독은 있는데 서버가 모르거나,
 //    서버는 아는데 브라우저가 구독을 지웠거나. 그래서 실패 시 되돌린다.
 
+// 🔑 앱 안에서는 «전부» 네이티브 경로로 넘긴다. 앱 웹뷰에는 서비스워커가 없어
+//    아래 웹 경로가 전부 불가능하기 때문이다(M-24). 분기를 UI 가 아니라 여기서 하는 이유는
+//    push-toggle.js 가 「상태 판단은 pushStatus() 하나로 모은다」를 전제로 쓰이기 때문 —
+//    UI 가 자체 판단을 갖기 시작하면 «브라우저는 거부인데 화면은 켜짐»이 생긴다.
+
+import {
+    isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
+} from './push-native';
+
 /** VAPID 공개키는 서버가 meta 태그로 심는다(공개키라 노출되어도 무방). */
 export function vapidPublicKey(doc = document) {
     return doc.querySelector('meta[name="vapid-public-key"]')?.content || '';
@@ -46,6 +55,8 @@ export function subscriptionToPayload(subscription) {
  * @returns {Promise<'unsupported'|'denied'|'subscribed'|'default'>}
  */
 export async function pushStatus(env = globalThis) {
+    if (isNativePushSupported(env)) return nativePushStatus(env);
+
     if (!isSupported(env)) return 'unsupported';
 
     // denied 는 페이지에서 되돌릴 수 없다(브라우저 설정에서 직접 풀어야 한다).
@@ -72,6 +83,8 @@ export function isSupported(env = globalThis) {
  * @returns {Promise<{ok: boolean, reason?: string}>}
  */
 export async function enablePush(env = globalThis) {
+    if (isNativePushSupported(env)) return enableNativePush(env);
+
     if (!isSupported(env)) {
         return { ok: false, reason: 'unsupported' };
     }
@@ -120,6 +133,8 @@ export async function enablePush(env = globalThis) {
  * @returns {Promise<{ok: boolean, reason?: string}>}
  */
 export async function disablePush(env = globalThis) {
+    if (isNativePushSupported(env)) return disableNativePush(env);
+
     if (!isSupported(env)) {
         return { ok: false, reason: 'unsupported' };
     }
