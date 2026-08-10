@@ -6,6 +6,17 @@
 > 상시 스테이징 서버는 두지 않는다. 배포 전 검증은 로컬 도커(운영과 동일 구성)로 하고,
 > 배포 리허설·부하테스트(OPS-10)는 **운영 스냅샷에서 임시 인스턴스를 복제해 쓰고 지운다.**
 
+> 🔴 **로컬에서 운영 compose 를 띄울 때는 반드시 `-p` 로 프로젝트를 분리한다.**
+> `docker-compose.prod.yml` 의 `name: gps119_app` 은 개발용 compose 의 기본 프로젝트명
+> (디렉터리명 = `gps119_app`)과 **같다.** 그대로 띄우면 같은 프로젝트로 취급돼서
+> 개발용 컨테이너를 운영 정의로 갈아엎고, 볼륨 `mysql_data` 도 공유한다 — 즉 운영 설정
+> 컨테이너가 **개발 DB** 에 붙는다(`.env.deploy` 의 `MYSQL_*` 는 볼륨이 이미 있으면 무시된다).
+> 이 상태에서 `down -v` 를 치면 개발 DB 가 날아간다.
+> ```bash
+> docker compose -p gps119_rehearsal --env-file .env.deploy -f docker-compose.prod.yml <명령>
+> ```
+> 서버에는 compose 가 하나뿐이라 문제가 없다. **로컬에서만 걸리는 함정이다.**
+
 파일 구성:
 
 | 파일 | 역할 |
@@ -35,6 +46,17 @@ sudo apt update && sudo apt install -y docker.io docker-compose-v2 git certbot
 sudo usermod -aG docker $USER && newgrp docker
 
 git clone <repo> ~/gps119_app && cd ~/gps119_app
+```
+
+**swap 2GB 를 먼저 잡는다.** `deploy.sh` 가 컨테이너 안에서 `npm run build`(Vite + Tailwind 4)
+를 돌리는데, 4GB 인스턴스에서는 여기서 OOM 으로 죽을 수 있다. 죽으면 배포가 **점검 모드를
+켜 둔 채로** 멈추므로(의도된 동작) 서비스가 내려간 상태에서 원인을 찾게 된다.
+
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # 재부팅 후에도 유지
+sudo sysctl -w vm.swappiness=10                              # 디스크 스왑은 최후수단으로만
 ```
 
 ### 1-3. 환경파일 2개
