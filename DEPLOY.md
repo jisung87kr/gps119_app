@@ -47,18 +47,24 @@ cp src/.env.production.example src/.env     # Laravel 전체
 ⚠️ `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` 는 **양쪽에 같은 값**을 넣는다. 어긋나면
 컨테이너는 정상적으로 뜨는데 앱만 DB 접속에 실패한다.
 
+⚠️ **`REVERB_APP_ID/KEY/SECRET` 을 여기서 채운다** — 아래 1-5 의 `npm run build` «전»이어야 한다.
+`VITE_REVERB_APP_KEY` 는 빌드 산출물에 상수로 박히므로, 비운 채 빌드하면 나중에 `.env` 만
+고쳐도 반영되지 않는다(재빌드 필요). 증상은 「화면은 뜨는데 계속 연결중」뿐이라 원인을
+Apache·방화벽에서 찾게 된다. VAPID 공개키는 meta 태그로 나가므로 나중에 채워도 된다.
+
 ### 1-4. TLS 인증서 — **compose 기동보다 먼저**
 
 443 vhost가 인증서 파일을 참조하므로, 인증서가 없으면 Apache가 아예 안 뜬다.
 그런데 갱신용 webroot는 그 Apache가 서빙한다. 그래서 **최초 발급만 standalone**으로 한다.
 
 ```bash
-sudo certbot certonly --standalone -d gps119.example.com \
-     -m admin@example.com --agree-tos --non-interactive
+# -m 은 «실제로 수신되는» 주소여야 한다. 만료 임박 경고가 여기로만 온다.
+sudo certbot certonly --standalone -d gps119.co.kr \
+     -m admin@gps119.co.kr --agree-tos --non-interactive
 
 # 이후 갱신은 webroot 로 전환 (Apache 를 멈추지 않아도 되게)
-sudo certbot certonly --webroot -w ~/gps119_app/src/public -d gps119.example.com \
-     --cert-name gps119.example.com \
+sudo certbot certonly --webroot -w ~/gps119_app/src/public -d gps119.co.kr \
+     --cert-name gps119.co.kr \
      --deploy-hook "cd ~/gps119_app && docker compose --env-file .env.deploy -f docker-compose.prod.yml exec -T app apachectl graceful"
 ```
 
@@ -89,7 +95,7 @@ scp fcm-service-account.json ubuntu@<IP>:~/gps119_app/src/storage/app/
 ### 1-6. 첫 확인
 
 ```bash
-curl -fsS https://gps119.example.com/up          # 200
+curl -fsS https://gps119.co.kr/up          # 200
 dc exec app apachectl -M | grep -E 'proxy_wstunnel|ssl'
 dc logs --tail=50 reverb                          # 데몬 기동 확인
 ```
