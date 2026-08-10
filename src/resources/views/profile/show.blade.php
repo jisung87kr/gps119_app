@@ -132,6 +132,10 @@
                 @endif
                 <x-ui.list-item :href="route('profile.edit')" icon="user"
                                 icon-tone="neutral" icon-size="sm" title="내 정보 수정" />
+                <x-ui.list-item :href="route('legal.privacy')" icon="shield"
+                                icon-tone="neutral" icon-size="sm" title="개인정보처리방침" />
+                <x-ui.list-item :href="route('legal.location-terms')" icon="pin"
+                                icon-tone="neutral" icon-size="sm" title="위치기반서비스 이용약관" />
             </x-ui.list>
         </x-ui.section>
 
