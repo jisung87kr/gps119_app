@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
@@ -65,5 +66,10 @@ class RolePermissionSeeder extends Seeder
         if (!$adminUser->hasRole('admin')) {
             $adminUser->assignRole('admin');
         }
+
+        // ADR-0005: 기본 행사("상시 운영") 보장. 여기서 하는 이유는 created_by 가 NOT NULL 이라
+        // «유저가 생긴 뒤»에만 만들 수 있기 때문이다 — 신규 설치의 migrate 단계에는 유저가 없다.
+        // 멱등(firstOrCreate). 기존 설치는 ensure_default_event_exists 마이그레이션이 담당한다.
+        Project::defaultEvent();
     }
 }
