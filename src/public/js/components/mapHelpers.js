@@ -111,6 +111,48 @@ export function wgs84ToWCONGNAMUL(lat, long) {
     });
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   지도 오버레이 UI (2026-08-10 리뉴얼)
+
+   CustomOverlay 안쪽은 Tailwind 가 닿지 않는다(런타임에 문자열로 심는 DOM이라
+   빌드 시점 스캔 대상이 아니다). 그래서 인라인 스타일로 쓰되, «색은 디자인 토큰의
+   실제 값»을 쓴다. 예전 카드는 파랑/초록 그라디언트(#3b82f6, #10b981)와 slate 회색을
+   썼는데 팔레트에 없는 색이라 화면 나머지와 따로 놀았다.
+
+     ink   50 #fafaf9 · 100 #f2f1ee · 200 #e5e3df · 400 #a7a29a · 500 #79746c · 950 #0e0c0a
+     brand 600 #0e6e7c · 700 #0a5560
+     danger 50 #feecec · 600 #e32f28
+
+   모바일 전용 화면이라 hover 효과는 넣지 않는다(터치엔 hover 가 없고, 예전 코드의
+   onmouseover 트랜스폼은 데스크톱에서만 도는 죽은 코드였다). 대신 :active 로 눌림을 준다.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** 오버레이 버튼 공통 스타일. tone: 'brand' | 'neutral' */
+function overlayButtonStyle(tone) {
+    const palette = tone === 'brand'
+        ? 'background:#0e6e7c;color:#ffffff;'
+        : 'background:#f2f1ee;color:#17140f;';
+
+    return `
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:5px;
+        flex:1 1 0;
+        min-height:40px;
+        padding:9px 12px;
+        border:none;
+        border-radius:14px;
+        font-size:13px;
+        font-weight:700;
+        letter-spacing:-0.01em;
+        text-decoration:none;
+        white-space:nowrap;
+        cursor:pointer;
+        ${palette}
+    `.replace(/\s+/g, ' ').trim();
+}
+
 /**
  * 변환된 WCONGNAMUL 좌표로 '큰지도보기' 앵커 HTML 생성.
  * @param {{x:string, y:string}} wcongnamul
@@ -118,30 +160,16 @@ export function wgs84ToWCONGNAMUL(lat, long) {
  */
 export function buildBigMapButton(wcongnamul) {
     return `
-                            <a href="https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=${wcongnamul.y}&urlX=${wcongnamul.x}"
-                               target="_blank"
-                               style="
-                                   display: inline-flex;
-                                   align-items: center;
-                                   padding: 8px 12px;
-                                   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-                                   color: white;
-                                   text-decoration: none;
-                                   border-radius: 8px;
-                                   font-size: 13px;
-                                   font-weight: 500;
-                                   transition: all 0.2s ease;
-                                   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-                                   border: none;
-                               "
-                               onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.4)'"
-                               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(59, 130, 246, 0.3)'"
-                            >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                </svg>
-                                큰지도보기
-                            </a>`;
+        <a href="https://m.map.kakao.com/actions/detailMapView?locName=요청자&urlY=${wcongnamul.y}&urlX=${wcongnamul.x}"
+           target="_blank" rel="noopener"
+           style="${overlayButtonStyle('neutral')}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M15 3h6v6" /><path d="M10 14 21 3" />
+                <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
+            </svg>
+            큰지도
+        </a>`;
 }
 
 /**
@@ -153,120 +181,61 @@ export function buildBigMapButton(wcongnamul) {
  */
 export function buildRequestInfoWindowContent({ requestLat, requestLong, bigMapButton }) {
     return `
-                    <div style="
-                        position: relative;
-                        padding-bottom: 34px;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        <div style="position:relative;padding-bottom:34px;font-family:inherit;">
+            <div style="
+                position:relative;
+                min-width:238px;
+                padding:14px;
+                background:#ffffff;
+                border-radius:20px;
+                box-shadow:0 12px 32px -12px rgba(14,12,10,0.35), 0 0 0 1px rgba(14,12,10,0.05);
+            ">
+                <button data-overlay-close type="button" aria-label="닫기" style="
+                    position:absolute;top:10px;right:10px;
+                    width:28px;height:28px;padding:0;
+                    display:flex;align-items:center;justify-content:center;
+                    border:none;border-radius:50%;
+                    background:#f2f1ee;color:#79746c;
+                    font-size:14px;line-height:1;cursor:pointer;
+                ">✕</button>
+
+                <div style="display:flex;align-items:center;gap:8px;padding-right:32px;">
+                    <span style="
+                        display:flex;align-items:center;justify-content:center;
+                        width:28px;height:28px;flex:none;
+                        background:#feecec;border-radius:50%;
                     ">
-                        <div style="
-                            position: relative;
-                            background: #ffffff;
-                            border-radius: 14px;
-                            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
-                            padding: 15px;
-                            min-width: 240px;
-                        ">
-                            <button data-overlay-close type="button" aria-label="닫기" style="
-                                position: absolute;
-                                top: 10px;
-                                right: 10px;
-                                width: 24px;
-                                height: 24px;
-                                padding: 0;
-                                border: none;
-                                border-radius: 50%;
-                                background: #f1f5f9;
-                                color: #64748b;
-                                font-size: 13px;
-                                line-height: 1;
-                                cursor: pointer;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            ">✕</button>
-                            <div style="
-                                display: flex;
-                                align-items: center;
-                                margin-bottom: 12px;
-                                padding-bottom: 8px;
-                                padding-right: 28px;
-                                border-bottom: 2px solid #fee2e2;
-                            ">
-                                <div style="
-                                    width: 24px;
-                                    height: 24px;
-                                    background: #dc2626;
-                                    border-radius: 50%;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    margin-right: 8px;
-                                ">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff">
-                                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                                    </svg>
-                                </div>
-                                <span style="
-                                    font-weight: 600;
-                                    font-size: 16px;
-                                    color: #dc2626;
-                                    letter-spacing: -0.02em;
-                                ">요청자 위치</span>
-                            </div>
-                            <div style="
-                                display: flex;
-                                gap: 8px;
-                                flex-wrap: wrap;
-                            ">
-                                ${bigMapButton}
-                                <a href="https://m.map.kakao.com/scheme/route?sp=&sn=&ep=${requestLat},${requestLong}&en=요청자&by=car"
-                                   target="_blank"
-                                   style="
-                                       display: inline-flex;
-                                       align-items: center;
-                                       padding: 8px 12px;
-                                       background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                                       color: white;
-                                       text-decoration: none;
-                                       border-radius: 8px;
-                                       font-size: 13px;
-                                       font-weight: 500;
-                                       transition: all 0.2s ease;
-                                       box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-                                       border: none;
-                                   "
-                                   onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.4)'"
-                                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(16, 185, 129, 0.3)'"
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
-                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                    </svg>
-                                    길찾기
-                                </a>
-                            </div>
-                            <div style="
-                                margin-top: 12px;
-                                padding-top: 8px;
-                                border-top: 1px solid #e2e8f0;
-                                font-size: 11px;
-                                color: #64748b;
-                                text-align: center;
-                            ">
-                                클릭하여 카카오맵으로 이동
-                            </div>
-                        </div>
-                        <div style="
-                            position: absolute;
-                            left: 50%;
-                            bottom: 27px;
-                            width: 14px;
-                            height: 14px;
-                            background: #ffffff;
-                            transform: translateX(-50%) rotate(45deg);
-                            box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.10);
-                        "></div>
-                    </div>
-                `;
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="#e32f28" aria-hidden="true">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+                        </svg>
+                    </span>
+                    <span style="font-size:15px;font-weight:800;letter-spacing:-0.02em;color:#0e0c0a;">
+                        구조 요청 위치
+                    </span>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    ${bigMapButton}
+                    <a href="https://m.map.kakao.com/scheme/route?sp=&sn=&ep=${requestLat},${requestLong}&en=요청자&by=car"
+                       target="_blank" rel="noopener"
+                       style="${overlayButtonStyle('brand')}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 11l19-9-9 19-2-8-8-2Z" />
+                        </svg>
+                        길찾기
+                    </a>
+                </div>
+            </div>
+
+            <div style="
+                position:absolute;left:50%;bottom:27px;
+                width:14px;height:14px;background:#ffffff;
+                transform:translateX(-50%) rotate(45deg);
+                box-shadow:3px 3px 6px rgba(14,12,10,0.08);
+            "></div>
+        </div>
+    `;
 }
 
 /**
@@ -276,31 +245,21 @@ export function buildRequestInfoWindowContent({ requestLat, requestLong, bigMapB
  */
 export function buildReopenButtonContent() {
     return `
-                    <div style="
-                        position: relative;
-                        padding-bottom: 36px;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    ">
-                        <button data-overlay-open type="button" style="
-                            display: inline-flex;
-                            align-items: center;
-                            gap: 5px;
-                            padding: 7px 13px;
-                            border: none;
-                            border-radius: 999px;
-                            background: #dc2626;
-                            color: #ffffff;
-                            font-size: 12px;
-                            font-weight: 600;
-                            white-space: nowrap;
-                            cursor: pointer;
-                            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
-                        ">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff">
-                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                            </svg>
-                            요청 정보
-                        </button>
-                    </div>
-                `;
+        <div style="position:relative;padding-bottom:36px;font-family:inherit;">
+            <button data-overlay-open type="button" style="
+                display:inline-flex;align-items:center;gap:5px;
+                min-height:34px;padding:7px 13px;
+                border:none;border-radius:999px;
+                background:#e32f28;color:#ffffff;
+                font-size:12px;font-weight:700;letter-spacing:-0.01em;
+                white-space:nowrap;cursor:pointer;
+                box-shadow:0 6px 16px -4px rgba(227,47,40,0.45);
+            ">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+                </svg>
+                요청 정보
+            </button>
+        </div>
+    `;
 }

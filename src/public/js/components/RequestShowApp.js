@@ -58,8 +58,14 @@ export default function createRequestShowApp(options = {}) {
                 controlTel: request.controlTel ?? '010-4794-0119',
                 statusWs: 'connecting', // connecting | ws | polling
                 showStageDetail: false,
-                myLat: '33.450701',
-                myLong: '126.570667',
+                // 🔑 내 위치는 «모른다»로 시작한다. 예전엔 제주 좌표(33.45, 126.57)가
+                //    기본값이었는데, setBounds 가 그 «가짜 점»까지 포함해 버려서
+                //    요청지가 강원도면 지도가 강원↔제주를 다 담는 축척으로 열렸다.
+                //    (실제로 보고된 증상 — 요청 마커가 화면 밖으로 나갔다.)
+                //    빈 문자열이면 LocationInfo 의 hasCoords 가 false 라 좌표 줄도 숨는다.
+                myLat: '',
+                myLong: '',
+                myLocated: false,
                 myAddress: '현재 위치를 확인 중입니다...',
                 mapObject: null,
                 requestMarker: null,
@@ -152,9 +158,11 @@ export default function createRequestShowApp(options = {}) {
                     this.toggleOverlay();
                 });
 
-                // 내 위치 마커 (파란색) - 초기에는 표시하지 않음
+                // 내 위치 마커 (파란색) - 초기에는 표시하지 않음.
+                // 위치를 아직 모르므로 요청지를 «자리표시» 좌표로 둔다. 지도에 올리지 않고
+                // setBounds 도 myLocated 전에는 이 마커를 보지 않는다(가짜 점 방지).
                 this.myMarker = new kakao.maps.Marker({
-                    position: new kakao.maps.LatLng(this.myLat, this.myLong),
+                    position: new kakao.maps.LatLng(this.requestLat, this.requestLong),
                     zIndex: 1,
                     image: new kakao.maps.MarkerImage(
                         'data:image/svg+xml;base64,' + btoa(`
@@ -190,6 +198,7 @@ export default function createRequestShowApp(options = {}) {
                     this.myLong = position.coords.longitude;
                     this.myMarker.setPosition(new kakao.maps.LatLng(this.myLat, this.myLong));
                     this.myMarker.setMap(this.mapObject);
+                    this.myLocated = true;   // 이때부터 setBounds 가 내 위치를 포함한다
                     const address = await reverseGeocode(this.myLong, this.myLat);
                     if (address) {
                         this.myAddress = address;
@@ -236,40 +245,76 @@ export default function createRequestShowApp(options = {}) {
             },
             // 바텀시트가 지도 하단을 가리는 만큼 중심을 위로 올려 마커가 보이게 한다.
             // setBounds/포커스처럼 중심을 절대값으로 새로 잡은 직후에만 호출(반복 호출 시 누적 방지).
+            // 시트가 지금 지도 하단을 가리는 높이(px). 접힘 상태는 핸들만 남으므로 0으로 본다.
+            sheetCoveredPx() {
+                const sheet = document.getElementById('bottom-sheet');
+                return this.sheetExpanded && sheet ? sheet.offsetHeight : 0;
+            },
             applySheetOffset() {
                 if (!this.mapObject) return;
-                const sheet = document.getElementById('bottom-sheet');
-                const covered = this.sheetExpanded && sheet ? sheet.offsetHeight : 0;
+                const covered = this.sheetCoveredPx();
                 if (covered > 0) {
                     this.mapObject.panBy(0, covered / 2);
                 }
             },
-            // 바텀시트 펼치기/접기. 슬라이드 후 카카오 지도 타일을 다시 그린다.
+            // 바텀시트 펼치기/접기.
+            //
+            // 🔑 «가려진 높이가 바뀐 만큼만» 중심을 되돌린다. 예전엔 접기 전 중심을 그대로
+            //    복원했는데, 그 중심에는 펼침 상태에서 넣어 둔 보정(panBy(0, covered/2))이
+            //    이미 들어 있었다. 그래서 접어서 지도가 다 보이게 되면 마커가 위로 치우쳐
+            //    「엉뚱한 곳을 보고 있는」 것처럼 됐다. 보정은 «넣었으면 빼야» 한다.
             toggleSheet() {
+                const before = this.sheetCoveredPx();
                 this.sheetExpanded = !this.sheetExpanded;
-                if (this.mapObject) {
-                    const center = this.mapObject.getCenter();
-                    setTimeout(() => {
-                        this.mapObject.relayout();
-                        this.mapObject.setCenter(center);
-                    }, 320);
-                }
+                if (!this.mapObject) return;
+
+                // 트랜지션(duration-300)이 끝난 뒤 계산해야 offsetHeight 가 맞는다.
+                setTimeout(() => {
+                    if (!this.mapObject) return;
+                    const after = this.sheetCoveredPx();
+                    this.mapObject.relayout();
+                    const delta = (after - before) / 2;
+                    if (delta !== 0) this.mapObject.panBy(0, delta);
+                }, 320);
             },
-            showMyLocation() {
-                if (this.myLat && this.myLong) {
-                    this.mapObject.setCenter(new kakao.maps.LatLng(this.myLat, this.myLong));
-                    this.mapObject.setLevel(3);
-                    this.applySheetOffset();
+            // 내 위치를 아직 모르면 «먼저 찾는다». 예전엔 기본값(제주)이 들어 있어
+            // 항상 참이었지만, 이제 모를 때는 빈 값이라 그냥 두면 버튼이 조용히
+            // 아무 일도 하지 않는다 — 눌렀는데 반응이 없는 건 고장으로 읽힌다.
+            async showMyLocation() {
+                if (!this.myLocated) {
+                    await this.getMyLocation();
+                    if (!this.myLocated) return;   // 권한 거부 등 — 오류는 getMyLocation 이 안내한다
                 }
+                this.mapObject.setCenter(new kakao.maps.LatLng(this.myLat, this.myLong));
+                this.mapObject.setLevel(3);
+                this.applySheetOffset();
             },
+            // 보여야 하는 점들이 모두 들어오도록 지도를 맞춘다.
+            //
+            // 🔑 «아는 점만» 넣는다. 내 위치를 모르는 동안 myMarker 를 포함시키면
+            //    자리표시 좌표까지 담느라 축척이 터무니없이 넓어진다.
+            // 🔑 setBounds 가 «계산한 레벨을 덮어쓰지 않는다». 예전엔 바로 뒤에
+            //    setLevel(7) 이 있어서, 두 점이 아무리 가까워도 항상 같은 축척으로
+            //    벌어졌다 — 맞춰 놓고 도로 풀어 버리는 코드였다.
             setBounds() {
-                const markers = [this.requestMarker, this.myMarker];
-                const bounds = new kakao.maps.LatLngBounds();
-                for (let i = 0; i < markers.length; i++) {
-                    bounds.extend(markers[i].getPosition());
+                if (!this.mapObject || !this.requestMarker) return;
+
+                const points = [this.requestMarker.getPosition()];
+                if (this.myLocated && this.myMarker) {
+                    points.push(this.myMarker.getPosition());
                 }
-                this.mapObject.setBounds(bounds);
-                this.mapObject.setLevel(7); // 줌 레벨 설정
+
+                if (points.length === 1) {
+                    this.mapObject.setCenter(points[0]);
+                    this.mapObject.setLevel(4);
+                } else {
+                    const bounds = new kakao.maps.LatLngBounds();
+                    points.forEach((p) => bounds.extend(p));
+                    this.mapObject.setBounds(bounds);
+                    // 두 점이 거의 겹칠 때 과도하게 확대되는 것만 막는다.
+                    if (this.mapObject.getLevel() < 3) this.mapObject.setLevel(3);
+                }
+
                 this.applySheetOffset();
             },
 
