@@ -99,11 +99,16 @@ cd ~/gps119_app
 docker compose --env-file .env.deploy -f docker-compose.prod.yml up -d --build
 
 alias dc='docker compose --env-file .env.deploy -f docker-compose.prod.yml'
-dc exec app php artisan key:generate
+
+# ⚠️ composer 가 «맨 먼저»다. vendor/ 가 없으면 artisan 자체가 뜨지 않아
+#    key:generate 부터 죽는다(리허설에서 실제로 걸렸다).
 dc exec app composer install --no-dev --optimize-autoloader
+dc exec app php artisan key:generate --force
 dc exec app npm ci && dc exec app npm run build
 dc exec app php artisan migrate --force
-dc exec app php artisan db:seed --class=RolePermissionSeeder   # admin@admin.com 생성 → 비밀번호 즉시 변경
+# ⚠️ --force 없이는 production 에서 확인 프롬프트가 뜨고, 비대화형이면 «Command cancelled»
+#    로 조용히 취소된다 — 관리자 계정이 안 생긴 채로 다음 단계로 넘어간다.
+dc exec app php artisan db:seed --class=RolePermissionSeeder --force   # admin@admin.com → 비밀번호 즉시 변경
 dc exec app php artisan push:vapid-keys                        # 출력값을 src/.env 에 기록
 dc exec app php artisan optimize
 ```
@@ -182,4 +187,9 @@ crontab -e
 - **Redis 없음.** 큐·캐시 모두 database 드라이버. 단일 Reverb 전제(ADR-0001)를 유지하며,
   전환 임계는 OPS-10 부하테스트 결과로 정한다
 - **관리형 DB 아님.** 컨테이너 MySQL + 덤프 백업. 유료 고객이 붙으면 RDS 분리를 검토한다
-- **배포 리허설·롤백 리허설 미실시.** OPS-08 완료 조건이며, 첫 행사 전에 임시 인스턴스로 1회 돌려야 한다
+- **배포·롤백 리허설은 «로컬에서» 1회 마쳤다(2026-08-10).** 격리 프로젝트에 저장소를 복제해
+  `deploy.sh` 를 무수정으로 실행 — 배포(백업→점검→체크아웃→빌드→마이그레이션→데몬 재기동→
+  헬스체크)와 롤백(코드 복귀 + DB 복원, 마커 행이 사라지는 것까지)이 모두 통과했다.
+  여기서 잡은 결함 3건은 이 문서와 `deploy.sh` 에 반영돼 있다(롤백 상태파일 파손, 위 1-5 순서 2건).
+  **아직 안 한 것: 실제 인스턴스에서의 리허설.** Let's Encrypt 실발급, 실도메인 DNS,
+  4GB 메모리에서의 빌드, 재부팅 복귀는 로컬로 대체되지 않는다 — 첫 행사 전에 임시 인스턴스로 1회 돌린다
