@@ -1,0 +1,153 @@
+# 운영용 compose (AWS Lightsail 서울, 단일 인스턴스).
+#
+# 🔑 개발용 `docker-compose.yml` 을 «고치지 않고» 별도 파일로 둔다.
+#    한 파일에 프로필로 섞으면 로컬에서 무심코 운영 설정을 띄우거나 그 반대가 되는데,
+#    이 프로젝트는 «로컬인 줄 알고 실서버 DB 를 건드리는» 사고가 정확히 그 지점에서 난다.
+#
+# 실행은 항상 `deploy.sh` 를 경유한다. 직접 쓸 일이 있으면:
+#   docker compose --env-file .env.deploy -f docker-compose.prod.yml <명령>
+#
+# 개발용과 달라진 것 (전부 의도된 것이다):
+#   - db·reverb 의 «호스트 포트 노출 제거» — 외부에서 MySQL/WS 에 직접 못 붙는다
+#   - 비밀번호가 파일에 없다 — `.env.deploy` 에서 주입, 미설정이면 기동 실패
+#   - 전 서비스 `restart: unless-stopped` — 개발용은 app 에 이게 빠져 있어서
+#     재부팅하면 웹만 안 뜬다
+#   - db healthcheck + depends_on condition — app 이 MySQL 보다 먼저 떠서 죽는 것 방지
+#   - 로그 로테이션 — 4GB 인스턴스에서 json 로그로 디스크가 차는 걸 막는다
+#   - TLS 는 mkcert 가 아니라 호스트의 Let's Encrypt(`/etc/letsencrypt`) 를 읽는다
+
+name: gps119_app # 컨테이너 이름을 문서(`gps119_app-app-1`)와 일치시킨다
+
+x-app-image: &app-image
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  image: gps119-app:latest # 세 서비스가 같은 이미지를 공유 (빌드 캐시로 실질 1회)
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-db-env: &db-env
+  DB_HOST: db
+  DB_DATABASE: ${DB_DATABASE:?.env.deploy 에 DB_DATABASE 가 없다}
+  DB_USERNAME: ${DB_USERNAME:?.env.deploy 에 DB_USERNAME 이 없다}
+  DB_PASSWORD: ${DB_PASSWORD:?.env.deploy 에 DB_PASSWORD 가 없다}
+
+services:
+  app:
+    <<: *app-image
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      <<: *db-env
+      # apache-prod.conf 가 `${APP_DOMAIN}` 으로 참조한다. 없으면 Apache 가 기동에 실패한다 —
+      # 조용히 잘못된 도메인으로 뜨는 것보다 낫다.
+      APP_DOMAIN: ${APP_DOMAIN:?.env.deploy 에 APP_DOMAIN 이 없다}
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/apache:/etc/apache2/gps119:ro
+      # 운영 vhost 는 이미지에 기본 활성화된 000-default.conf 를 덮어써서 올린다.
+      # (개발용 apache.conf / apache-ssl.conf 는 여기서 쓰지 않는다)
+      - ./docker/apache/apache-prod.conf:/etc/apache2/sites-available/000-default.conf:ro
+      # 호스트의 certbot 이 발급·갱신한 인증서. 컨테이너는 읽기만 한다.
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - gps-network
+
+  # Laravel Reverb WebSocket 데몬.
+  # 호스트 포트를 열지 않는다 — 클라이언트는 app(Apache) 이 443 에서 /app 을 역프록시한 것만 쓴다.
+  # 이게 `resolveReverbConfig` 의 «동일 오리진» 전제이고, 여길 깨면 VITE_REVERB_HOST 핀 고정으로
+  # 되돌아간다 (그 방식으로 이미 두 번 깨졌다).
+  reverb:
+    <<: *app-image
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    restart: unless-stopped
+    environment:
+      <<: *db-env
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - gps-network
+
+  # 큐 워커 (broadcast + NotifyRescuers + PersistLocationPing).
+  # --max-time 으로 주기적 재기동해 메모리 누수를 끊는다.
+  queue:
+    <<: *app-image
+    command: php artisan queue:work database --queue=default --sleep=1 --tries=3 --max-time=3600
+    restart: unless-stopped
+    environment:
+      <<: *db-env
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - gps-network
+
+  # 스케줄러 — 지금은 예약 작업이 없어 끈다.
+  # OPS-11(`location_pings` 보존기간 자동파기)을 켤 때 주석을 푼다.
+  # 그 잡은 «파괴적»이므로 보존기간(Q2/OI-7) 확정 + 드라이런 전에는 켜지 않는다.
+  # scheduler:
+  #   <<: *app-image
+  #   command: php artisan schedule:work
+  #   restart: unless-stopped
+  #   environment:
+  #     <<: *db-env
+  #   volumes:
+  #     - ./src:/var/www/html
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   logging: *default-logging
+  #   networks:
+  #     - gps-network
+
+  db:
+    image: mysql:8.3
+    restart: unless-stopped
+    # ⚠️ ports 를 열지 않는다. 개발용은 9052 로 열려 있는데, 운영에서 그러면
+    #    공인 IP 에 MySQL 이 그대로 노출된다.
+    command:
+      - --innodb-buffer-pool-size=512M # 4GB 인스턴스 기준. 8GB 로 올리면 1G~1.5G 로.
+      - --max-connections=150
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?}
+      MYSQL_USER: ${DB_USERNAME:?}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?.env.deploy 에 DB_ROOT_PASSWORD 가 없다}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # $$ 는 compose 보간을 피해 컨테이너 셸에 $ 로 전달하기 위한 것이다.
+      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    logging: *default-logging
+    networks:
+      - gps-network
+
+volumes:
+  mysql_data:
+
+networks:
+  gps-network:
+    driver: bridge
