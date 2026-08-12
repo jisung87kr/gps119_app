@@ -23,7 +23,6 @@ class AdminController extends Controller
         $stats = [
             'total_users' => User::count(),
             'total_admins' => User::role('admin')->count(),
-            'total_rescuers' => User::role('rescuer')->count(),
             'total_requests' => RescueRequest::count(),
             'pending_requests' => RescueRequest::where('status', 'pending')->count(),
             'in_progress_requests' => RescueRequest::where('status', 'in_progress')->count(),
@@ -229,7 +228,8 @@ class AdminController extends Controller
     public function memberEdit($id)
     {
         $member = User::findOrFail($id);
-        $roles = ['admin', 'rescuer'];
+        // 시스템 롤은 «일반회원 / 관리자회원» 둘뿐이다. 체크 해제 = 일반회원.
+        $roles = ['admin'];
 
         return view('admin.members.edit', compact('member', 'roles'));
     }
@@ -280,9 +280,7 @@ class AdminController extends Controller
             return response()->json($rescueRequest);
         }
 
-        $rescuers = User::role('rescuer')->get();
-
-        return view('admin.requests.show', compact('rescueRequest', 'rescuers'));
+        return view('admin.requests.show', compact('rescueRequest'));
     }
 
     /**
@@ -326,7 +324,8 @@ class AdminController extends Controller
 
     public function memberCreate()
     {
-        $roles = ['admin', 'rescuer'];
+        // 시스템 롤은 «일반회원 / 관리자회원» 둘뿐이다. 체크 해제 = 일반회원.
+        $roles = ['admin'];
 
         return view('admin.members.create', compact('roles'));
     }

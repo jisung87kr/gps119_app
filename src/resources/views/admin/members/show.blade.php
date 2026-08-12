@@ -61,14 +61,22 @@
                             <p class="text-sm text-slate-500 mb-1.5">역할</p>
                             <div class="flex flex-wrap gap-2">
                                 @if($member->hasRole('admin'))
-                                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자회원</span>
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                 @endif
-                                @if($member->hasRole('rescuer'))
-                                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">구조대</span>
-                                @endif
-                                @if(!$member->hasAnyRole(['admin', 'rescuer']))
-                                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반 사용자</span>
-                                @endif
+                            </div>
+                            {{-- 구조·구급 역할은 «회원 등급»이 아니라 행사별 역할이다.
+                                 행사가 끝나면 그 역할도 끝나므로 여기서 «지금» 값을 보여준다. --}}
+                            <p class="text-sm text-slate-500 mt-3 mb-1.5">행사 역할 (진행 중인 행사)</p>
+                            <div class="flex flex-wrap gap-2">
+                                @forelse($member->eventParticipations()->with('project:id,name')->get()->filter(fn ($p) => $p->project?->isActive()) as $p)
+                                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full {{ $p->role->badgeClasses() }}">
+                                        {{ $p->project->name }} · {{ $p->role->label() }}
+                                    </span>
+                                @empty
+                                    <span class="text-sm text-slate-400">없음</span>
+                                @endforelse
                             </div>
                         </div>
                     </div>
@@ -128,10 +136,11 @@
                             <span class="text-sm font-semibold text-slate-900 tabular-nums">{{ $member->requests_count }}건</span>
                         </div>
 
-                        @if($member->hasRole('rescuer'))
+                        @php ($dispatchCount = \App\Models\Dispatch::where('paramedic_id', $member->id)->count())
+                        @if($dispatchCount > 0)
                             <div class="flex justify-between items-center">
-                                <span class="text-sm text-slate-500">처리한 요청</span>
-                                <span class="text-sm font-semibold text-slate-900 tabular-nums">{{ $member->assigned_requests_count }}건</span>
+                                <span class="text-sm text-slate-500">받은 지령</span>
+                                <span class="text-sm font-semibold text-slate-900 tabular-nums">{{ $dispatchCount }}건</span>
                             </div>
                         @endif
 
@@ -142,8 +151,8 @@
                     </div>
                 </div>
 
-                @if($member->hasRole('rescuer'))
-                    <!-- Assigned Requests -->
+                @if($member->assignedRequests->isNotEmpty())
+                    <!-- Assigned Requests (legacy assigned_rescuer_id — ADR-0003 이전 데이터) -->
                     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
                         <div class="px-6 py-4 border-b border-slate-100">
                             <h3 class="text-base font-semibold text-slate-900">담당 구조 요청</h3>

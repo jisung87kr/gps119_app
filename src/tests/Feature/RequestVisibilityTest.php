@@ -94,17 +94,27 @@ class RequestVisibilityTest extends TestCase
         $this->actingAs($owner)->get("/requests/{$r->id}")->assertOk();
     }
 
-    public function test_admin_and_rescuer_can_open_it(): void
+    public function test_admin_can_open_it(): void
     {
         ['request' => $r] = $this->scenario();
 
         $admin = User::factory()->create();
         $admin->assignRole('admin');
-        $rescuer = User::factory()->create();
-        $rescuer->assignRole('rescuer');
 
         $this->actingAs($admin)->get("/requests/{$r->id}")->assertOk();
-        $this->actingAs($rescuer)->get("/requests/{$r->id}")->assertOk();
+    }
+
+    /**
+     * 「모든 신고 열람」은 관리자만이다(2026-08-12). 상시 구급 인력은 「상시 운영」
+     * 행사의 구급대가 됐고, 그 사람은 «자기에게 배정된 건»과 «자기 행사»만 보면 된다.
+     */
+    public function test_a_paramedic_of_another_event_cannot_open_it(): void
+    {
+        ['request' => $r] = $this->scenario();
+        $otherProject = Project::factory()->create(['created_by' => User::factory()->create()->id]);
+
+        $this->actingAs($this->inEvent($otherProject, EventRole::PARAMEDIC))
+            ->get("/requests/{$r->id}")->assertForbidden();
     }
 
     public function test_the_events_control_room_can_open_it(): void

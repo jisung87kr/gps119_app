@@ -164,13 +164,17 @@ class Request extends Model
      *
      * 볼 수 있는 사람:
      *  - 신고자 본인 (상태 추적)
-     *  - 시스템 admin / rescuer
+     *  - 시스템 관리자
      *  - 그 행사의 상황실(controller) — 관제 판단에 필요
      *  - 그 신고에 배정된(또는 배정됐던) 대원 — 자기 출동 건이다
+     *
+     * 「모든 신고 열람」은 관리자만이다(2026-08-12). 예전에는 시스템 롤 rescuer 도
+     * 전부 볼 수 있었는데, 그 롤이 사라지면서 상시 인력은 「상시 운영」 행사의 구급대가
+     * 됐다 — 자기에게 배정된 건과 자기 행사만 보면 된다.
      */
     public function isVisibleTo(User $user): bool
     {
-        if ($this->isOwner($user) || $user->hasRole('admin') || $user->hasRole('rescuer')) {
+        if ($this->isOwner($user) || $user->hasRole('admin')) {
             return true;
         }
 

@@ -83,13 +83,18 @@ class RoleBasedLandingTest extends TestCase
         $this->assertSame(route('dispatches.index'), $this->landing->for($user));
     }
 
-    public function test_system_rescuer_without_any_event_still_lands_on_dispatch_home(): void
+    /**
+     * 시스템 롤 rescuer 는 2026-08-12 에 없앴다. 상시 구급 인력은 「상시 운영」 행사의
+     * 구급대이고, 그 행사는 항상 활성이라 착지도 그 행사의 지령 화면이 된다.
+     */
+    public function test_a_paramedic_of_the_always_on_event_lands_on_its_dispatch_screen(): void
     {
         $user = User::factory()->create();
-        $user->assignRole('rescuer');
+        $user->assignRole('user');
+        $always = Project::defaultEvent();
+        $this->inEvent($user, EventRole::PARAMEDIC, $always);
 
-        // 구조대 계정은 「내가 신고한 0건」 화면을 보면 안 된다 — 그게 피드백 #4 다.
-        $this->assertSame(route('dispatches.index'), $this->landing->for($user));
+        $this->assertSame(route('events.dispatch', $always->id), $this->landing->for($user));
     }
 
     /**
@@ -105,14 +110,20 @@ class RoleBasedLandingTest extends TestCase
         }
     }
 
-    public function test_volunteer_medic_lands_on_the_dispatch_screen(): void
+    /**
+     * 🔑 현장 요구(#6)는 「자원봉사(구급) → 구조요청 화면」이다. 처음엔 착지 판정에
+     *    canReceiveDispatch()(구급대+자원봉사구급)를 써서 지령 화면으로 보냈는데,
+     *    #5 로 배정 후보에서도 빠졌으니 새 지령이 갈 일이 없다. 판정을
+     *    isDispatchCandidate()(구급대만)로 바로잡았다.
+     *    지령 «화면 접근» 자격(canReceiveDispatch)은 진행 중 지령을 위해 남아 있다.
+     */
+    public function test_volunteer_medic_lands_on_the_request_screen(): void
     {
-        // 배정 «후보»에서는 빠졌지만(피드백 #5) 지령 수령 «자격»은 남아 있다 —
-        // 진행 중인 지령을 가진 사람이 자기 화면에 못 들어가면 그 지령이 고아가 된다.
         $user = User::factory()->create();
-        $project = $this->inEvent($user, EventRole::VOLUNTEER_MEDIC);
+        $this->inEvent($user, EventRole::VOLUNTEER_MEDIC);
 
-        $this->assertSame(route('events.dispatch', $project->id), $this->landing->for($user));
+        $this->assertSame(route('request.create'), $this->landing->for($user));
+        $this->assertTrue(EventRole::VOLUNTEER_MEDIC->canReceiveDispatch());
     }
 
     public function test_a_finished_event_no_longer_decides_the_landing(): void
@@ -163,22 +174,46 @@ class RoleBasedLandingTest extends TestCase
         $this->assertNull(session('url.intended'));
     }
 
-    // ── 구조대 계정의 신고 차단 (#4) ──────────────────────────
+    // ── 구급대의 신고 차단 (#4) ───────────────────────────────
+    //
+    // 판정 기준이 시스템 롤 rescuer 에서 «지금 행사에서 구급대인가»로 바뀌었다
+    // (2026-08-12, 회원 권한을 일반/관리자 둘로 정리하면서).
 
-    public function test_rescuer_cannot_open_the_request_form(): void
+    /** 행사 중인 구급대를 만든다. */
+    private function onDutyParamedic(): User
     {
         $user = User::factory()->create(['phone' => '01011112222']);
-        $user->assignRole('rescuer');
+        $user->assignRole('user');
+        $this->inEvent($user, EventRole::PARAMEDIC);
+
+        return $user;
+    }
+
+    public function test_an_on_duty_paramedic_cannot_open_the_request_form(): void
+    {
+        $user = $this->onDutyParamedic();
 
         $this->actingAs($user)->get('/requests/create')
             ->assertForbidden()
-            ->assertSee('구조대 계정입니다');
+            ->assertSee('구급대 계정입니다');
+    }
+
+    /**
+     * 🔑 행사가 끝나면 그 사람도 평범한 사용자로 돌아가 신고할 수 있다.
+     *    비번기에도 신고를 못 하는 건 부작용이지 의도가 아니었다.
+     */
+    public function test_the_same_person_can_file_once_the_event_ends(): void
+    {
+        $user = $this->onDutyParamedic();
+        $user->eventParticipations()->first()->project
+            ->forceFill(['start_date' => now()->subDays(10), 'end_date' => now()->subDays(3)])->save();
+
+        $this->actingAs($user)->get('/requests/create')->assertOk();
     }
 
     public function test_the_block_screen_still_offers_a_way_to_get_help(): void
     {
-        $user = User::factory()->create(['phone' => '01011112222']);
-        $user->assignRole('rescuer');
+        $user = $this->onDutyParamedic();
 
         // 🔑 막다른 길이면 안 된다. 구급대원 본인이 코스에서 쓰러지는 것은 이 도메인의
         //    실제 사고 유형이고, 그때 그 사람은 앱을 다시 배울 수 없다.
@@ -187,10 +222,9 @@ class RoleBasedLandingTest extends TestCase
             ->assertSee('상황실 전화');
     }
 
-    public function test_rescuer_is_blocked_on_the_project_request_form_too(): void
+    public function test_a_paramedic_is_blocked_on_the_project_request_form_too(): void
     {
-        $user = User::factory()->create(['phone' => '01011112222']);
-        $user->assignRole('rescuer');
+        $user = $this->onDutyParamedic();
         $project = Project::factory()->create(['created_by' => User::factory()->create()->id]);
 
         $this->actingAs($user)->get("/requests/create/{$project->slug}")
@@ -209,10 +243,9 @@ class RoleBasedLandingTest extends TestCase
      * 🔑 화면만 막으면 API 는 그대로 열려 있다. 이 앱의 신고는 JSON 한 번이면 만들어진다 —
      *    「기능 자체를 차단」이라는 결정을 지키려면 규칙이 서비스에 있어야 한다.
      */
-    public function test_rescuer_cannot_file_through_the_api_either(): void
+    public function test_a_paramedic_cannot_file_through_the_api_either(): void
     {
-        $user = User::factory()->create(['phone' => '01011112222']);
-        $user->assignRole('rescuer');
+        $user = $this->onDutyParamedic();
 
         $this->actingAs($user)->postJson('/api/requests', [
             'latitude' => 37.5665,
@@ -238,7 +271,8 @@ class RoleBasedLandingTest extends TestCase
     public function test_the_dispatch_side_gets_the_dispatch_home(): void
     {
         $user = User::factory()->create();
-        $user->assignRole('rescuer');
+        $user->assignRole('user');
+        $this->inEvent($user, EventRole::PARAMEDIC);
 
         $this->actingAs($user)->get('/dashboard')->assertRedirect(route('dispatches.index'));
         $this->actingAs($user)->get('/dispatches')
@@ -259,12 +293,13 @@ class RoleBasedLandingTest extends TestCase
 
     public function test_the_tab_bar_swaps_only_the_middle_slot(): void
     {
-        $rescuer = User::factory()->create();
-        $rescuer->assignRole('rescuer');
+        $paramedic = User::factory()->create();
+        $paramedic->assignRole('user');
+        $this->inEvent($paramedic, EventRole::PARAMEDIC);
         $ordinary = User::factory()->create();
         $ordinary->assignRole('user');
 
-        $this->actingAs($rescuer)->get('/dispatches')
+        $this->actingAs($paramedic)->get('/dispatches')
             ->assertSee('프로필')
             ->assertDontSee('구조요청');
 

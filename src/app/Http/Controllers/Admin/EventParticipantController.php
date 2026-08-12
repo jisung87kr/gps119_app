@@ -18,7 +18,7 @@ use RuntimeException;
 /**
  * 관리자용 행사 참가자·역할 관리 (EventRole).
  *
- * 회원관리(시스템 역할: admin/rescuer/user)와는 별개인 "행사 내 역할"을 관리한다.
+ * 회원관리(시스템 역할: 일반회원/관리자회원)와는 별개인 "행사 내 역할"을 관리한다.
  * 실무 배정은 EventParticipantService::assignRole 로 위임(단일 writer).
  */
 class EventParticipantController extends Controller

@@ -5,7 +5,8 @@ namespace App\Enums;
 /**
  * 행사(프로젝트) 내 참가자 역할 (SPEC-02a).
  *
- * 시스템 전역 역할(spatie: admin/rescuer/user)과는 별개의 "행사 내 역할"이다.
+ * 시스템 전역 역할(spatie: user/admin)과는 별개의 "행사 내 역할"이다.
+ * 구조·구급 인력은 «전부» 이쪽으로 표현된다 — 시스템 롤 rescuer 는 2026-08-12 에 없앴다.
  * 채널 인가·지령 배정 적격 판정에 사용한다.
  */
 enum EventRole: string

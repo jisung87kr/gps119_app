@@ -38,10 +38,13 @@
                 <p class="text-sm font-bold text-ink-900">{{ $user->created_at->format('Y년 m월 d일') }}</p>
             </div>
 
-            @if ($user->hasRole('rescuer'))
+            {{-- 계정 권한은 «회원 등급»이 아니라 지금 맡은 «행사 역할»을 보여준다.
+                 시스템 롤은 일반/관리자 둘뿐이라 일반 사용자에게 알릴 것이 없다. --}}
+            @php ($eventRole = $user->activeEventRole())
+            @if ($eventRole)
                 <div class="mt-2.5 flex items-center justify-between rounded-xl bg-ink-50 px-4 py-3">
-                    <p class="text-sm font-bold text-ink-500">계정 권한</p>
-                    <x-ui.badge tone="brand" size="sm" icon="ambulance">구조대원</x-ui.badge>
+                    <p class="text-sm font-bold text-ink-500">행사 역할</p>
+                    <x-ui.badge tone="brand" size="sm" :icon="$eventRole->icon()">{{ $eventRole->label() }}</x-ui.badge>
                 </div>
             @endif
 
@@ -77,11 +80,12 @@
         @endif
 
         {{-- 활동 통계 --}}
-        <div @class(['grid gap-3', 'grid-cols-2' => $user->hasRole('rescuer')])>
+        <div @class(['grid gap-3', 'grid-cols-2' => $user->usesDispatchHome()])>
             <x-ui.stat label="총 구조 요청" :value="$user->requests()->count()" />
-            @if ($user->hasRole('rescuer'))
-                <x-ui.stat label="처리 완료"
-                           :value="$user->assignedRequests()->where('status', \App\Enums\RequestStatus::COMPLETED->value)->count()" />
+            @if ($user->usesDispatchHome())
+                {{-- 출동 실적은 legacy assigned_rescuer_id 가 아니라 지령(dispatches) 기준이다. --}}
+                <x-ui.stat label="출동 완료"
+                           :value="\App\Models\Dispatch::where('paramedic_id', $user->id)->where('status', \App\Enums\DispatchStatus::COMPLETED)->count()" />
             @endif
         </div>
 

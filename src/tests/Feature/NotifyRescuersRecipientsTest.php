@@ -144,7 +144,6 @@ class NotifyRescuersRecipientsTest extends TestCase
         $project = Project::factory()->create(['created_by' => $owner->id]);
 
         $both = User::factory()->create();
-        $both->assignRole('rescuer');
         $both->assignRole('admin');
         EventParticipant::create([
             'project_id' => $project->id,

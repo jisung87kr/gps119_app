@@ -43,14 +43,18 @@ class LandingResolver
             return route('control', ['project' => $control->project_id]);
         }
 
-        // 구급 인력 — 지령 화면. 시스템 롤 rescuer 도 여기로 본다(현장 결정 2026-08-12).
-        $dispatchable = $participations->filter(fn ($p) => $p->role->canReceiveDispatch());
+        // 구급대 — 지령 화면.
+        //
+        // 🔑 canReceiveDispatch()(구급대 + 자원봉사구급)가 아니라 isDispatchCandidate()
+        //    (구급대만)다. 자원봉사(구급)는 배정 후보에서 빠졌으므로 새 지령이 갈 일이
+        //    없고, 현장 요구도 「자원봉사(구급) → 구조요청 화면」이다.
+        $dispatchable = $participations->filter(fn ($p) => $p->role->isDispatchCandidate());
         if ($dispatchable->count() === 1) {
             return route('events.dispatch', $dispatchable->first()->project_id);
         }
-        if ($dispatchable->count() > 1 || $user->hasRole('rescuer')) {
+        if ($dispatchable->count() > 1) {
             // 🔑 행사가 둘 이상이면 «직행하지 않는다». 잘못된 현장을 여는 비용이
-            //    탭 한 번보다 훨씬 크다. 행사가 0개인 rescuer 도 여기서 빈 상태를 본다.
+            //    탭 한 번보다 훨씬 크다.
             return route('dispatches.index');
         }
 

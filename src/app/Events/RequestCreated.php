@@ -28,7 +28,8 @@ class RequestCreated implements ShouldBroadcast, ShouldDispatchAfterCommit
      * 브로드캐스트 대상 채널 (OI-1 확정 반영 / SPEC-05b 정정6).
      *
      * - project_id 있는 행사 신고 → 해당 행사 관제 채널(event.{id}.control)
-     * - project_id 없는 일반 신고 → 전역 채널(requests.global, 시스템 admin·rescuer 구독)
+     * - project_id 없는 일반 신고 → 전역 채널(requests.global). ADR-0005 이후로는 도달 불가
+     *   («모든 신고는 행사에 소속»). 방어적으로만 남긴다.
      *
      * 기존 new Channel('requests') + PrivateChannel('rescuers') 는 ADR-0004대로 제거.
      *
@@ -46,7 +47,7 @@ class RequestCreated implements ShouldBroadcast, ShouldDispatchAfterCommit
     /**
      * 브로드캐스트 페이로드 (SPEC-05b 최소 페이로드).
      *
-     * control / global 은 신뢰 채널(admin·rescuer·controller 만 인가)이므로
+     * control / global 은 신뢰 채널(admin·controller 만 인가)이므로
      * 연락처(requester.phone) 포함 가능 — ADR-0004 위배 아님.
      *
      * @return array<string, mixed>

@@ -21,9 +21,8 @@
     // 🔑 탭은 «세 개 고정»이고 가운데 자리만 역할에 따라 바뀐다 (현장 피드백 #6).
     //    개수를 바꾸면 같은 사람이 행사마다 다른 탭 수를 보게 되어 근육 기억이 깨진다.
     //
-    //    판정은 시스템 롤이 아니라 «지금 활성 행사에서의 역할»이 우선이다 — 행사가
-    //    끝나면 구급대원도 평범한 사용자로 돌아간다. 다만 시스템 롤 rescuer 는
-    //    행사와 무관한 상시 구급 인력이라 함께 본다(2026-08-12 결정).
+    //    판정은 «지금 활성 행사에서의 역할»이다 — 행사가 끝나면 구급대원도 평범한
+    //    사용자로 돌아간다. 시스템 롤은 일반/관리자 둘뿐이라 여기서 볼 것이 없다.
     $user = auth()->user();
     $eventRole = $user?->activeEventRole();
     $isDispatchSide = (bool) $user?->usesDispatchHome();
@@ -40,7 +39,7 @@
             ->where('status', \App\Enums\ParticipantStatus::ACTIVE)
             ->whereHas('project', fn ($q) => $q->active())
             ->get()
-            ->filter(fn ($p) => $p->role->canReceiveDispatch());
+            ->filter(fn ($p) => $p->role->isDispatchCandidate());
 
         $middle = $only->count() === 1
             ? ['key' => 'work', 'label' => '지령', 'icon' => 'ambulance', 'url' => route('events.dispatch', $only->first()->project_id)]

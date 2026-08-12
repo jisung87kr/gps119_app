@@ -23,10 +23,11 @@ Route::view('/privacy', 'legal.privacy')->name('legal.privacy');
 Route::view('/location-terms', 'legal.location-terms')->name('legal.location-terms');
 
 Route::get('/requests/create', function () {
-    // 구조대(시스템 롤 rescuer) 계정은 신고를 «올리지» 않는다 — 지령만 받는다.
+    // 지금 «행사 중인 구급대»는 신고를 «올리지» 않는다 — 지령만 받는다.
     // (2026-08-12 현장 결정. 차단 화면이 119·상황실 전화를 대신 제공한다.)
-    if (Auth::user()->hasRole('rescuer')) {
-        return response()->view('errors.rescuer-no-request', [
+    // 행사가 끝나면 그 사람도 평범한 사용자로 돌아가 신고할 수 있다.
+    if (Auth::user()->usesDispatchHome()) {
+        return response()->view('errors.paramedic-no-request', [
             'controlTel' => '010-4794-0119',
         ], 403);
     }
@@ -42,8 +43,8 @@ Route::get('/requests/create', function () {
 Route::get('/requests/create/{slug}', function ($slug) {
     $project = \App\Models\Project::where('slug', $slug)->firstOrFail();
 
-    if (Auth::user()->hasRole('rescuer')) {
-        return response()->view('errors.rescuer-no-request', [
+    if (Auth::user()->usesDispatchHome()) {
+        return response()->view('errors.paramedic-no-request', [
             'project' => $project,
             'controlTel' => data_get($project->settings, 'emergency_tel', '010-4794-0119'),
         ], 403);

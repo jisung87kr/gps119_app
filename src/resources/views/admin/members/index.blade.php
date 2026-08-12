@@ -33,8 +33,8 @@
                     </div>
                     <select name="role" class="px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
                         <option value="">모든 역할</option>
-                        <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>관리자</option>
-                        <option value="rescuer" {{ request('role') === 'rescuer' ? 'selected' : '' }}>구조대</option>
+                        <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>관리자회원</option>
+                        <option value="user" {{ request('role') === 'user' ? 'selected' : '' }}>일반회원</option>
                     </select>
                     <div class="flex gap-2">
                         {{--
@@ -71,13 +71,10 @@
                             </div>
                             <div class="flex flex-wrap justify-end gap-1 flex-none">
                                 @if($member->hasRole('admin'))
-                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자회원</span>
                                 @endif
-                                @if($member->hasRole('rescuer'))
-                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">구조대</span>
-                                @endif
-                                @if(!$member->hasAnyRole(['admin', 'rescuer']))
-                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">사용자</span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                 @endif
                             </div>
                         </div>
@@ -148,13 +145,10 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex flex-wrap gap-1">
                                         @if($member->hasRole('admin'))
-                                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자</span>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자회원</span>
                                         @endif
-                                        @if($member->hasRole('rescuer'))
-                                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">구조대</span>
-                                        @endif
-                                        @if(!$member->hasAnyRole(['admin', 'rescuer']))
-                                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">사용자</span>
+                                        @else
+                                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                         @endif
                                     </div>
                                 </td>

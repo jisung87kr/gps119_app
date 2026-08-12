@@ -137,9 +137,7 @@
                                        {{ in_array($role, old('roles', [])) ? 'checked' : '' }}>
                                 <label for="role_{{ $role }}" class="ml-2 block text-sm text-slate-700">
                                     @if($role === 'admin')
-                                        관리자
-                                    @elseif($role === 'rescuer')
-                                        구조대원
+                                        관리자회원
                                     @else
                                         {{ $role }}
                                     @endif

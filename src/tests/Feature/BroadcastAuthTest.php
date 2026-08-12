@@ -15,7 +15,8 @@ use Tests\TestCase;
  * BE-0.1 / FE-0.1 — 채널 인가 콜백 검증 (SPEC-05a, Phase 0 잠정 규칙).
  *
  * /broadcasting/auth 의 인가 판정은 routes/channels.php 의 채널 콜백이 담당한다.
- * Phase 0 잠정 인가: requests.global / event.{id}.control 모두 admin·rescuer 통과, 그 외 거부.
+ * requests.global / event.{id}.control 인가. 시스템 롤로는 «관리자»만 통과한다
+ * (rescuer 롤은 2026-08-12 에 없앴다 — 대응 인력은 행사 역할로 표현된다).
  *
  * 콜백을 직접 실행하여 검증한다(impl-tasks: "Broadcast::channel 인가 콜백 직접 호출").
  * 이렇게 하면 브로드캐스터 드라이버(null/reverb) 구성과 무관하게 인가 규칙만 단위 검증된다.
@@ -66,12 +67,20 @@ class BroadcastAuthTest extends TestCase
         $this->assertTrue($this->authorizeChannel($admin, 'requests.global'));
     }
 
-    public function test_rescuer_passes_requests_global(): void
+    /**
+     * 「상시 운영」 행사의 구급대(예전 rescuer)는 이제 전역 채널을 구독하지 않는다.
+     * 그 사람의 신고 통지는 «그 행사» 스코프로 온다 — 전역은 관리자만이다.
+     */
+    public function test_a_paramedic_does_not_pass_requests_global(): void
     {
-        $rescuer = User::factory()->create();
-        $rescuer->assignRole('rescuer');
+        $medic = User::factory()->create();
+        $medic->assignRole('user');
+        EventParticipant::factory()->paramedic()->create([
+            'project_id' => \App\Models\Project::defaultEvent()->id,
+            'user_id' => $medic->id,
+        ]);
 
-        $this->assertTrue($this->authorizeChannel($rescuer, 'requests.global'));
+        $this->assertFalse($this->authorizeChannel($medic, 'requests.global'));
     }
 
     public function test_regular_user_denied_requests_global(): void
@@ -136,16 +145,16 @@ class BroadcastAuthTest extends TestCase
         $this->assertFalse($this->authorizeChannel($controller, "event.{$project->id}.control"));
     }
 
-    /** 비참가 일반 사용자(시스템 rescuer 포함)는 control 불통과 */
+    /** 비참가 일반 사용자는 control 불통과 */
     public function test_non_participant_denied_event_control(): void
     {
         $owner = User::factory()->create();
         $project = Project::factory()->create(['created_by' => $owner->id]);
 
-        $rescuer = User::factory()->create();
-        $rescuer->assignRole('rescuer');
+        $stranger = User::factory()->create();
+        $stranger->assignRole('user');
 
-        $this->assertFalse($this->authorizeChannel($rescuer, "event.{$project->id}.control"));
+        $this->assertFalse($this->authorizeChannel($stranger, "event.{$project->id}.control"));
     }
 
     /**

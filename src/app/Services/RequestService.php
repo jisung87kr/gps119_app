@@ -17,7 +17,7 @@ class RequestService
 
     public function getAllRequests(User $user): Collection
     {
-        if ($user->hasRole('admin') || $user->hasRole('rescuer')) {
+        if ($user->hasRole('admin')) {
             return Request::with(['user', 'assignedRescuer'])
                 ->orderBy('priority', 'desc')
                 ->orderBy('requested_at', 'desc')
@@ -29,12 +29,15 @@ class RequestService
 
     public function createRequest(array $data, User $user): Request
     {
-        // 🔑 구조대(시스템 롤 rescuer) 계정은 신고를 올릴 수 없다 (2026-08-12 현장 결정).
+        // 🔑 «지금 행사 중인 구급대»는 신고를 올릴 수 없다 (2026-08-12 현장 결정).
         //    화면만 숨기면 API 는 그대로 열려 있고, 이 앱의 신고는 JSON 한 번이면 만들어진다.
         //    「기능 자체를 차단」이라는 결정을 지키려면 규칙이 서비스에 있어야 한다.
         //    (본인이 도움이 필요하면 119·상황실 전화 — 차단 화면이 그 두 개를 준다.)
-        if ($user->hasRole('rescuer')) {
-            throw new \RuntimeException('구조대 계정은 구조요청을 접수할 수 없습니다. 119 또는 상황실로 전화해 주세요.');
+        //
+        // 판정 기준이 시스템 롤에서 «행사 역할»로 바뀌었다. 행사가 끝나면 그 사람도
+        // 평범한 사용자로 돌아가 신고할 수 있다 — 비번기에도 못 하는 건 부작용이었다.
+        if ($user->usesDispatchHome()) {
+            throw new \RuntimeException('구급대 계정은 구조요청을 접수할 수 없습니다. 119 또는 상황실로 전화해 주세요.');
         }
 
         // type 미지정 시 기본값(other). priority 미지정 시 type->defaultPriority() 자동 매핑.
@@ -73,7 +76,7 @@ class RequestService
      */
     public function updateRequest(Request $request, array $data, User $user): Request
     {
-        if (! $user->hasRole('admin') && ! $user->hasRole('rescuer') && ! $request->isOwner($user)) {
+        if (! $user->hasRole('admin') && ! $request->isOwner($user)) {
             throw new \Exception('Unauthorized to update this request');
         }
 
@@ -200,28 +203,6 @@ class RequestService
                 '이미 구조대가 배정되어 직접 취소할 수 없습니다. 상황실로 전화해 주세요.'
             );
         }
-    }
-
-    /**
-     * @deprecated ADR-0003 — DispatchService::assign 으로 대체. 레거시 라우트만 잠정 유지.
-     */
-    public function assignRescuer(Request $request, User $rescuer, User $admin): Request
-    {
-        if (! $admin->hasRole('admin') && ! $admin->hasRole('rescuer')) {
-            throw new \Exception('Unauthorized to assign rescuer');
-        }
-
-        if (! $rescuer->hasRole('rescuer')) {
-            throw new \Exception('Selected user is not a rescuer');
-        }
-
-        $request->update([
-            'assigned_rescuer_id' => $rescuer->id,
-            'status' => RequestStatus::IN_PROGRESS,
-            'responded_at' => now(),
-        ]);
-
-        return $request->fresh(['user', 'assignedRescuer']);
     }
 
     public function getRequestById(int $id, User $user): Request

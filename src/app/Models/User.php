@@ -98,7 +98,7 @@ class User extends Authenticatable
      * 화면 구성(하단 탭·착지)의 판정 기준이다. 시스템 롤이 아니라 행사 역할을 보는 이유는
      * 행사가 끝나면 그 역할도 끝나기 때문이다 — 구급대원도 비번기엔 평범한 사용자다.
      *
-     * 우선순위는 「지금 이 사람이 하는 일」 순: 상황실 > 구급대 > 자원봉사(구급) > 그 외.
+     * 우선순위는 「지금 이 사람이 하는 일」 순: 상황실 > 구급대 > 그 외.
      */
     public function activeEventRole(): ?EventRole
     {
@@ -109,7 +109,7 @@ class User extends Authenticatable
             ->map(fn ($r) => $r instanceof EventRole ? $r : EventRole::tryFrom($r))
             ->filter();
 
-        foreach ([EventRole::CONTROLLER, EventRole::PARAMEDIC, EventRole::VOLUNTEER_MEDIC] as $priority) {
+        foreach ([EventRole::CONTROLLER, EventRole::PARAMEDIC] as $priority) {
             if ($roles->contains($priority)) {
                 return $priority;
             }
@@ -126,7 +126,11 @@ class User extends Authenticatable
      */
     public function usesDispatchHome(): bool
     {
-        return $this->hasRole('rescuer') || (bool) $this->activeEventRole()?->canReceiveDispatch();
+        // 🔑 canReceiveDispatch()(구급대 + 자원봉사구급)가 아니라 isDispatchCandidate()
+        //    (구급대만)로 판정한다. 자원봉사(구급)는 배정 후보에서 빠졌으므로 새 지령이
+        //    갈 일이 없고, 현장 요구도 「자원봉사(구급) → 구조요청 화면」이다.
+        //    자격(canReceiveDispatch)은 진행 중인 지령 화면 접근용으로만 남는다.
+        return (bool) $this->activeEventRole()?->isDispatchCandidate();
     }
 
     /**

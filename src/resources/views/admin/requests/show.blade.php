@@ -151,19 +151,9 @@
                             </select>
                         </div>
 
-                        <div>
-                            <label for="assigned_rescuer_id" class="block text-sm font-medium text-slate-700 mb-1.5">담당 구조대원</label>
-                            <select name="assigned_rescuer_id" id="assigned_rescuer_id"
-                                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
-                                <option value="">미배정</option>
-                                @foreach($rescuers as $rescuer)
-                                    <option value="{{ $rescuer->id }}"
-                                            {{ $rescueRequest->assigned_rescuer_id == $rescuer->id ? 'selected' : '' }}>
-                                        {{ $rescuer->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                        {{-- 담당 배정 셀렉트를 없앴다. 배정은 ADR-0003 이후 «지령(Dispatch)»이
+                             단일 출처이고, 이 셀렉트는 legacy assigned_rescuer_id 를 직접 건드려
+                             지령 보드와 어긋난 값을 만들었다. 배정은 실시간 관제 화면에서 한다. --}}
 
                         <button type="submit"
                                 class="w-full inline-flex items-center justify-center gap-1.5 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm shadow-blue-600/20 transition-colors">
