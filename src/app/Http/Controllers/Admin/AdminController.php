@@ -297,7 +297,6 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', 'in:pending,in_progress,completed,cancelled'],
-            'assigned_rescuer_id' => ['nullable', 'exists:users,id'],
             'cancel_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -309,9 +308,12 @@ class AdminController extends Controller
                     $validated['cancel_reason'] ?? '관리자 취소'
                 );
             } else {
+                // 🔑 assigned_rescuer_id 를 «건드리지 않는다». 예전에는 폼의 배정 셀렉트
+                //    값을 그대로 덮어썼는데, 그 셀렉트를 없앤 뒤에도 코드가 남아 있으면
+                //    상태만 바꿔도 기존 담당자 기록이 조용히 null 로 지워진다.
+                //    배정은 ADR-0003 이후 지령(Dispatch)이 단일 출처다.
                 $requestService->updateRequest($rescueRequest, [
                     'status' => RequestStatus::from($validated['status']),
-                    'assigned_rescuer_id' => $validated['assigned_rescuer_id'] ?? null,
                 ], $request->user());
             }
         } catch (\Exception $e) {

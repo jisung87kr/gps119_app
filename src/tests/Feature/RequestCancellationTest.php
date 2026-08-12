@@ -240,6 +240,25 @@ class RequestCancellationTest extends TestCase
         $this->assertSame('잘못 눌렀습니다', $r->fresh()->cancel_reason);
     }
 
+    /**
+     * 🔴 관리자 화면에서 «상태만» 바꿨는데 담당자 기록이 지워지면 안 된다.
+     *    배정 셀렉트를 없앤 뒤에도 컨트롤러가 그 필드를 계속 덮어쓰고 있었다.
+     */
+    public function test_an_admin_status_change_does_not_wipe_the_legacy_assignee(): void
+    {
+        ['request' => $r, 'paramedic' => $p] = $this->scenario();
+        $r->forceFill(['assigned_rescuer_id' => $p->id])->save();
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin)
+            ->patch("/admin/requests/{$r->id}", ['status' => 'completed'])
+            ->assertRedirect();
+
+        $this->assertSame($p->id, $r->fresh()->assigned_rescuer_id);
+    }
+
     public function test_admin_screen_cancellation_goes_through_the_service(): void
     {
         ['request' => $r, 'paramedic' => $p, 'controller' => $c] = $this->scenario();
