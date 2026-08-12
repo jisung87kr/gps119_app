@@ -294,6 +294,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // 명단 CSV 일괄 등록 — 참가자 100명을 한 명씩 넣을 수는 없다(현장 피드백).
     Route::post('/projects/{project}/participants/import', [\App\Http\Controllers\Admin\EventParticipantController::class, 'import'])->name('projects.participants.import');
     Route::get('/projects/{project}/participants/template', [\App\Http\Controllers\Admin\EventParticipantController::class, 'importTemplate'])->name('projects.participants.template');
+    Route::delete('/projects/{project}/roster/{roster}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'rosterDestroy'])->name('projects.roster.destroy');
     Route::patch('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'update'])->name('projects.participants.update');
     Route::delete('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'destroy'])->name('projects.participants.destroy');
 

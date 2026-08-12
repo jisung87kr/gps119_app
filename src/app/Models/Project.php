@@ -170,6 +170,19 @@ class Project extends Model
         return route('request.create.project', ['slug' => $this->slug]);
     }
 
+    /**
+     * 행사 «입장» 링크 — QR 이 담는 주소 (2026-08-12 일원화).
+     *
+     * 🔑 getUrl() 은 신고 작성 화면으로 «직행»한다. 그 QR 을 찍은 사람은 행사에 들어오지
+     *    않으므로 역할도, 위치 공유도, 관제 지도 표시도 없다. 현장에 QR 을 두 개 붙이면
+     *    반드시 헷갈리므로 QR 은 입장 링크 하나로 통일한다 — 들어온 뒤 신고 화면은
+     *    앱 안에서 바로 갈 수 있어 기능 손실이 없다.
+     */
+    public function getJoinUrl(): string
+    {
+        return route('events.join.code', ['joinCode' => $this->join_code]);
+    }
+
     // Scopes
     public function scopeActive($query)
     {

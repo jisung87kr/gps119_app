@@ -20,9 +20,9 @@ class ProjectController extends Controller
         // 검색
         if ($request->has('search') && $request->search) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -73,16 +73,16 @@ class ProjectController extends Controller
         $project = Project::with(['creator', 'requests.user', 'requests.assignedRescuer'])
             ->withCount([
                 'requests',
-                'requests as pending_requests_count' => function($query) {
+                'requests as pending_requests_count' => function ($query) {
                     $query->where('status', 'pending');
                 },
-                'requests as in_progress_requests_count' => function($query) {
+                'requests as in_progress_requests_count' => function ($query) {
                     $query->where('status', 'in_progress');
                 },
-                'requests as completed_requests_count' => function($query) {
+                'requests as completed_requests_count' => function ($query) {
                     $query->where('status', 'completed');
                 },
-                'requests as cancelled_requests_count' => function($query) {
+                'requests as cancelled_requests_count' => function ($query) {
                     $query->where('status', 'cancelled');
                 },
             ])
@@ -127,6 +127,7 @@ class ProjectController extends Controller
         $project = Project::with(['creator', 'requests'])
             ->withCount('requests')
             ->findOrFail($id);
+
         return view('admin.projects.edit', compact('project'));
     }
 
@@ -177,24 +178,34 @@ class ProjectController extends Controller
         $project = Project::findOrFail($id);
 
         // slug가 없으면 생성
-        if (!$project->slug) {
+        if (! $project->slug) {
             $project->slug = \Illuminate\Support\Str::slug($project->name);
 
             // 한글 등으로 slug가 빈 문자열이 된 경우 랜덤 문자열 생성
             if (empty($project->slug)) {
-                $project->slug = 'project-' . \Illuminate\Support\Str::random(8);
+                $project->slug = 'project-'.\Illuminate\Support\Str::random(8);
             }
 
             $originalSlug = $project->slug;
             $count = 1;
             while (Project::where('slug', $project->slug)->where('id', '!=', $project->id)->exists()) {
-                $project->slug = $originalSlug . '-' . $count;
+                $project->slug = $originalSlug.'-'.$count;
                 $count++;
             }
             $project->save();
         }
 
-        $url = $project->getUrl();
+        // 🔑 QR 이 담는 것은 «입장» 링크다(2026-08-12 일원화). 예전에는 getUrl() —
+        //    신고 작성 화면 직행 — 이었는데, 그 QR 을 찍은 사람은 행사에 «들어오지 않는다».
+        //    역할도 위치 공유도 관제 표시도 없이 신고만 하나 쓰고 끝났다.
+        //
+        // join_code 는 생성 훅에서 자동 발급되지만 그 기능 이전에 만들어진 행사에는
+        // NULL 이 남아 있다. 여기서 지연 백필한다(참가자 화면과 같은 처리).
+        if (empty($project->join_code)) {
+            $project->forceFill(['join_code' => Project::generateUniqueJoinCode()])->save();
+        }
+
+        $url = $project->getJoinUrl();
 
         // QR 코드 생성 (endroid/qr-code 6.x)
         $qrCode = new \Endroid\QrCode\QrCode(
@@ -204,7 +215,7 @@ class ProjectController extends Controller
             margin: 10,
         );
 
-        $writer = new \Endroid\QrCode\Writer\PngWriter();
+        $writer = new \Endroid\QrCode\Writer\PngWriter;
         $result = $writer->write($qrCode);
 
         return response($result->getString())
@@ -220,7 +231,7 @@ class ProjectController extends Controller
 
         // 새 프로젝트 생성 (요청은 복제하지 않음)
         $newProject = $originalProject->replicate();
-        $newProject->name = $originalProject->name . ' (복제본)';
+        $newProject->name = $originalProject->name.' (복제본)';
         $newProject->slug = null; // slug는 자동 생성되도록
         $newProject->created_by = Auth::id();
 
@@ -253,7 +264,7 @@ class ProjectController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
-        $callback = function() use ($project) {
+        $callback = function () use ($project) {
             $file = fopen('php://output', 'w');
 
             // UTF-8 BOM 추가 (엑셀에서 한글 깨짐 방지)
@@ -272,7 +283,7 @@ class ProjectController extends Controller
                 '상태',
                 '담당자',
                 '요청일시',
-                '수정일시'
+                '수정일시',
             ]);
 
             // 데이터 행

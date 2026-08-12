@@ -6,6 +6,7 @@ use App\Enums\EventRole;
 use App\Enums\ParticipantStatus;
 use App\Http\Controllers\Controller;
 use App\Models\EventParticipant;
+use App\Models\EventRoster;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\EventParticipantService;
@@ -47,13 +48,45 @@ class EventParticipantController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'phone']);
 
+        // 명단에는 있는데 아직 입장하지 않은 사람.
+        //
+        // 🔑 이게 «전화번호 오타»를 잡는 유일한 장치다. 명단 매칭은 전화번호 기준이라,
+        //    한 자리가 틀리면 그 운영진은 조용히 «참가자»로 입장하고 아무도 모른다.
+        //    행사 시작 전에 이 목록이 비어 가는지 보면 발견할 수 있다.
+        $rosterPending = EventRoster::forProject($project->id)
+            ->unclaimed()
+            ->orderBy('role')
+            ->orderBy('name')
+            ->get();
+
         return view('admin.projects.participants', [
             'project' => $project,
             'participants' => $participants,
             'addableUsers' => $addableUsers,
+            'rosterPending' => $rosterPending,
+            'rosterTotal' => EventRoster::forProject($project->id)->count(),
             'roles' => EventRole::cases(),
             'statuses' => ParticipantStatus::cases(),
         ]);
+    }
+
+    /**
+     * 명단 1행 삭제 (아직 입장 안 한 줄의 오타 정정용).
+     *
+     * 이미 입장한 줄은 지우지 않는다 — 그건 «누가 명단에 있었는가»라는 행사 기록이고,
+     * 지워도 그 사람의 참가(EventParticipant)는 남으므로 화면만 헷갈려진다.
+     */
+    public function rosterDestroy(Project $project, EventRoster $roster)
+    {
+        abort_unless($roster->project_id === $project->id, 404);
+
+        if ($roster->isClaimed()) {
+            return back()->withErrors(['roster' => '이미 입장한 명단은 삭제할 수 없습니다. 참가자 목록에서 역할을 바꾸거나 삭제해 주세요.']);
+        }
+
+        $roster->delete();
+
+        return back()->with('success', '명단에서 삭제했습니다.');
     }
 
     public function store(Request $request, Project $project)

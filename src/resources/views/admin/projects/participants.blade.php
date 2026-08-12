@@ -97,9 +97,11 @@
     {{-- 명단 일괄 등록 (CSV) --}}
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm" x-data="{ fileName: '' }">
         <div class="px-6 py-4 border-b border-slate-100">
-            <h2 class="text-base font-semibold text-slate-900">명단 일괄 등록</h2>
+            <h2 class="text-base font-semibold text-slate-900">운영진 명단 일괄 등록</h2>
             <p class="mt-0.5 text-xs text-slate-400">
-                참가자가 많으면 명단 파일로 한 번에 등록하세요. <b class="text-slate-500">엑셀에서 「다른 이름으로 저장 → CSV」로 저장해 올려주세요</b>(.xlsx 는 지원하지 않습니다).
+                운영진·경찰·자원봉사·구급대 등 <b class="text-slate-500">역할이 있는 사람</b>의 명단을 올립니다.
+                일반 참가자는 올릴 필요가 없습니다 — 입장 QR 로 들어오면 자동으로 참가자가 됩니다.
+                <b class="text-slate-500">엑셀에서 「다른 이름으로 저장 → CSV」</b>로 저장해 올려주세요(.xlsx 는 지원하지 않습니다).
             </p>
         </div>
         <div class="p-6 space-y-4">
@@ -107,7 +109,8 @@
             <div class="rounded-xl bg-slate-50 ring-1 ring-slate-200/70 px-4 py-3.5 text-xs text-slate-500 space-y-1.5">
                 <p><b class="text-slate-700">컬럼 순서</b> · 이름, 전화번호, 역할 <span class="text-slate-400">(첫 줄에 제목행이 있어도 됩니다)</span></p>
                 <p><b class="text-slate-700">역할</b> · {{ collect($roles)->map(fn($r) => $r->label())->implode(' / ') }} <span class="text-slate-400">— 비워두면 참가자로 등록됩니다.</span></p>
-                <p><b class="text-slate-700">전화번호</b> · <span class="tabular-nums">010-1234-5678</span> 처럼 하이픈이 있어도 됩니다. 이미 가입된 회원은 새로 만들지 않고 역할만 배정합니다.</p>
+                <p><b class="text-slate-700">전화번호</b> · <span class="tabular-nums">010-1234-5678</span> 처럼 하이픈이 있어도 됩니다. <b class="text-slate-700">이 번호가 명단의 기준</b>이라 본인이 입장할 때 쓰는 번호와 같아야 합니다.</p>
+                <p><b class="text-slate-700">계정</b> · 계정을 미리 만들지 않습니다. 명단만 등록해 두면 <b class="text-slate-700">본인이 입장 QR 로 들어오는 순간 그 역할이 자동으로 붙습니다.</b> 이미 가입된 회원은 업로드 즉시 역할이 배정됩니다.</p>
                 <p><b class="text-slate-700">한도</b> · 최대 {{ number_format(\App\Services\ParticipantImportService::MAX_ROWS) }}행 / 1MB. 넘으면 파일을 나눠 올려주세요.</p>
             </div>
 
@@ -143,18 +146,28 @@
                         <p class="mt-0.5 text-lg font-bold text-slate-800 tabular-nums">{{ number_format($report['total']) }}</p>
                     </div>
                     <div class="rounded-xl bg-emerald-50 ring-1 ring-emerald-200/70 px-4 py-3">
-                        <p class="text-xs text-emerald-600/70">성공</p>
-                        <p class="mt-0.5 text-lg font-bold text-emerald-700 tabular-nums">{{ number_format($report['success']) }}</p>
+                        <p class="text-xs text-emerald-600/70">역할 배정 완료</p>
+                        <p class="mt-0.5 text-lg font-bold text-emerald-700 tabular-nums">{{ number_format($report['joined']) }}</p>
                     </div>
                     <div class="rounded-xl bg-blue-50 ring-1 ring-blue-200/70 px-4 py-3">
-                        <p class="text-xs text-blue-600/70">신규 회원</p>
-                        <p class="mt-0.5 text-lg font-bold text-blue-700 tabular-nums">{{ number_format($report['created_users']) }}</p>
+                        <p class="text-xs text-blue-600/70">입장 대기</p>
+                        <p class="mt-0.5 text-lg font-bold text-blue-700 tabular-nums">{{ number_format($report['pending']) }}</p>
                     </div>
                     <div class="rounded-xl {{ $report['failed'] ? 'bg-red-50 ring-red-200/70' : 'bg-slate-50 ring-slate-200/70' }} ring-1 px-4 py-3">
                         <p class="text-xs {{ $report['failed'] ? 'text-red-600/70' : 'text-slate-400' }}">실패</p>
                         <p class="mt-0.5 text-lg font-bold {{ $report['failed'] ? 'text-red-700' : 'text-slate-800' }} tabular-nums">{{ number_format($report['failed']) }}</p>
                     </div>
                 </div>
+
+                {{-- 🔴 상황실은 전원의 실시간 위치와 신고자 연락처를 보는 자리다.
+                     엑셀로 부여하는 것을 허용했으므로, 몇 명에게 줬는지는 반드시 보이게 한다 —
+                     붙여넣기 사고는 단서가 없으면 영영 발견되지 않는다. --}}
+                @if(($report['controllers'] ?? 0) > 0)
+                    <div class="rounded-xl bg-amber-50 ring-1 ring-amber-200/70 px-4 py-3 text-sm text-amber-800">
+                        <b>상황실 권한 {{ number_format($report['controllers']) }}명</b>이 이 명단으로 부여됐습니다.
+                        상황실은 전원의 실시간 위치와 신고자 연락처를 볼 수 있습니다 — 의도한 인원이 맞는지 아래 목록에서 확인해 주세요.
+                    </div>
+                @endif
 
                 @if(!empty($report['errors']))
                     <div class="rounded-xl ring-1 ring-red-200/70 overflow-hidden">
@@ -180,6 +193,48 @@
             </div>
         @endif
     </div>
+
+    {{-- 명단에 있는데 아직 입장하지 않은 사람.
+
+         🔑 이게 «전화번호 오타»를 잡는 유일한 장치다. 명단 매칭은 전화번호 기준이라
+            한 자리가 틀리면 그 운영진은 조용히 «참가자»로 입장하고 아무도 모른다.
+            행사 시작 전에 이 목록이 비어 가는지 보면 발견할 수 있다. --}}
+    @if($rosterPending->isNotEmpty())
+        <div class="bg-white rounded-2xl border border-amber-200/80 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-amber-100 bg-amber-50/60 flex items-baseline justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-amber-900">입장 대기 명단</h2>
+                    <p class="mt-0.5 text-xs text-amber-700/80">
+                        명단에는 있지만 아직 입장하지 않았습니다. 행사 시작 전에 이 목록이 줄어드는지 확인하세요 —
+                        <b>전화번호가 한 자리라도 다르면 그 사람은 «참가자»로 입장하고 이 줄은 그대로 남습니다.</b>
+                    </p>
+                </div>
+                <span class="flex-none text-sm font-bold text-amber-800 tabular-nums">
+                    {{ number_format($rosterPending->count()) }} / {{ number_format($rosterTotal) }}
+                </span>
+            </div>
+            <div class="divide-y divide-slate-100">
+                @foreach($rosterPending as $row)
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
+                        <span class="font-medium text-slate-800 min-w-[6rem]">{{ $row->name ?: '이름 없음' }}</span>
+                        <span class="font-mono text-sm text-slate-500 tabular-nums">{{ $row->phone }}</span>
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-semibold {{ $row->role->badgeClasses() }}">
+                            {{ $row->role->label() }}
+                        </span>
+                        <form action="{{ route('admin.projects.roster.destroy', [$project->id, $row->id]) }}" method="POST" class="ml-auto">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" onclick="return confirm('이 줄을 명단에서 삭제할까요?')"
+                                    class="text-xs font-medium text-slate-400 hover:text-red-600 transition-colors">삭제</button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+            @error('roster')
+                <p class="px-6 py-3 text-sm text-red-600 border-t border-slate-100">{{ $message }}</p>
+            @enderror
+        </div>
+    @endif
 
     {{-- 참가자 목록 --}}
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">

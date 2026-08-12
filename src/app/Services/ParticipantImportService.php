@@ -4,14 +4,19 @@ namespace App\Services;
 
 use App\Enums\EventRole;
 use App\Enums\ParticipantStatus;
+use App\Models\EventRoster;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * 행사 참가자 명단 CSV 일괄 등록 (현장 피드백: "100명을 한 명씩 못 넣는다").
+ * 행사 «운영진» 사전명단 CSV 일괄 등록.
+ *
+ * 운영 흐름(2026-08-12 확정):
+ *   ① 프로젝트 생성 → ②-1 관리자가 «운영진» 명단을 올린다(이 클래스)
+ *                  → ②-2 참가자·운영진 모두 «같은 입장 QR» 로 들어온다.
+ *                        명단에 있으면 그 역할, 없으면 일반 참가자.
  *
  * 컬럼: 이름, 전화번호, 역할  (헤더 행 유무 무관)
  *
@@ -37,7 +42,7 @@ class ParticipantImportService
     /**
      * CSV 원문 → 리포트.
      *
-     * @return array{total:int,success:int,created_users:int,failed:int,errors:list<array{line:int,reason:string,raw:string}>,hidden_errors:int}
+     * @return array{total:int,success:int,joined:int,pending:int,controllers:int,failed:int,errors:list<array{line:int,reason:string,raw:string}>,hidden_errors:int}
      *
      * @throws RuntimeException 행 수 상한 초과 / 빈 파일 (전량 거부)
      */
@@ -60,7 +65,14 @@ class ParticipantImportService
         $report = [
             'total' => count($rows),
             'success' => 0,
-            'created_users' => 0,
+            // 이미 회원이라 «지금» 역할이 붙은 사람 / 명단에만 올라간 사람.
+            'joined' => 0,
+            'pending' => 0,
+            // 🔴 상황실(controller)은 전원의 실시간 위치와 신고자 연락처를 보는 자리다.
+            //    엑셀로 부여하는 것을 허용하기로 했으므로(2026-08-12 결정), 최소한
+            //    «몇 명에게 줬는지»는 결과 화면에서 바로 보이게 한다. 스프레드시트
+            //    붙여넣기 사고는 사후에 발견할 단서가 없으면 영영 발견되지 않는다.
+            'controllers' => 0,
             'failed' => 0,
             'errors' => [],
             'hidden_errors' => 0,
@@ -68,10 +80,11 @@ class ParticipantImportService
 
         foreach ($rows as $row) {
             try {
-                $created = $this->importRow($project, $row);
+                $result = $this->importRow($project, $row);
                 $report['success']++;
-                if ($created) {
-                    $report['created_users']++;
+                $report[$result['outcome']]++;
+                if ($result['role'] === EventRole::CONTROLLER) {
+                    $report['controllers']++;
                 }
             } catch (RuntimeException $e) {
                 $report['failed']++;
@@ -93,15 +106,20 @@ class ParticipantImportService
     /**
      * 한 행 처리: 검증 → 회원 조회/생성 → 역할 upsert.
      *
-     * 회원 생성과 역할 배정은 «같은» 트랜잭션 안에 둔다. 회원만 만들어지고 역할이
-     * 안 붙으면 명단에 없는 유령 계정이 남는다.
+     * 🔑 계정을 «만들지 않는다». 예전에는 여기서 User 를 생성했는데, 그러면 그 사람은
+     *    임의 비밀번호라 로그인할 수 없고(재설정은 이메일 기반), 전화번호가 점유돼
+     *    본인이 회원가입도 못 한다 — 명단은 들어가는데 사람이 못 들어온다.
+     *    명단만 남기고, 본인이 입장할 때 역할이 붙는다(EventParticipantService::joinByCode).
+     *
+     * 이미 회원인 사람은 그 자리에서 역할을 부여한다. 기다릴 이유가 없고,
+     * 「업로드했는데 아직 아무 일도 안 일어난다」는 인상을 주지 않는다.
      *
      * @param  array{line:int,raw:string,name:string,phone:string,role:string}  $row
-     * @return bool 신규 회원을 만들었으면 true
+     * @return array{outcome:'joined'|'pending',role:EventRole}
      *
      * @throws RuntimeException 행 단위 검증 실패 (호출부가 리포트로 수집)
      */
-    private function importRow(Project $project, array $row): bool
+    private function importRow(Project $project, array $row): array
     {
         $name = trim($row['name']);
         if ($name === '') {
@@ -123,24 +141,27 @@ class ParticipantImportService
         }
 
         return DB::transaction(function () use ($project, $name, $phone, $role) {
+            // 명단은 «전화번호» 기준 1행. 재업로드하면 이름·역할이 최신값으로 덮인다.
+            $roster = EventRoster::updateOrCreate(
+                ['project_id' => $project->id, 'phone' => $phone],
+                ['name' => $name, 'role' => $role],
+            );
+
             $user = User::where('phone', $phone)->first();
-            $created = false;
 
             if (! $user) {
-                $user = User::create([
-                    'name' => $name,
-                    'phone' => $phone,
-                    // 관리자 대행 등록이라 비밀번호를 정할 수 없다. 임의값을 넣어두고
-                    // 본인은 전화번호 로그인 흐름으로 들어온다(비밀번호는 쓰이지 않는다).
-                    'password' => Str::password(32),
-                ]);
-                $created = true;
+                return ['outcome' => 'pending', 'role' => $role];
             }
 
-            // 이미 있는 회원의 이름은 CSV 로 덮지 않는다 — 본인이 정한 값이 우선.
+            // 이미 있는 회원의 «이름»은 CSV 로 덮지 않는다 — 본인이 정한 값이 우선이다.
             $this->participants->assignRole($project, $user, $role, ParticipantStatus::ACTIVE);
 
-            return $created;
+            $roster->forceFill([
+                'user_id' => $user->id,
+                'claimed_at' => $roster->claimed_at ?? now(),
+            ])->save();
+
+            return ['outcome' => 'joined', 'role' => $role];
         });
     }
 
