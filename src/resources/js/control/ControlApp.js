@@ -10,6 +10,10 @@ import {
 import { isNativeApp, hasNativeCapability, NativeCapability } from '../native/bridge';
 
 const POLL_INTERVAL_MS = 12000;
+// 마커의 online/stale/offline 재판정 주기. 임계값은 30s/120s(roleMeta)이므로
+// 15초면 «한 칸 늦게» 어두워지는 정도라 상황실 판단을 그르치지 않는다.
+// 이 타이머가 없으면 WS 가 붙어 있는 동안 마커 상태가 영원히 갱신되지 않는다.
+const PRESENCE_DECAY_MS = 15000;
 const KAKAO_KEY = '509c2656c00fa9af4782197a888763f6';
 
 // 전체보기가 파고들 수 있는 최대 배율(카카오는 숫자가 작을수록 확대).
@@ -357,8 +361,15 @@ export default {
             const pid = this.selectedProjectId;
             this._subscribedProjectId = pid; // teardown 이 읽을 단일 출처
             // presence: 위치
+            // 🔑 presence «멤버십»도 쓴다. 예전에는 .participant.location 만 듣고
+            //    leaving 을 무시해서, 앱을 끈 사람의 핀이 임계 시간(2분)이 지나도
+            //    선명한 채로 남았다 — 상황실은 그 사람이 아직 현장에 있다고 읽는다.
             this._locCh = echo.join(`event.${pid}.locations`)
+                .here((members) => this._onPresenceSync(members))
+                .joining((member) => this._onPresenceJoin(member))
+                .leaving((member) => this._onPresenceLeave(member))
                 .listen('.participant.location', (e) => this._onLocation(e));
+            this._startPresenceDecay();
             // private control: 신규 신고 + 지령 상태 갱신 + 신고 자체의 상태 갱신
             this._ctrlCh = echo.private(`event.${pid}.control`)
                 .listen('.request.created', (e) => this._onRequestCreated(e))
@@ -393,6 +404,50 @@ export default {
             });
         },
 
+        // ── presence 멤버십 ─────────────────────────────────────
+        // 페이로드는 {user_id, role} 만이다(ADR-0004 — 연락처는 presence 에 싣지 않는다).
+
+        _onPresenceSync(members) {
+            if (!this.pool) return;
+            const here = new Set((members || []).map((m) => Number(m.user_id)));
+            for (const [userId, entry] of this.pool.markers) {
+                if (here.has(Number(userId))) entry.left = false;
+                else this.pool.markLeft(userId);
+            }
+            this._refreshCounts();
+        },
+
+        _onPresenceJoin(member) {
+            if (!this.pool || !member) return;
+            const entry = this.pool.markers.get(member.user_id);
+            if (entry) {
+                entry.left = false;
+                this.pool._applyState(entry);
+                this._refreshCounts();
+            }
+            // 풀에 없으면 아직 좌표가 없는 사람이다. 첫 .participant.location 이
+            // 오면 upsert 로 생긴다 — 좌표 없는 마커를 만들지 않는 규칙 그대로.
+        },
+
+        _onPresenceLeave(member) {
+            if (!this.pool || !member) return;
+            if (this.pool.markLeft(member.user_id)) this._refreshCounts();
+        },
+
+        // 시간이 지나면 online → stale → offline 으로 «저절로» 내려앉아야 한다.
+        // 아무 이벤트도 안 오는 동안 화면이 갱신될 유일한 계기가 이 타이머다.
+        _startPresenceDecay() {
+            if (this._presenceTimer) return;
+            this._presenceTimer = setInterval(() => {
+                if (!this.pool) return;
+                if (this.pool.refreshPresence()) this._refreshCounts();
+            }, PRESENCE_DECAY_MS);
+        },
+
+        _stopPresenceDecay() {
+            if (this._presenceTimer) { clearInterval(this._presenceTimer); this._presenceTimer = null; }
+        },
+
         _onLocation(payload) {
             // 지도가 없으면 그릴 마커도 없다. 실시간 «수신»은 계속돼야 하므로 조용히 지나간다.
             if (!this.pool) return;
@@ -420,6 +475,9 @@ export default {
                     entry.row.last_lat = payload.latitude;
                     entry.row.last_lng = payload.longitude;
                     entry.row.last_accuracy = payload.accuracy ?? null;
+                    // 위치가 왔으니 다시 online 이다. 이 재판정이 없으면 한 번
+                    // 어두워진 마커는 돌아와도 계속 어두운 채로 남는다.
+                    this.pool._applyState(entry);
                 }
             }
             this._refreshCounts();
@@ -701,6 +759,7 @@ export default {
         // 이전 행사의 신고가 연락처째로 새 화면에 계속 흘러들어온다.
         _teardownRealtime() {
             this._stopPolling();
+            this._stopPresenceDecay();
             const pid = this._subscribedProjectId;
             if (window.Echo && pid != null) {
                 try { window.Echo.leave(`event.${pid}.locations`); } catch (e) { /* noop */ }

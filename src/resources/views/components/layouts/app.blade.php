@@ -104,5 +104,30 @@
         <x-ui.tab-bar :active="$tab" />
     @endif
 @endif
+
+@php
+    // 위치 공유를 셸 레벨로 올린다. 예전에는 활동/지령 화면 «안에서만» 송신해서,
+    // 그 화면을 떠나는 순간 관제 지도의 좌표가 얼어붙었다.
+    //
+    // 그 두 화면은 자기 sharer 를 직접 소유하고 화면에 상태를 그린다. 셸이 하나를 더
+    // 띄우면 같은 좌표를 두 번 보내게 되므로 여기서는 비켜선다. (마운트 순서에 기대는
+    // 대신 라우트로 판정한다 — 순서 경합은 언젠가 반드시 진다.)
+    $ownsLocationShare = request()->routeIs('events.active') || request()->routeIs('events.dispatch');
+    $shellSharing = (! $bare && auth()->check() && ! $ownsLocationShare)
+        ? auth()->user()->sharingParticipation()
+        : null;
+@endphp
+
+@if ($shellSharing)
+    <script type="module">
+        import { createLocationSharer } from '/js/components/locationShare.js';
+
+        // 본인이 이미 켜 둔 공유만 이어받는다(resume 은 PATCH 를 보내지 않는다).
+        // 끄는 것은 활동 화면의 토글에서만 — 셸은 동의를 만들지 않는다.
+        const sharer = createLocationSharer({ projectId: {{ $shellSharing->project_id }} });
+        sharer.resume();
+        window.__shellLocationShare = sharer;
+    </script>
+@endif
 </body>
 </html>

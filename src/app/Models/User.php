@@ -93,6 +93,27 @@ class User extends Authenticatable
     }
 
     /**
+     * 지금 «위치를 공유 중»인 행사 참가 1건 (없으면 null).
+     *
+     * 위치 송신을 특정 화면에 묶어 두면, 그 화면을 떠나는 순간 watchPosition 이 죽어
+     * 관제 지도의 그 사람 좌표가 그 자리에서 얼어붙는다. 실제로 일반 참가자는 행사
+     * 입장 시각의 좌표 한 건으로 남아 있었다. 셸(레이아웃)이 이 값을 읽어, 사용자가
+     * 앱 안 어느 화면에 있든 공유가 이어지게 한다.
+     *
+     * 🔑 «본인이 켠» 공유만 이어붙인다(sharing_location=true). 여기서 플래그를 켜지
+     *    않는다 — 동의는 활동 화면에서 받는 것이고, 셸은 그 결정을 따를 뿐이다.
+     */
+    public function sharingParticipation(): ?EventParticipant
+    {
+        return $this->eventParticipations()
+            ->where('status', ParticipantStatus::ACTIVE)
+            ->where('sharing_location', true)
+            ->whereHas('project', fn ($q) => $q->active())
+            ->latest('last_seen_at')
+            ->first();
+    }
+
+    /**
      * Get the formatted phone number.
      */
     public function getFormattedPhoneAttribute(): ?string

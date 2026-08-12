@@ -77,23 +77,11 @@
             </p>
         </x-ui.card>
 
-        {{-- 첫 위치 전송 후 자동 이동 카운트다운 (참가자 전용) --}}
-        @unless ($canDispatch)
-        <div v-if="redirecting"
-             class="flex items-center justify-between gap-4 rounded-2xl bg-brand-50 px-4 py-3.5">
-            <div class="flex items-center gap-2 text-sm font-bold text-brand-700">
-                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                    <path d="M12 3a9 9 0 1 0 9 9" />
-                </svg>
-                <span>@{{ countdown }}초 후 구조요청 화면으로 이동…</span>
-            </div>
-            <button type="button" v-on:click="cancelRedirect"
-                    class="shrink-0 text-xs font-bold text-brand-500 underline underline-offset-2">
-                취소
-            </button>
-        </div>
-        @endunless
+        {{-- 🔑 예전에는 여기에 「3초 후 구조요청 화면으로 이동」 카운트다운이 있었다.
+             그게 관제 지도가 텅 비는 «직접 원인»이었다 — 참가자는 첫 좌표 1건만 보내고
+             페이지를 떠나고, 페이지를 떠나면 watchPosition 이 죽는다. 결과적으로 일반
+             참가자는 「행사 입장 시각의 좌표」에 박제된 핀으로 남았다.
+             이 화면은 이제 «머무는» 화면이다. 신고는 아래 버튼으로 언제든 갈 수 있다. --}}
 
         {{-- 다음 단계 --}}
         <div class="space-y-3">
@@ -105,7 +93,11 @@
                 </x-ui.button>
                 <x-ui.button :href="route('request.create')" variant="secondary">구조요청 화면으로</x-ui.button>
             @else
-                <x-ui.button :href="route('request.create')">구조요청 화면으로</x-ui.button>
+                {{-- 이 화면에 머무는 동안 위치가 계속 공유된다. 신고는 여기서 바로 간다. --}}
+                <x-ui.button :href="route('request.create')">
+                    <x-ui.icon name="ambulance" class="h-5 w-5" />
+                    구조요청 하기
+                </x-ui.button>
             @endif
             <x-ui.button :href="route('dashboard')" variant="ghost">홈으로</x-ui.button>
         </div>
@@ -133,10 +125,6 @@
                     lastAccuracy: null,
                     bufferedCount: 0,
                     error: null,
-                    // 자동 이동 카운트다운
-                    redirecting: false,
-                    countdown: 3,
-                    redirectTimer: null,
                 };
             },
             computed: {
@@ -160,31 +148,9 @@
                     this.lastAccuracy = s.lastAccuracy;
                     this.bufferedCount = s.bufferedCount;
                     this.error = s.error;
-
-                    // 첫 위치 전송 완료 시 카운트다운 시작 (참가자 전용 — canDispatch=false)
-                    @unless ($canDispatch)
-                    if (s.sharing && s.sentCount >= 1 && !this.redirecting && !this.redirectTimer) {
-                        this.redirecting = true;
-                        this.countdown = 3;
-                        this.redirectTimer = setInterval(() => {
-                            this.countdown--;
-                            if (this.countdown <= 0) {
-                                clearInterval(this.redirectTimer);
-                                window.location.href = "{{ route('request.create') }}";
-                            }
-                        }, 1000);
-                    }
-                    @endunless
                 },
                 toggle() {
                     this.sharer.toggle();
-                },
-                cancelRedirect() {
-                    if (this.redirectTimer) {
-                        clearInterval(this.redirectTimer);
-                        this.redirectTimer = null;
-                    }
-                    this.redirecting = false;
                 },
             },
             mounted() {

@@ -217,6 +217,20 @@ export function createLocationSharer(config = {}) {
             startWatch();
         },
 
+        // 공유 «이어받기»: 서버에 이미 sharing_location=true 인 사람만 부른다.
+        // enable() 과 달리 PATCH 를 보내지 않는다 — 셸이 매 페이지마다 공유를 다시
+        // 켜버리면, 사용자가 끈 공유가 화면을 옮기는 것만으로 되살아난다.
+        resume() {
+            if (!('geolocation' in navigator)) {
+                state.permission = 'unsupported';
+                emit();
+                return;
+            }
+            state.sharing = true;
+            emit();
+            startWatch();
+        },
+
         // 공유 중지: watch 중지 + sharing off(PATCH)
         async disable() {
             state.sharing = false;
