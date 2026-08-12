@@ -42,9 +42,20 @@
                                         :title="$participant->project->name"
                                         :meta="$participant->role->label()">
                             <x-slot:trailing>
-                                <x-ui.button :href="route('events.dispatch', $participant->project_id)" size="sm">
-                                    지령·출동
-                                </x-ui.button>
+                                {{-- 🔑 역할별로 버튼이 갈린다. 이 목록에는 «참가 중인 행사 전부»가
+                                     오는데(그래야 참가자로 있는 행사에 갈 길이 생긴다), 라벨을
+                                     「지령·출동」으로 고정하면 참가자에게 거짓말이 된다 —
+                                     눌러도 활동 화면으로 튕기므로 «동작은» 하지만 그게 더 나쁘다. --}}
+                                @if ($participant->role->canReceiveDispatch())
+                                    <x-ui.button :href="route('events.dispatch', $participant->project_id)" size="sm">
+                                        지령·출동
+                                    </x-ui.button>
+                                @else
+                                    <x-ui.button :href="route('events.active', $participant->project_id)"
+                                                 variant="secondary" size="sm">
+                                        활동 화면
+                                    </x-ui.button>
+                                @endif
                             </x-slot:trailing>
                         </x-ui.list-item>
                     @endforeach
@@ -57,6 +68,27 @@
                 </x-ui.empty>
                 <x-ui.button :href="route('events.join')" variant="secondary">행사 참가하기</x-ui.button>
             </x-ui.card>
+        @endif
+
+        {{-- 내가 «신고한» 건 — 0이면 아예 안 보인다. 이 홈을 쓰는 사람도 다른 행사에서는
+             참가자일 수 있어서 자기 신고를 다시 볼 통로가 필요하다. --}}
+        @if ($myRequests->isNotEmpty())
+            <x-ui.section title="내 구조 요청" :meta="$myRequests->count().'건'">
+                <x-ui.list>
+                    @foreach ($myRequests as $request)
+                        <x-ui.list-item :href="route('request.show', $request)" icon="pin" icon-tone="neutral"
+                                        :title="$request->address ?: '위치 확인 중'"
+                                        :meta="($request->project?->name ? $request->project->name.' · ' : '').$request->requested_at?->format('n/j H:i')">
+                            <x-slot:trailing>
+                                <x-ui.badge :tone="$request->status->badgeTone()"
+                                            :icon="$request->status->badgeIcon()" size="sm">
+                                    {{ $request->status->label() }}
+                                </x-ui.badge>
+                            </x-slot:trailing>
+                        </x-ui.list-item>
+                    @endforeach
+                </x-ui.list>
+            </x-ui.section>
         @endif
 
         <x-ui.section title="출동 이력" :meta="$dispatches->count().'건'">

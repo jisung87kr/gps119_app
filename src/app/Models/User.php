@@ -145,6 +145,51 @@ class User extends Authenticatable
     }
 
     /**
+     * 이 사람이 «신고할 수 있는» 행사들 (최근 입장 순).
+     *
+     * 🔴 역할은 사람이 아니라 «행사»의 속성이다. 한 사람이 A 행사에서는 참가자,
+     *    B 행사에서는 구급대일 수 있다. 그때 activeEventRole() 처럼 역할을 하나로
+     *    뭉개서 전역 판정에 쓰면 — **A 행사에서 사고를 당해도 「구급대는 신고 불가」에
+     *    걸려 신고를 못 한다.** 응급 도메인에서 가장 나쁜 실패다.
+     *
+     * 그래서 신고 쪽 판정은 «행사별»로 한다. 구급대인 행사는 어차피 신고 대상이 아니므로
+     * 기본값·선택지에서 빼고, 참가자·운영진 등으로 있는 행사만 남긴다.
+     *
+     * @return \Illuminate\Support\Collection<int, Project>
+     */
+    public function reportableEvents(): Collection
+    {
+        return $this->activeEvents()
+            ->reject(fn (Project $p) => $this->eventRoleIn($p)?->isDispatchCandidate())
+            ->values();
+    }
+
+    /**
+     * 이 대상 행사로 «신고할 수 있는가» — 신고 차단의 단일 출처.
+     *
+     * 규칙 둘, 둘 다 필요하다:
+     *  ① **대상 행사에서 구급대면 불가.** 「구급대는 담당 행사에 신고하지 않고 지령만
+     *     받는다」는 제품 결정(2026-08-12)이다.
+     *  ② **구급 쪽 사람인데 신고 가능한 행사가 하나도 없어도 불가.** ①만 있으면
+     *     구급대가 «일반 신고» 화면으로 들어가 「상시 운영」에 접수해 버린다 —
+     *     결정이 무의미해지고, 게다가 그 신고를 정작 자기 행사 상황실이 못 본다.
+     *
+     * 🔴 ①이 «행사별»이어야 하는 이유: 역할은 사람이 아니라 행사의 속성이다.
+     *    A 참가자 + B 구급대인 사람을 전역으로 막았더니 **A 행사에서 사고를 당해도
+     *    신고를 못 했다.** 그 사람은 A 에서는 그냥 참가자다.
+     *
+     * 화면(2곳)과 서비스가 «같은» 이 메서드를 읽는다. 규칙이 두 벌이면 한쪽이 조용히 빈다.
+     */
+    public function canFileRequestFor(?Project $target): bool
+    {
+        if ($target && $this->eventRoleIn($target)?->isDispatchCandidate()) {
+            return false;
+        }
+
+        return ! ($this->usesDispatchHome() && $this->reportableEvents()->isEmpty());
+    }
+
+    /**
      * 「지금 이 사람이 있는 행사」 (없으면 null).
      *
      * 네 곳이 같은 질문을 한다 — 신고를 어느 행사에 붙일지(RequestService), 어디로

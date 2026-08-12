@@ -25,8 +25,11 @@ Route::view('/location-terms', 'legal.location-terms')->name('legal.location-ter
 Route::get('/requests/create', function () {
     // 지금 «행사 중인 구급대»는 신고를 «올리지» 않는다 — 지령만 받는다.
     // (2026-08-12 현장 결정. 차단 화면이 119·상황실 전화를 대신 제공한다.)
-    // 행사가 끝나면 그 사람도 평범한 사용자로 돌아가 신고할 수 있다.
-    if (Auth::user()->usesDispatchHome()) {
+    //
+    // 🔴 판정은 «행사별»이다. A 참가자 + B 구급대인 사람은 A 로는 신고할 수 있어야 한다 —
+    //    전역으로 막았더니 그 사람이 A 행사에서 사고를 당해도 신고를 못 했다.
+    //    신고할 수 있는 행사가 «하나도» 없을 때만 막는다.
+    if (! Auth::user()->canFileRequestFor(Auth::user()->reportableEvents()->first())) {
         return response()->view('errors.paramedic-no-request', [
             'controlTel' => '010-4794-0119',
         ], 403);
@@ -43,7 +46,8 @@ Route::get('/requests/create', function () {
 Route::get('/requests/create/{slug}', function ($slug) {
     $project = \App\Models\Project::where('slug', $slug)->firstOrFail();
 
-    if (Auth::user()->usesDispatchHome()) {
+    // 판정은 User::canFileRequestFor 하나 — 서비스도 같은 것을 읽는다.
+    if (! Auth::user()->canFileRequestFor($project)) {
         return response()->view('errors.paramedic-no-request', [
             'project' => $project,
             'controlTel' => data_get($project->settings, 'emergency_tel', '010-4794-0119'),
@@ -160,16 +164,37 @@ Route::get('/dispatches', function () {
         'completed_total' => (int) ($counts[\App\Enums\DispatchStatus::COMPLETED->value] ?? 0),
     ];
 
-    // 지령을 받을 수 있는 활성 행사 — 실시간 작업 화면 진입점
+    // 🔴 참가 중인 활성 행사 «전부». 예전에는 지령 수령 역할만 걸러서, A 행사 참가자이면서
+    //    B 행사 구급대인 사람의 홈에 B 만 뜨고 **A 로 갈 길이 앱 어디에도 없었다.**
+    //    역할별로 버튼이 갈리므로(지령·출동 / 활동) 목록에 다 있어도 헷갈리지 않는다.
     $myEvents = \App\Models\EventParticipant::query()
         ->where('user_id', $user->id)
         ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
         ->whereHas('project', fn ($q) => $q->active())
-        ->with('project:id,name')
+        // ⚠️ is_default 를 «반드시» select 에 넣는다. project:id,name 만 불러오면 아래
+        //    필터의 $p->project->is_default 가 null 이라 조용히 통과한다 — 필터가
+        //    있는데 아무것도 안 거르는 상태가 된다.
+        ->with('project:id,name,is_default')
         ->get()
-        ->filter(fn ($p) => $p->project !== null && $p->role->canReceiveDispatch());
+        // 「상시 운영」은 내부 폴백 자리라 «참가자»로 속해 있는 건 사용자에게 의미가 없다.
+        // 다만 거기 배정된 상시 구급 인력에게는 지령 화면으로 가는 유일한 길이므로 남긴다.
+        ->filter(fn ($p) => $p->project !== null
+            && (! $p->project->is_default || $p->role->canReceiveDispatch()));
 
-    return view('dispatch.home', compact('dispatches', 'stats', 'myEvents'));
+    // 🔑 «내가 신고한» 처리 중 요청. 이 홈을 쓰는 사람도 다른 행사에서는 참가자일 수
+    //    있고(A 참가자 + B 구급대), 그때 신고한 건을 다시 볼 통로가 필요하다.
+    //    프로필에 있던 「최근 구조 요청 내역」을 뺐으므로(2026-08-13) 여기가 유일한 길이다.
+    //    완료된 건까지는 싣지 않는다 — 이 화면의 주인공은 지령이다.
+    $myRequests = $user->requests()
+        ->with('project:id,name')
+        ->whereIn('status', [
+            \App\Enums\RequestStatus::PENDING->value,
+            \App\Enums\RequestStatus::IN_PROGRESS->value,
+        ])
+        ->latest('requested_at')
+        ->get();
+
+    return view('dispatch.home', compact('dispatches', 'stats', 'myEvents', 'myRequests'));
 })->middleware(['auth'])->name('dispatches.index');
 
 // 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
