@@ -1,12 +1,14 @@
 {{--
-    프로필 — src/tmp/profile.html 기준.
+    프로필 — 「내 계정을 관리하는 곳」.
     셸에서 푸터가 사라졌으므로 사업자 정보(법적 표기)를 이 화면 하단으로 옮겼다.
+
+    ⚠️ 활동(행사 역할·요청 건수·최근 내역)은 여기 두지 않는다 (2026-08-13 현장 피드백).
+       그건 홈(/dashboard·/dispatches)의 몫이고, 두 곳에 두면 한쪽이 반드시 낡는다.
+       행사 역할은 특히 위험했다 — 여러 행사에 다른 역할로 참가하는 사람에게
+       activeEventRole() 이 그중 «하나»만 뽑아 보여주므로 사실과 다르다.
 --}}
 <x-layouts.app title="GPS119 - 프로필" heading="프로필" tab="profile">
-    @php
-        $user = auth()->user();
-        $recentRequests = $user->requests()->latest()->limit(5)->get();
-    @endphp
+    @php ($user = auth()->user())
 
     <div class="space-y-6">
         @if (session('status'))
@@ -38,16 +40,6 @@
                 <p class="text-sm font-bold text-ink-900">{{ $user->created_at->format('Y년 m월 d일') }}</p>
             </div>
 
-            {{-- 계정 권한은 «회원 등급»이 아니라 지금 맡은 «행사 역할»을 보여준다.
-                 시스템 롤은 일반/관리자 둘뿐이라 일반 사용자에게 알릴 것이 없다. --}}
-            @php ($eventRole = $user->activeEventRole())
-            @if ($eventRole)
-                <div class="mt-2.5 flex items-center justify-between rounded-xl bg-ink-50 px-4 py-3">
-                    <p class="text-sm font-bold text-ink-500">행사 역할</p>
-                    <x-ui.badge tone="brand" size="sm" :icon="$eventRole->icon()">{{ $eventRole->label() }}</x-ui.badge>
-                </div>
-            @endif
-
             {{-- 소셜 연동 상태 --}}
             @if ($user->provider)
                 <div class="mt-4 flex items-center gap-3 border-t border-ink-100 pt-4">
@@ -78,37 +70,6 @@
                 </x-ui.list>
             </x-ui.section>
         @endif
-
-        {{-- 활동 통계 --}}
-        <div @class(['grid gap-3', 'grid-cols-2' => $user->usesDispatchHome()])>
-            <x-ui.stat label="총 구조 요청" :value="$user->requests()->count()" />
-            @if ($user->usesDispatchHome())
-                {{-- 출동 실적은 legacy assigned_rescuer_id 가 아니라 지령(dispatches) 기준이다. --}}
-                <x-ui.stat label="출동 완료"
-                           :value="\App\Models\Dispatch::where('paramedic_id', $user->id)->where('status', \App\Enums\DispatchStatus::COMPLETED)->count()" />
-            @endif
-        </div>
-
-        {{-- 최근 구조 요청 내역 --}}
-        <x-ui.section title="최근 구조 요청 내역">
-            <x-ui.list>
-                @forelse ($recentRequests as $request)
-                    <x-ui.list-item :href="route('request.show', $request)" icon="pin"
-                                    :title="$request->address ?? '위치 정보 없음'"
-                                    :meta="$request->created_at->format('Y.m.d H:i')"
-                                    :chevron="false">
-                        <x-slot:trailing>
-                            <x-ui.badge :tone="$request->status->badgeTone()"
-                                        :icon="$request->status->badgeIcon()" size="sm">
-                                {{ $request->status->label() }}
-                            </x-ui.badge>
-                        </x-slot:trailing>
-                    </x-ui.list-item>
-                @empty
-                    <x-ui.empty icon="pin">아직 구조 요청 내역이 없습니다.</x-ui.empty>
-                @endforelse
-            </x-ui.list>
-        </x-ui.section>
 
         {{-- 설정 --}}
         <x-ui.section title="설정">

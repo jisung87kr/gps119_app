@@ -70,6 +70,27 @@
             </x-ui.card>
         @endif
 
+        {{-- 내가 «신고한» 건 — 0이면 아예 안 보인다. 이 홈을 쓰는 사람도 다른 행사에서는
+             참가자일 수 있어서 자기 신고를 다시 볼 통로가 필요하다. --}}
+        @if ($myRequests->isNotEmpty())
+            <x-ui.section title="내 구조 요청" :meta="$myRequests->count().'건'">
+                <x-ui.list>
+                    @foreach ($myRequests as $request)
+                        <x-ui.list-item :href="route('request.show', $request)" icon="pin" icon-tone="neutral"
+                                        :title="$request->address ?: '위치 확인 중'"
+                                        :meta="($request->project?->name ? $request->project->name.' · ' : '').$request->requested_at?->format('n/j H:i')">
+                            <x-slot:trailing>
+                                <x-ui.badge :tone="$request->status->badgeTone()"
+                                            :icon="$request->status->badgeIcon()" size="sm">
+                                    {{ $request->status->label() }}
+                                </x-ui.badge>
+                            </x-slot:trailing>
+                        </x-ui.list-item>
+                    @endforeach
+                </x-ui.list>
+            </x-ui.section>
+        @endif
+
         <x-ui.section title="출동 이력" :meta="$dispatches->count().'건'">
             @if ($dispatches->isEmpty())
                 <x-ui.card>

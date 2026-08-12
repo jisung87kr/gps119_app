@@ -181,7 +181,20 @@ Route::get('/dispatches', function () {
         ->filter(fn ($p) => $p->project !== null
             && (! $p->project->is_default || $p->role->canReceiveDispatch()));
 
-    return view('dispatch.home', compact('dispatches', 'stats', 'myEvents'));
+    // 🔑 «내가 신고한» 처리 중 요청. 이 홈을 쓰는 사람도 다른 행사에서는 참가자일 수
+    //    있고(A 참가자 + B 구급대), 그때 신고한 건을 다시 볼 통로가 필요하다.
+    //    프로필에 있던 「최근 구조 요청 내역」을 뺐으므로(2026-08-13) 여기가 유일한 길이다.
+    //    완료된 건까지는 싣지 않는다 — 이 화면의 주인공은 지령이다.
+    $myRequests = $user->requests()
+        ->with('project:id,name')
+        ->whereIn('status', [
+            \App\Enums\RequestStatus::PENDING->value,
+            \App\Enums\RequestStatus::IN_PROGRESS->value,
+        ])
+        ->latest('requested_at')
+        ->get();
+
+    return view('dispatch.home', compact('dispatches', 'stats', 'myEvents', 'myRequests'));
 })->middleware(['auth'])->name('dispatches.index');
 
 // 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
