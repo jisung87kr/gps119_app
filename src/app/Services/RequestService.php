@@ -228,7 +228,9 @@ class RequestService
     {
         $request = Request::with(['user', 'assignedRescuer'])->findOrFail($id);
 
-        if (! $user->hasRole('admin') && ! $user->hasRole('rescuer') && ! $request->isOwner($user)) {
+        // 판정은 모델이 한다(Request::isVisibleTo) — 웹 라우트도 같은 것을 읽는다.
+        // 규칙이 두 군데였을 때 웹 쪽이 조용히 비어 있었다.
+        if (! $request->isVisibleTo($user)) {
             throw new \Exception('Unauthorized to view this request');
         }
 

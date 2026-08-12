@@ -62,6 +62,11 @@ Route::get('/requests/create/{slug}', function ($slug) {
 })->middleware(['auth'])->name('request.create.project');
 
 Route::get('/requests/{request}', function (\App\Models\Request $request) {
+    // 🔴 예전에는 여기 `auth` 말고 아무 검사가 없었다. 로그인만 하면 id 를 바꿔가며
+    //    남의 신고 좌표·주소·담당 대원 연락처를 그대로 읽을 수 있었다.
+    //    판정은 모델이 한다 — API 쪽도 같은 것을 읽는다(규칙이 두 벌이면 한쪽이 빈다).
+    abort_unless($request->isVisibleTo(Auth::user()), 403);
+
     // FE-3.4: 신고자 상태추적용 담당자/상황실 정보 동봉(웹 뷰 데이터 — 실시간 갱신은 채널)
     $request->load(['activeDispatch.paramedic', 'project']);
 

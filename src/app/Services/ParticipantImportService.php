@@ -129,7 +129,11 @@ class ParticipantImportService
         // 🔑 조회·중복판정 «전에» 정규화. (클래스 주석 2번)
         $phone = self::normalizePhone($row['phone']);
         if ($phone === null) {
-            throw new RuntimeException('전화번호가 비어 있습니다.');
+            // 「비어 있다」와 「숫자가 하나도 없다」를 구분한다. 100행을 고치는 사람에게
+            // 셀에 글자가 있는데 «비어 있습니다» 는 찾을 수 없는 단서다.
+            throw new RuntimeException(trim($row['phone']) === ''
+                ? '전화번호가 비어 있습니다.'
+                : "전화번호에 숫자가 없습니다: {$row['phone']}");
         }
         if (! self::isValidPhone($phone)) {
             throw new RuntimeException("전화번호 형식이 올바르지 않습니다: {$row['phone']}");

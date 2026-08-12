@@ -152,4 +152,32 @@ class Request extends Model
     {
         return in_array($this->status, [RequestStatus::PENDING, RequestStatus::IN_PROGRESS]);
     }
+
+    /**
+     * 이 신고를 «볼 수» 있는 사람인가 — 열람 권한의 단일 출처.
+     *
+     * 🔴 이 메서드가 생긴 이유: 웹 라우트 `GET /requests/{request}` 에 `auth` 말고는
+     *    아무 검사가 없었다. 로그인만 하면 id 를 바꿔가며 **남의 신고 좌표·주소·담당
+     *    대원 연락처를 그대로 읽을 수 있었다.** API 쪽(RequestService::getRequestById)
+     *    에는 있던 검사가 웹에만 빠져 있었고, 규칙이 두 군데라 한쪽이 조용히 비었다.
+     *    이제 양쪽이 여기를 읽는다.
+     *
+     * 볼 수 있는 사람:
+     *  - 신고자 본인 (상태 추적)
+     *  - 시스템 admin / rescuer
+     *  - 그 행사의 상황실(controller) — 관제 판단에 필요
+     *  - 그 신고에 배정된(또는 배정됐던) 대원 — 자기 출동 건이다
+     */
+    public function isVisibleTo(User $user): bool
+    {
+        if ($this->isOwner($user) || $user->hasRole('admin') || $user->hasRole('rescuer')) {
+            return true;
+        }
+
+        if ($this->project && $user->eventRoleIn($this->project)?->canDispatch()) {
+            return true;
+        }
+
+        return $this->dispatches()->where('paramedic_id', $user->id)->exists();
+    }
 }

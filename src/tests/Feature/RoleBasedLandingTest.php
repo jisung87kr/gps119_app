@@ -139,6 +139,22 @@ class RoleBasedLandingTest extends TestCase
             ->assertRedirect(route('control', ['project' => $project->id]));
     }
 
+    /**
+     * 🔴 브라우저 QA 에서 발견: 로그인은 새 규칙을 타는데 «회원가입»만 fortify.home 을
+     *    그대로 써서 혼자 /dashboard 로 떨어졌다. 문이 셋인데 둘만 고친 상태였고,
+     *    이런 건 아무도 안 보는 채로 오래간다.
+     */
+    public function test_registration_uses_the_same_rule_as_login(): void
+    {
+        $this->post('/register', [
+            'phone' => '010-9999-0001',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect(route('request.create'));
+
+        $this->assertAuthenticated();
+    }
+
     public function test_the_root_path_sends_guests_straight_to_login(): void
     {
         // 신고 작성으로 한 번 튕기면 auth 미들웨어가 intended 를 심고,

@@ -16,6 +16,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
 use Laravel\Fortify\Fortify;
 
@@ -26,9 +27,13 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // 로그인 착지를 역할별로 가른다(관리자 → /admin/dashboard).
-        // 2FA 를 켠 계정도 같은 곳에 떨어져야 하므로 두 계약을 같은 구현에 묶는다.
+        // 인증 직후 착지를 역할별로 가른다(LandingResolver 단일 판정).
+        //
+        // 🔑 세 계약을 «전부» 같은 구현에 묶는다. 하나라도 빠지면 그 문으로 들어온
+        //    사람만 다른 화면을 보게 되고, 그건 조용히 오래간다 — 실제로 회원가입만
+        //    fortify.home 을 써서 혼자 /dashboard 로 떨어지고 있었다.
         $this->app->singleton(LoginResponseContract::class, LoginResponse::class);
+        $this->app->singleton(RegisterResponseContract::class, LoginResponse::class);
         $this->app->singleton(TwoFactorLoginResponseContract::class, LoginResponse::class);
     }
 
