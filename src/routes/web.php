@@ -233,6 +233,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // 행사 참가자·역할 관리 (EventRole) — resource projects 보다 먼저 등록해 /{project}/participants 우선 매칭
     Route::get('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'index'])->name('projects.participants');
     Route::post('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'store'])->name('projects.participants.store');
+    // 명단 CSV 일괄 등록 — 참가자 100명을 한 명씩 넣을 수는 없다(현장 피드백).
+    Route::post('/projects/{project}/participants/import', [\App\Http\Controllers\Admin\EventParticipantController::class, 'import'])->name('projects.participants.import');
+    Route::get('/projects/{project}/participants/template', [\App\Http\Controllers\Admin\EventParticipantController::class, 'importTemplate'])->name('projects.participants.template');
     Route::patch('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'update'])->name('projects.participants.update');
     Route::delete('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'destroy'])->name('projects.participants.destroy');
 
