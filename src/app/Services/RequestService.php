@@ -29,17 +29,6 @@ class RequestService
 
     public function createRequest(array $data, User $user): Request
     {
-        // 🔑 «지금 행사 중인 구급대»는 신고를 올릴 수 없다 (2026-08-12 현장 결정).
-        //    화면만 숨기면 API 는 그대로 열려 있고, 이 앱의 신고는 JSON 한 번이면 만들어진다.
-        //    「기능 자체를 차단」이라는 결정을 지키려면 규칙이 서비스에 있어야 한다.
-        //    (본인이 도움이 필요하면 119·상황실 전화 — 차단 화면이 그 두 개를 준다.)
-        //
-        // 판정 기준이 시스템 롤에서 «행사 역할»로 바뀌었다. 행사가 끝나면 그 사람도
-        // 평범한 사용자로 돌아가 신고할 수 있다 — 비번기에도 못 하는 건 부작용이었다.
-        if ($user->usesDispatchHome()) {
-            throw new \RuntimeException('구급대 계정은 구조요청을 접수할 수 없습니다. 119 또는 상황실로 전화해 주세요.');
-        }
-
         // 🔴 행사에 «참가 중인» 사람의 신고는 그 행사로 간다.
         //
         //    화면 링크에 맡겼더니 실제로 깨졌다: 행사에 입장한 참가자가 「구조요청 하기」를
@@ -51,6 +40,20 @@ class RequestService
         //    (모델 creating 훅의 「상시 운영」 귀속은 그대로 최후 폴백으로 남는다 — ADR-0005)
         if (empty($data['project_id'])) {
             $data['project_id'] = $this->resolveEventFor($user);
+        }
+
+        // 🔴 「구급대는 신고할 수 없다」(2026-08-12 현장 결정)를 «그 행사 기준»으로 판정한다.
+        //
+        //    전역(usesDispatchHome)으로 봤더니, A 행사 참가자이면서 B 행사 구급대인 사람이
+        //    **A 행사에서 사고를 당해도 신고를 못 했다.** 역할은 사람이 아니라 행사의
+        //    속성이다 — 그 사람은 A 에서는 그냥 참가자다.
+        //
+        //    화면만 숨기면 API 는 그대로 열려 있다(신고는 JSON 한 번이면 만들어진다).
+        //    「기능 자체를 차단」이라는 결정을 지키려면 규칙이 서비스에 있어야 한다.
+        //    본인이 도움이 필요하면 119·상황실 전화 — 차단 화면이 그 두 개를 준다.
+        $target = $data['project_id'] ? \App\Models\Project::find($data['project_id']) : null;
+        if (! $user->canFileRequestFor($target)) {
+            throw new \RuntimeException('구급대 계정은 구조요청을 접수할 수 없습니다. 119 또는 상황실로 전화해 주세요.');
         }
 
         // type 미지정 시 기본값(other). priority 미지정 시 type->defaultPriority() 자동 매핑.
@@ -91,7 +94,10 @@ class RequestService
      */
     private function resolveEventFor(User $user): ?int
     {
-        return $user->currentEvent()?->id;
+        // 🔴 currentEvent() 가 아니라 reportableEvents() 다. 구급대인 행사는 어차피
+        //    신고할 수 없으므로 기본 대상이 되면 안 된다 — A 참가자 / B 구급대인 사람이
+        //    신고 화면에 들어가자마자 「신고 불가」에 걸리게 된다.
+        return $user->reportableEvents()->first()?->id;
     }
 
     /**

@@ -22,9 +22,12 @@
     //
     //    $project 는 slug 로 들어온 경우(현수막 QR)이고, 없으면 RequestService 가
     //    「지금 있는 행사」로 붙인다 — 그 판정과 같은 것을 여기서도 읽는다.
+    //    🔴 구급대인 행사는 대상·선택지에서 뺀다. 어차피 그 행사에는 신고할 수 없으므로
+    //       기본값으로 제시하면 화면에 들어가자마자 「신고 불가」에 걸린다.
     $requester = auth()->user();
-    $targetEvent = $project ?: $requester?->currentEvent();
-    $switchable = $requester ? $requester->activeEvents()->reject(fn ($p) => $targetEvent && $p->id === $targetEvent->id) : collect();
+    $reportable = $requester ? $requester->reportableEvents() : collect();
+    $targetEvent = $project ?: $reportable->first();
+    $switchable = $reportable->reject(fn ($p) => $targetEvent && $p->id === $targetEvent->id)->values();
 
     // 상황 버튼별 Vue 핸들러. 긴급전화만 즉시 통화, 나머지는 주소확인 모달을 띄운다.
     $handlers = collect(RequestType::cases())
