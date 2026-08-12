@@ -44,14 +44,22 @@ class AdminShellSwitchTest extends TestCase
         ])->assertRedirect(route('admin.dashboard'));
     }
 
-    public function test_regular_user_login_still_lands_on_the_user_dashboard(): void
+    /**
+     * 2026-08-12: 착지 규칙이 LandingResolver 한 곳으로 합쳐지면서 일반 사용자의 기본
+     * 착지가 `/dashboard` → `/requests/create` 로 바뀌었다. 현장 요구(#6)가 「참가자·
+     * 운영진·경찰·자원봉사는 구조요청 화면」이고, `/` 는 원래도 거기로 보내고 있었다 —
+     * 즉 진입 경로에 따라 다른 화면이 뜨던 것을 없앤 것이다.
+     *
+     * 이 테스트가 지키는 것은 목적지 문자열이 아니라 «관리 셸로 새지 않는다»이다.
+     */
+    public function test_regular_user_login_does_not_land_in_the_admin_shell(): void
     {
         $this->regularUser();
 
         $this->post('/login', [
             'phone' => '01012345678',
             'password' => 'password',
-        ])->assertRedirect(config('fortify.home'));
+        ])->assertRedirect(route('request.create'));
     }
 
     public function test_intended_destination_still_wins_over_the_role_default(): void

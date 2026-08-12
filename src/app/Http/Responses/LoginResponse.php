@@ -2,6 +2,8 @@
 
 namespace App\Http\Responses;
 
+use App\Models\User;
+use App\Services\LandingResolver;
 use Illuminate\Http\JsonResponse;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
@@ -34,13 +36,13 @@ class LoginResponse implements LoginResponseContract, TwoFactorLoginResponseCont
 
     /**
      * 이 사용자의 기본 착지 경로.
+     *
+     * 판정은 LandingResolver 한 곳에만 있다 — `/` 도 같은 것을 부른다. 예전에는 둘이
+     * 서로 다른 규칙을 갖고 있어서, 같은 사람이 도메인을 직접 치고 들어왔을 때와
+     * 로그인 폼을 거쳤을 때 다른 화면을 봤다.
      */
     private function homeFor(?object $user): string
     {
-        if ($user && method_exists($user, 'hasRole') && $user->hasRole('admin')) {
-            return route('admin.dashboard');
-        }
-
-        return config('fortify.home');
+        return app(LandingResolver::class)->for($user instanceof User ? $user : null);
     }
 }

@@ -29,6 +29,14 @@ class RequestService
 
     public function createRequest(array $data, User $user): Request
     {
+        // 🔑 구조대(시스템 롤 rescuer) 계정은 신고를 올릴 수 없다 (2026-08-12 현장 결정).
+        //    화면만 숨기면 API 는 그대로 열려 있고, 이 앱의 신고는 JSON 한 번이면 만들어진다.
+        //    「기능 자체를 차단」이라는 결정을 지키려면 규칙이 서비스에 있어야 한다.
+        //    (본인이 도움이 필요하면 119·상황실 전화 — 차단 화면이 그 두 개를 준다.)
+        if ($user->hasRole('rescuer')) {
+            throw new \RuntimeException('구조대 계정은 구조요청을 접수할 수 없습니다. 119 또는 상황실로 전화해 주세요.');
+        }
+
         // type 미지정 시 기본값(other). priority 미지정 시 type->defaultPriority() 자동 매핑.
         // priority 가 명시되면 그 값을 우선(상황실 수동 상향).
         $type = isset($data['type']) ? RequestType::from($data['type']) : RequestType::OTHER;

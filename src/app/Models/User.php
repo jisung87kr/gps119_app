@@ -93,6 +93,43 @@ class User extends Authenticatable
     }
 
     /**
+     * 지금 «활성 행사»에서 가진 역할 중 가장 높은 것 (없으면 null).
+     *
+     * 화면 구성(하단 탭·착지)의 판정 기준이다. 시스템 롤이 아니라 행사 역할을 보는 이유는
+     * 행사가 끝나면 그 역할도 끝나기 때문이다 — 구급대원도 비번기엔 평범한 사용자다.
+     *
+     * 우선순위는 「지금 이 사람이 하는 일」 순: 상황실 > 구급대 > 자원봉사(구급) > 그 외.
+     */
+    public function activeEventRole(): ?EventRole
+    {
+        $roles = $this->eventParticipations()
+            ->where('status', ParticipantStatus::ACTIVE)
+            ->whereHas('project', fn ($q) => $q->active())
+            ->pluck('role')
+            ->map(fn ($r) => $r instanceof EventRole ? $r : EventRole::tryFrom($r))
+            ->filter();
+
+        foreach ([EventRole::CONTROLLER, EventRole::PARAMEDIC, EventRole::VOLUNTEER_MEDIC] as $priority) {
+            if ($roles->contains($priority)) {
+                return $priority;
+            }
+        }
+
+        return $roles->first();
+    }
+
+    /**
+     * 이 사람의 홈이 «출동 현황»인가 (= 구급 쪽 사람인가).
+     *
+     * 하단 탭과 /dashboard 리다이렉트가 같은 판정을 써야 한다 — 둘이 어긋나면
+     * 탭이 보내는 곳과 실제로 열리는 곳이 달라진다.
+     */
+    public function usesDispatchHome(): bool
+    {
+        return $this->hasRole('rescuer') || (bool) $this->activeEventRole()?->canReceiveDispatch();
+    }
+
+    /**
      * 지금 «위치를 공유 중»인 행사 참가 1건 (없으면 null).
      *
      * 위치 송신을 특정 화면에 묶어 두면, 그 화면을 떠나는 순간 watchPosition 이 죽어
