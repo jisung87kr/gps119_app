@@ -69,23 +69,23 @@
                     <span class="h-1.5 w-12 rounded-full bg-ink-200"></span>
                 </div>
 
-                @if ($project)
-                    <div class="px-5 pb-1">
-                        <p class="text-sm leading-relaxed text-ink-500">
-                            {{ $project->description ?? '위치를 공유하여 구조를 요청하세요.' }}
-                        </p>
-                    </div>
-                @endif
+                {{-- 행사 «설명»은 신고 결정과 무관해서 뺐다. 행사 이름은 헤더에 있고,
+                     어디로 접수되는지는 버튼 바로 위에 있다. 시트에서 읽어야 하는 것은
+                     「여기가 맞나 / 무슨 상황인가」 둘뿐이다. --}}
 
                 <location-info :latitude="lat" :longitude="long" :address="address"
                                title="현재 발송 위치"></location-info>
 
                 {{-- 주소 직접 검색 (Daum 우편번호) --}}
+                {{-- 🔑 예전에는 readonly input 에 v-model="address" 라, 바로 위 큰 글씨와
+                     «같은 주소»가 한 번 더 찍혔다. 이건 입력칸이 아니라 검색 진입 버튼이므로
+                     버튼으로 만든다 — 탭 타깃 크기는 그대로 두고 중복만 없앤다. --}}
                 <div class="px-5 py-3">
-                    <input type="text" id="address" name="address" readonly
-                           placeholder="다른 위치로 검색하려면 탭하세요"
-                           class="w-full rounded-2xl border-2 border-ink-200 bg-ink-50 px-4 py-3.5 text-base text-ink-950 placeholder:text-ink-400 focus:border-brand-600 focus:bg-white focus:outline-none"
-                           v-model="address" v-on:click="execDaumPostcode">
+                    <button type="button" v-on:click="execDaumPostcode"
+                            class="flex w-full items-center gap-2 rounded-2xl border-2 border-ink-200 bg-ink-50 px-4 py-3.5 text-base text-ink-500 active:bg-ink-100">
+                        <x-ui.icon name="pin" class="h-5 w-5 shrink-0 text-ink-400" />
+                        여기가 아니면 주소로 검색
+                    </button>
                 </div>
 
                 {{-- 접수 대상 안내 — 상황 버튼 «바로 위». 결정 직전에 보여야 의미가 있다.

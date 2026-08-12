@@ -30,6 +30,16 @@ export default {
         hasCoords() {
             return this.latitude !== '' && this.longitude !== '';
         },
+
+        // 🔑 소수점 5자리 ≈ 1m. 원본은 14자리까지 찍혀서 시트에서 «읽을 수 없는 숫자»가
+        //    한 줄을 통째로 먹었다. 좌표를 남기는 이유는 「위치가 잡혔다」는 신호와
+        //    GPS 정확도 확인이지, 값을 정밀하게 읽으라는 게 아니다.
+        //    (신고에 저장·전송되는 값은 그대로 원본이다 — 여기는 표시만 줄인다.)
+        shortCoords() {
+            const round = (v) => Number.parseFloat(v).toFixed(5);
+
+            return `${round(this.latitude)}, ${round(this.longitude)}`;
+        },
         pinClass() {
             return this.tone === 'danger' ? 'text-danger-600' : 'text-brand-600';
         }
@@ -51,7 +61,7 @@ export default {
             </p>
 
             <p v-if="hasCoords" class="mt-1 font-mono text-xs text-ink-400">
-                {{ latitude }}, {{ longitude }}
+                {{ shortCoords }}
             </p>
         </div>
     `
