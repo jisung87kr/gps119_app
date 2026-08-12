@@ -42,34 +42,45 @@
 
     <x-ui.page-header :heading="$heading" :back="route('dashboard')" class="shrink-0" />
 
-    {{-- 접수 대상 안내. 행사가 하나뿐이어도 «항상» 띄운다 — 안 띄우면 위 주석의 사고가 반복된다. --}}
-    <div class="shrink-0 px-5 pb-2" @if($switchable->isNotEmpty()) x-data="{ open: false }" @endif>
-        <div class="flex items-center gap-2 rounded-xl bg-ink-100 px-3.5 py-2.5">
-            <x-ui.icon name="pin" class="h-4 w-4 shrink-0 text-ink-400" />
-            <p class="min-w-0 flex-1 truncate text-sm text-ink-600">
-                @if ($targetEvent)
-                    <b class="font-bold text-ink-950">{{ $targetEvent->name }}</b> 으로 접수됩니다
-                @else
-                    행사와 무관한 <b class="font-bold text-ink-950">일반 신고</b>로 접수됩니다
-                @endif
-            </p>
-            @if ($switchable->isNotEmpty())
-                <button type="button" @click="open = !open"
-                        class="shrink-0 text-sm font-bold text-brand-600">변경</button>
-            @endif
-        </div>
+    {{-- 접수 대상 안내. 행사가 하나뿐이어도 «항상» 띄운다 — 안 띄우면 위 주석의 사고가 반복된다.
 
-        @if ($switchable->isNotEmpty())
-            {{-- 참가 중인 행사만 고를 수 있다. 선택지가 늘수록 급할 때 잘못 고른다. --}}
-            <div x-show="open" x-cloak class="mt-2 overflow-hidden rounded-xl border border-ink-200 bg-white">
-                @foreach ($switchable as $alt)
-                    <a href="{{ route('request.create.project', $alt->slug) }}"
-                       class="flex items-center gap-2 border-b border-ink-100 px-3.5 py-3 text-sm text-ink-700 last:border-0 active:bg-ink-50">
-                        <x-ui.icon name="pin" class="h-4 w-4 text-ink-300" />
-                        {{ $alt->name }} 으로 접수
-                    </a>
-                @endforeach
+         🔑 프레임워크를 쓰지 않는다(순수 <details>). 이 블록은 Vue 마운트 루트(#app) «안»에
+            있어서 Vue 가 컴파일하고, 사용자 화면에는 Alpine 이 없다(Alpine 은 관리자 셸 전용).
+            처음에 x-data/x-show 로 짰더니 «목록이 항상 펼쳐진 채»로 렌더됐다 — Vue 는 x-show 를
+            모르고 그냥 통과시키고, @click 은 Vue 가 open 을 못 찾아 죽었다.
+            응급 화면에 프레임워크 의존을 만들 이유도 없다. --}}
+    <div class="shrink-0 px-5 pb-2">
+        @php
+            $bannerText = $targetEvent
+                ? '<b class="font-bold text-ink-950">'.e($targetEvent->name).'</b> 으로 접수됩니다'
+                : '행사와 무관한 <b class="font-bold text-ink-950">일반 신고</b>로 접수됩니다';
+        @endphp
+
+        @if ($switchable->isEmpty())
+            <div class="flex items-center gap-2 rounded-xl bg-ink-100 px-3.5 py-2.5">
+                <x-ui.icon name="pin" class="h-4 w-4 shrink-0 text-ink-400" />
+                <p class="min-w-0 flex-1 truncate text-sm text-ink-600">{!! $bannerText !!}</p>
             </div>
+        @else
+            <details class="group">
+                <summary class="flex cursor-pointer list-none items-center gap-2 rounded-xl bg-ink-100 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
+                    <x-ui.icon name="pin" class="h-4 w-4 shrink-0 text-ink-400" />
+                    <p class="min-w-0 flex-1 truncate text-sm text-ink-600">{!! $bannerText !!}</p>
+                    <span class="shrink-0 text-sm font-bold text-brand-600 group-open:hidden">변경</span>
+                    <span class="hidden shrink-0 text-sm font-bold text-ink-400 group-open:inline">닫기</span>
+                </summary>
+
+                {{-- 참가 중인 행사만 고를 수 있다. 선택지가 늘수록 급할 때 잘못 고른다. --}}
+                <div class="mt-2 overflow-hidden rounded-xl border border-ink-200 bg-white">
+                    @foreach ($switchable as $alt)
+                        <a href="{{ route('request.create.project', $alt->slug) }}"
+                           class="flex items-center gap-2 border-b border-ink-100 px-3.5 py-3 text-sm text-ink-700 last:border-0 active:bg-ink-50">
+                            <x-ui.icon name="pin" class="h-4 w-4 shrink-0 text-ink-300" />
+                            {{ $alt->name }} 으로 접수
+                        </a>
+                    @endforeach
+                </div>
+            </details>
         @endif
     </div>
 

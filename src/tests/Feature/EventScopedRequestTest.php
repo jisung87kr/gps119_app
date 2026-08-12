@@ -283,4 +283,43 @@ class EventScopedRequestTest extends TestCase
             ->assertDontSee('참가 안 한 행사')
             ->assertDontSee(route('request.create.project', $notMine->slug), false);
     }
+
+    /**
+     * 🔴 이 가드가 생긴 이유: 배너의 「변경」 목록을 Alpine(x-data/x-show)으로 짰더니
+     *    «항상 펼쳐진 채»로 렌더됐다. 이 파일은 Vue 마운트 루트(#app) 안이고,
+     *    사용자 화면에는 Alpine 이 없다(Alpine 은 관리자 셸 전용) — Vue 는 x-show 를
+     *    모르고 통과시키고, @click 은 Vue 가 그 변수를 못 찾아 죽는다.
+     *
+     * 🔑 assertSee 로는 못 잡는다. 접혀 있든 펼쳐져 있든 DOM 에는 있기 때문이다.
+     *    그래서 «결과»가 아니라 «금지된 도구»를 본다.
+     */
+    public function test_the_request_screen_uses_no_alpine_directives(): void
+    {
+        $source = file_get_contents(resource_path('views/request/_map-screen.blade.php'));
+        // 주석 안의 설명은 제외하고 실제 마크업만 본다.
+        $markup = preg_replace('/\{\{--.*?--\}\}/s', '', $source);
+
+        foreach (['x-data', 'x-show', 'x-cloak', 'x-text'] as $directive) {
+            $this->assertStringNotContainsString(
+                $directive,
+                $markup,
+                "{$directive} 는 Vue 루트 안에서 동작하지 않는다 — 사용자 화면에는 Alpine 이 없다"
+            );
+        }
+    }
+
+    /** 「변경」 목록은 접힌 채로 시작해야 한다 — 그게 <details> 를 쓴 이유다. */
+    public function test_the_change_list_starts_collapsed(): void
+    {
+        $user = User::factory()->create(['phone' => '01011112222']);
+        $user->assignRole('user');
+        $this->join($user, $this->event('행사 A'), EventRole::PARTICIPANT, now()->subHour()->toDateTimeString());
+        $this->join($user, $this->event('행사 B'), EventRole::PARTICIPANT, now()->toDateTimeString());
+
+        $html = $this->actingAs($user)->get('/requests/create')->getContent();
+
+        $this->assertStringContainsString('<details', $html);
+        // open 속성이 붙어 있으면 처음부터 펼쳐진다.
+        $this->assertStringNotContainsString('<details open', $html);
+    }
 }
