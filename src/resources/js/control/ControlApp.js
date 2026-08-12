@@ -53,7 +53,13 @@ export default {
 
             requests: [],          // 라이브 신고(최신 우선)
             expandedRequestId: null,
-            requestStatusMap: {},  // request_id -> dispatch status(배정후 신고행 표시용)
+            // request_id -> { primary: 지령상태|null, supports: 보조 인원수 }
+            //
+            // 🔑 예전에는 request_id -> status 1:1 이었다. 다중 배차(ADR-0007 D4)에서
+            //    그대로 두면 보조의 상태가 주담당 칸을 덮어써서, 상황실 화면이 「누가 이
+            //    환자를 책임지는가」를 잘못 보여준다. 주담당은 «상태», 보조는 «머릿수»로
+            //    성격이 다르므로 한 칸에 합치지 않는다.
+            requestStatusMap: {},
 
             onlineCount: 0,
             requestCount: 0,
@@ -63,6 +69,9 @@ export default {
             // FE-3.3 지령 배정 패널
             assign: {
                 open: false,
+                // 'primary' = 주담당 배정/재배정, 'support' = 보조 «추가»(ADR-0007 D4).
+                // 서버도 별도 엔드포인트다 — 한 신고에 두 명이 붙는 건 명시적 결정이다.
+                mode: 'primary',
                 request: null,     // 대상 신고(payload)
                 paramedics: [],     // 가용 대원
                 selectedId: null,
@@ -546,8 +555,9 @@ export default {
         },
 
         // ── FE-3.3: 지령 배정 패널 ──────────────────────────────
-        async openAssign(req) {
+        async openAssign(req, mode = 'primary') {
             this.assign.open = true;
+            this.assign.mode = mode === 'support' ? 'support' : 'primary';
             this.assign.request = req;
             this.assign.selectedId = null;
             this.assign.note = '';
@@ -570,6 +580,7 @@ export default {
 
         closeAssign() {
             this.assign.open = false;
+            this.assign.mode = 'primary';
             this.assign.request = null;
             this.assign.paramedics = [];
             this.assign.selectedId = null;
@@ -598,21 +609,27 @@ export default {
 
         async submitAssign() {
             if (!this.assign.selectedId || this.assign.submitting) return;
+            const rid = this.assign.request.request_id;
+            const support = this.assign.mode === 'support';
             this.assign.submitting = true;
             this.assign.error = '';
             try {
                 await window.axios.post(
-                    `/api/requests/${this.assign.request.request_id}/dispatch`,
+                    `/api/requests/${rid}/dispatch${support ? '/support' : ''}`,
                     { paramedic_id: this.assign.selectedId, note: this.assign.note || null },
                     { headers: { Accept: 'application/json' } }
                 );
-                // 신고행 상태 = 배정
-                this.requestStatusMap[this.assign.request.request_id] = 'assigned';
+                // 신고행 즉시 반영(보드 왕복 동안의 빈 칸 방지). 확정은 loadBoard 가 한다.
+                const entry = this._statusEntry(rid);
+                if (support) entry.supports += 1;
+                else entry.primary = 'assigned';
+                this.requestStatusMap[rid] = entry;
+
                 this.closeAssign();
                 await this.loadBoard();
             } catch (e) {
                 const status = e.response?.status;
-                // OI-2 동시 배정 경합 → 422
+                // OI-2 동시 배정 경합 / 중복 대원 / 주담당 없음 → 422(서버 메시지가 더 정확하다)
                 this.assign.error = status === 422
                     ? (e.response?.data?.message || '이미 배정된 신고입니다.')
                     : (status === 403 ? '배정 권한이 없습니다.' : '지령 발령에 실패했습니다.');
@@ -635,9 +652,13 @@ export default {
                 this.board.counts = d.counts || {};
                 this.board.active = d.active || [];
                 this.board.history = d.history || [];
-                // 신고행 상태 맵 갱신(활성 지령 기준)
+                // 신고행 상태 맵 갱신(활성 지령 기준). 주담당은 «상태», 보조는 «머릿수».
                 const map = {};
-                (d.active || []).forEach((x) => { map[x.request_id] = x.status; });
+                (d.active || []).forEach((x) => {
+                    const e = map[x.request_id] || (map[x.request_id] = { primary: null, supports: 0 });
+                    if (x.is_primary === false) e.supports += 1;
+                    else e.primary = x.status;
+                });
                 this.requestStatusMap = map;
             } catch (e) {
                 console.error('[control] 출동보드 조회 실패', e);
@@ -649,14 +670,43 @@ export default {
         _onDispatchUpdated(payload) {
             // 실시간 상태 갱신: 보드 재조회(controller 전용, 저빈도) + 신고행 상태 반영
             if (payload && payload.request_id) {
-                // rejected 면 재지령 필요 → 신고행 경고 표시
-                this.requestStatusMap[payload.request_id] = payload.status;
+                const entry = this._statusEntry(payload.request_id);
+                // 🔑 보조의 전이는 주담당 칸을 «건드리지 않는다». 보조가 완료를 눌렀다고
+                //    신고행이 [완료]로 보이면, 아직 현장에 있는 주담당이 화면에서 사라진다.
+                //    보조 인원수는 바로 아래 loadBoard() 가 활성 지령 기준으로 확정한다.
+                //    (is_primary 가 없는 옛 페이로드는 주담당으로 본다 — 기존 동작 유지)
+                if (payload.is_primary !== false) {
+                    // rejected 면 재지령 필요 → 신고행 경고 표시
+                    entry.primary = payload.status;
+                }
+                this.requestStatusMap[payload.request_id] = entry;
             }
             this.loadBoard();
         },
 
         boardCount(s) { return this.board.counts?.[s] || 0; },
-        requestStatus(id) { return this.requestStatusMap[id] || null; },
+
+        /** 신고행 상태 엔트리(없으면 빈 엔트리를 «복사»로 만든다 — 맵을 몰래 채우지 않는다). */
+        _statusEntry(id) {
+            const cur = this.requestStatusMap[id];
+
+            return cur ? { primary: cur.primary ?? null, supports: cur.supports ?? 0 }
+                : { primary: null, supports: 0 };
+        },
+
+        /** 이 신고의 «주담당» 지령 상태. 화면의 배지·배정 버튼이 전부 이 값을 본다. */
+        requestStatus(id) { return this.requestStatusMap[id]?.primary ?? null; },
+
+        /** 이 신고에 붙은 «보조» 인원수. */
+        supportCount(id) { return this.requestStatusMap[id]?.supports ?? 0; },
+
+        // 보조는 주담당이 «현장에 붙어 있는 동안»에만 추가할 수 있다. 서버도 같은 규칙이라
+        // (주담당 없는 신고에는 보조 배정 거부) 버튼을 먼저 숨겨 422 를 만나지 않게 한다.
+        canAddSupport(id) {
+            const s = this.requestStatus(id);
+
+            return ['assigned', 'accepted', 'en_route', 'arrived'].includes(s);
+        },
 
         // 「이 신고를 (다시) 배정할 수 있는가」의 단일 출처 — 목록 정렬·미배정 카운트·
         // 배정 버튼이 전부 여기를 본다.
@@ -671,6 +721,14 @@ export default {
 
         // 거절·회수 뒤에는 «다시» 보내는 것이라 [재배정]으로 부른다.
         assignLabel(id) { return this.requestStatus(id) ? '재배정' : '배정'; },
+
+        // 보드 행의 «구분» 배지 — 이 지령이 그 신고의 책임자인지 보조인지.
+        kindLabel(d) { return d && d.is_primary === false ? '보조' : '주담당'; },
+        kindBadge(d) {
+            return d && d.is_primary === false
+                ? 'bg-gray-100 text-gray-500'
+                : 'bg-blue-50 text-blue-700';
+        },
 
         // ── 지령 회수 (ADR-0007) ────────────────────────────────
         // 🔑 arrived 에서는 회수 버튼을 «노출하지 않는다». 서버 전이표가 막아 422 를
@@ -709,7 +767,13 @@ export default {
                 // 회수된 신고는 즉시 «미배정»으로 돌아가야 한다. loadBoard() 가 활성
                 // 지령 기준으로 맵을 통째로 다시 만들지만, 그 왕복 동안 옛 상태가
                 // 남아 [배정] 버튼이 사라져 있는 것을 막는다.
-                delete this.requestStatusMap[d.request_id];
+                //
+                // ⚠️ 엔트리를 통째로 지우지 않는다 — 보조를 회수했는데 주담당 상태까지
+                //    사라지면 그 왕복 동안 「아무도 안 갔다」로 보인다.
+                const entry = this._statusEntry(d.request_id);
+                if (d.is_primary === false) entry.supports = Math.max(0, entry.supports - 1);
+                else entry.primary = null;
+                this.requestStatusMap[d.request_id] = entry;
                 this.cancelRecallConfirm();
                 await this.loadBoard();
             } catch (e) {
@@ -1088,15 +1152,26 @@ export default {
                     class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(requestStatus(req.request_id))">
                 {{ dispatchLabel(requestStatus(req.request_id)) }}
               </span>
+              <!-- 보조 인원(ADR-0007 D4). 주담당 «상태» 옆에 머릿수로 붙인다. -->
+              <span v-if="supportCount(req.request_id)"
+                    class="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
+                +보조 {{ supportCount(req.request_id) }}
+              </span>
               <span v-if="requestStatus(req.request_id)==='rejected'" class="text-[10px] text-rose-600 font-semibold">재지령 필요</span>
             </button>
             <div class="flex items-center gap-2 flex-shrink-0">
               <span class="text-xs text-gray-400">{{ fmtTime(req.created_at) }}</span>
-              <!-- 활성 배정 없으면 [배정], 거절/회수 상태면 [재배정] -->
+              <!-- 활성 주담당 없으면 [배정], 거절/회수 상태면 [재배정] -->
               <button v-if="needsAssign(req.request_id)"
                       @click="openAssign(req)"
                       class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium">
                 {{ assignLabel(req.request_id) }}
+              </button>
+              <!-- 주담당이 붙어 있는 동안만 [보조]. 주담당을 «교체»하는 버튼이 아니다. -->
+              <button v-else-if="canAddSupport(req.request_id)"
+                      @click="openAssign(req, 'support')"
+                      class="text-xs px-2 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 font-medium">
+                보조
               </button>
             </div>
           </div>
@@ -1141,6 +1216,7 @@ export default {
           <span class="flex items-center gap-2 min-w-0">
             <span class="text-sm font-medium">#{{ d.request_id }}</span>
             <span class="text-xs text-gray-500">{{ d.request ? typeLabel(d.request.type) : '' }}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="kindBadge(d)">{{ kindLabel(d) }}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
           </span>
           <span class="flex items-center gap-2 flex-shrink-0">
@@ -1157,6 +1233,7 @@ export default {
         <div v-for="d in board.history" :key="'h'+d.dispatch_id" class="flex items-center justify-between px-3 py-1.5 border-b border-gray-50 opacity-70">
           <span class="flex items-center gap-2 min-w-0">
             <span class="text-sm">#{{ d.request_id }}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="kindBadge(d)">{{ kindLabel(d) }}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
           </span>
           <span class="text-xs text-gray-400">{{ d.paramedic_name }}</span>
@@ -1213,6 +1290,10 @@ export default {
                   class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="dispatchBadge(requestStatus(req.request_id))">
               {{ dispatchLabel(requestStatus(req.request_id)) }}
             </span>
+            <span v-if="supportCount(req.request_id)"
+                  class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+              +보조 {{ supportCount(req.request_id) }}
+            </span>
             <span class="ml-auto text-xs text-gray-400">{{ fmtTime(req.created_at) }}</span>
           </div>
           <div v-if="req.address" class="mt-1 text-xs text-gray-600 break-keep">{{ req.address }}</div>
@@ -1232,6 +1313,11 @@ export default {
                     @click="openAssign(req)"
                     class="flex h-11 flex-1 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white active:bg-blue-700">
               {{ assignLabel(req.request_id) }}
+            </button>
+            <button v-else-if="canAddSupport(req.request_id)"
+                    @click="openAssign(req, 'support')"
+                    class="flex h-11 flex-1 items-center justify-center rounded-xl border border-blue-300 text-sm font-bold text-blue-700 active:bg-blue-50">
+              보조 추가
             </button>
           </div>
         </div>
@@ -1262,6 +1348,7 @@ export default {
         </div>
         <div v-for="d in board.active" :key="'mb'+d.dispatch_id" class="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
           <span class="text-sm font-bold">#{{ d.request_id }}</span>
+          <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="kindBadge(d)">{{ kindLabel(d) }}</span>
           <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
           <span class="ml-auto truncate text-xs text-gray-500">{{ d.paramedic_name }}</span>
           <!-- 회수(ADR-0007) — 폰에서도 오탭 방지 2단 확인을 거친다 -->
@@ -1273,6 +1360,7 @@ export default {
         <div v-if="board.history.length" class="bg-gray-50 px-4 py-1.5 text-[10px] text-gray-400">완료/종료 이력</div>
         <div v-for="d in board.history" :key="'mh'+d.dispatch_id" class="flex items-center gap-2 border-b border-gray-100 px-4 py-2 opacity-70">
           <span class="text-sm">#{{ d.request_id }}</span>
+          <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="kindBadge(d)">{{ kindLabel(d) }}</span>
           <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
           <span class="ml-auto truncate text-xs text-gray-400">{{ d.paramedic_name }}</span>
         </div>
@@ -1302,7 +1390,9 @@ export default {
            2026-08-09). 하단은 이미 처리돼 있었는데(아래 pb-[calc(...)]) 상단만 빠져 있었다.
            딥링크로 들어오면 이 패널이 «자동으로» 열리므로 앱에서 가장 먼저 보이는 화면이다. -->
       <div class="flex flex-none items-center justify-between border-b border-gray-200 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
-        <h3 class="text-base font-bold text-gray-900">지령 배정 — 신고 #{{ assign.request && assign.request.request_id }}</h3>
+        <h3 class="text-base font-bold text-gray-900">
+          {{ assign.mode === 'support' ? '보조 인원 추가' : '지령 배정' }} — 신고 #{{ assign.request && assign.request.request_id }}
+        </h3>
         <button @click="closeAssign" class="flex h-11 w-11 items-center justify-center text-gray-400 hover:text-gray-600" aria-label="닫기">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -1321,19 +1411,28 @@ export default {
       </div>
       <!-- 가용 대원 리스트 -->
       <div class="min-h-0 flex-1 overflow-y-auto p-2">
-        <div class="px-2 py-1 text-xs font-semibold text-gray-500">가용 구급대원 (online · 거리순)</div>
+        <div class="px-2 py-1 text-xs font-semibold text-gray-500">
+          가용 구급대원 (online · 거리순)
+          <span v-if="assign.mode === 'support'" class="ml-1 font-normal text-gray-400">— 주담당은 그대로 둡니다</span>
+        </div>
         <div v-if="assign.loading" class="p-4 text-center text-sm text-gray-400">불러오는 중…</div>
         <div v-else-if="assign.paramedics.length === 0" class="p-4 text-center text-sm text-gray-400">
           배정 가능한 구급대원이 없습니다.
         </div>
+        <!-- 이미 이 신고에 붙어 있는 대원은 «고를 수 없다». 서버가 422 로 막으므로
+             누를 수 있게 두면 상황실은 눌러 보고서야 안다(ADR-0007 D4). -->
         <label v-for="m in assign.paramedics" :key="m.user_id"
-               class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-3 hover:bg-gray-50 sm:py-2"
-               :class="{ 'bg-blue-50 ring-1 ring-blue-300': assign.selectedId === m.user_id }">
-          <input type="radio" name="medic" :value="m.user_id" v-model="assign.selectedId" class="text-blue-600">
+               class="flex items-center gap-2 rounded-lg px-2 py-3 sm:py-2"
+               :class="m.on_this_request
+                         ? 'cursor-not-allowed opacity-50'
+                         : ['cursor-pointer hover:bg-gray-50', assign.selectedId === m.user_id ? 'bg-blue-50 ring-1 ring-blue-300' : '']">
+          <input type="radio" name="medic" :value="m.user_id" v-model="assign.selectedId"
+                 :disabled="m.on_this_request" class="text-blue-600">
           <span class="h-2 w-2 flex-shrink-0 rounded-full" :class="m.online ? 'bg-green-500' : 'bg-gray-300'"></span>
           <span class="min-w-0 flex-1">
             <span class="text-sm font-medium">{{ m.name }}</span>
             <span class="ml-1 text-xs text-gray-400">{{ roleLabel(m.role) }}</span>
+            <span v-if="m.on_this_request" class="ml-1 text-[10px] font-semibold text-gray-500">이 신고 배정중</span>
           </span>
           <span class="text-xs text-gray-500">{{ fmtDistance(m.distance_m) }}</span>
           <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
@@ -1352,7 +1451,7 @@ export default {
             <button @click="closeAssign" class="h-12 flex-1 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">취소</button>
             <button @click="requestAssignConfirm" :disabled="!assign.selectedId"
                     class="h-12 flex-1 rounded-md bg-blue-600 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-              지령 발령
+              {{ assign.mode === 'support' ? '보조 발령' : '지령 발령' }}
             </button>
           </div>
         </template>
@@ -1360,8 +1459,12 @@ export default {
         <template v-else>
           <p class="mb-2.5 text-sm text-gray-700">
             <b>{{ selectedParamedic() ? selectedParamedic().name : '' }}</b> 님에게
-            신고 <b>#{{ assign.request && assign.request.request_id }}</b> 지령을 발령합니다.
-            <span class="mt-1 block text-xs text-gray-400">발령 후에는 취소할 수 없습니다.</span>
+            신고 <b>#{{ assign.request && assign.request.request_id }}</b>
+            {{ assign.mode === 'support' ? '보조 지령을 발령합니다.' : '지령을 발령합니다.' }}
+            <span v-if="assign.mode === 'support'" class="mt-1 block text-xs text-gray-500">
+              주담당은 그대로 유지됩니다. 신고 종결은 주담당이 완료할 때 이뤄집니다.
+            </span>
+            <span class="mt-1 block text-xs text-gray-400">발령 후에는 회수만 가능합니다.</span>
           </p>
           <div class="flex gap-2">
             <button @click="cancelAssignConfirm" :disabled="assign.submitting"
@@ -1388,8 +1491,13 @@ export default {
       <h3 class="text-base font-bold text-gray-900">지령 회수</h3>
       <p class="mt-2 text-sm text-gray-700">
         <b>{{ recall.dispatch.paramedic_name }}</b> 님의
-        신고 <b>#{{ recall.dispatch.request_id }}</b> 지령을 회수합니다.
-        <span class="mt-1 block text-xs text-gray-400">
+        신고 <b>#{{ recall.dispatch.request_id }}</b> {{ kindLabel(recall.dispatch) }} 지령을 회수합니다.
+        <!-- 보조를 뺀 것과 주담당을 뺀 것은 신고에 미치는 영향이 다르다.
+             한 문장으로 뭉뚱그리면 상황실이 「미배정으로 돌아갔다」고 잘못 읽는다. -->
+        <span v-if="recall.dispatch.is_primary === false" class="mt-1 block text-xs text-gray-400">
+          해당 대원 화면에서 지령이 즉시 사라집니다. 주담당은 그대로 출동을 이어갑니다. 되돌릴 수 없습니다.
+        </span>
+        <span v-else class="mt-1 block text-xs text-gray-400">
           대원 화면에서 지령이 즉시 사라지고, 신고는 다시 미배정으로 돌아갑니다. 되돌릴 수 없습니다.
         </span>
       </p>

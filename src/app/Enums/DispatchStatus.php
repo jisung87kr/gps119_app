@@ -96,7 +96,44 @@ enum DispatchStatus: string
     /** 활성(진행) 지령: 배정/수락/출동/도착. */
     public function isActive(): bool
     {
-        return in_array($this, [self::ASSIGNED, self::ACCEPTED, self::EN_ROUTE, self::ARRIVED], true);
+        return in_array($this, self::activeCases(), true);
+    }
+
+    /**
+     * 활성 상태 목록 — 스코프·관계에서 쓰는 단일 출처.
+     *
+     * 예전에는 이 4개 값이 Dispatch::scopeActive 와 Request::activeDispatch 에 각각
+     * 하드코딩돼 있었다. 상태가 하나 늘 때 한쪽만 고치면 «활성인데 관계에는 안 잡히는»
+     * 지령이 생기고, 그건 화면에서 지령이 통째로 사라지는 것으로 나타난다.
+     *
+     * @return array<int, self>
+     */
+    public static function activeCases(): array
+    {
+        return [self::ASSIGNED, self::ACCEPTED, self::EN_ROUTE, self::ARRIVED];
+    }
+
+    /**
+     * 활성 상태의 문자열 값 목록(쿼리용).
+     *
+     * @return array<int, string>
+     */
+    public static function activeValues(): array
+    {
+        return array_map(fn (self $s) => $s->value, self::activeCases());
+    }
+
+    /**
+     * 「현장에서 실제로 대응 중」인 상태: 수락 이후.
+     *
+     * 배정(assigned)은 아직 대원이 응답하지 않은 «보낸» 상태라 여기 들어가지 않는다.
+     * 신고를 in_progress 로 올릴지 판정하는 집계(DispatchService)가 이 경계를 쓴다.
+     *
+     * @return array<int, string>
+     */
+    public static function respondingValues(): array
+    {
+        return [self::ACCEPTED->value, self::EN_ROUTE->value, self::ARRIVED->value];
     }
 
     /** 종료 지령: 완료/거절/회수. */
@@ -131,7 +168,16 @@ enum DispatchStatus: string
     }
 
     /**
-     * 이 전이가 연결 requests 에 강제할 상태(없으면 null). (SPEC-02d 동기화 규칙)
+     * 이 전이가 연결 requests 에 «단독으로» 강제할 상태(없으면 null). (SPEC-02d 동기화 규칙)
+     *
+     * 🔑 다중 배차(ADR-0007 D4) 이후 이 함수는 신고 상태의 «권위»가 아니다 — 한 신고에
+     *    주담당 1명 + 보조 N명이 붙으므로, 「보조가 완료를 눌렀다」와 「주담당이 완료를
+     *    눌렀다」는 같은 전이인데 신고에 미치는 영향이 다르다. 전이 하나만 보는 함수는
+     *    형제 지령을 볼 수 없어 그 구분을 할 수 없다.
+     *    실제 판정은 활성 지령 «집계»를 보는 DispatchService::deriveRequestStatus() 가 한다.
+     *
+     * @deprecated ADR-0007 D4 — DispatchService::deriveRequestStatus() 로 대체. 전이 1건의
+     *             의도를 읽는 용도로만 남겨 둔다.
      */
     public function syncsRequestStatus(): ?RequestStatus
     {

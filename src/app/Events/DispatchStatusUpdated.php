@@ -32,6 +32,10 @@ class DispatchStatusUpdated implements ShouldBroadcast, ShouldDispatchAfterCommi
             'dispatch_id' => $this->dispatch->id,
             'request_id' => $this->dispatch->request_id,
             'status' => $this->dispatch->status->value,
+            // 다중 배차(ADR-0007 D4): 관제 화면은 주담당 상태와 보조 인원수를 따로 센다.
+            // 이 플래그가 없으면 보조의 전이가 주담당 상태를 덮어써서, 상황실이 「누가
+            // 책임지는가」를 잘못 읽는다.
+            'is_primary' => (bool) $this->dispatch->is_primary,
             'paramedic_id' => $this->dispatch->paramedic_id,
             'occurred_at' => now()->toISOString(),
         ];

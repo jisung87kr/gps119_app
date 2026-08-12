@@ -87,18 +87,35 @@ class Request extends Model
     }
 
     /**
-     * 현재 활성(진행) 지령 1건 (SPEC-03d). 활성 지령 1건 불변식과 연동.
+     * 현재 «책임자»인 활성 지령 1건 — 주담당 우선 (SPEC-03d, ADR-0007 D4).
+     *
+     * 🔑 다중 배차 이후 한 신고에는 활성 지령이 여럿일 수 있다. 이 관계는 그중 «누가
+     *    이 환자를 책임지는가»에 답한다 — 담당자 이름·전화(신고자 화면), 리포트 CSV 의
+     *    담당자 칸이 전부 여기를 읽는다. 보조가 최신이라는 이유로 그 자리에 올라오면
+     *    신고자는 주담당이 아닌 사람에게 전화를 건다.
+     *
+     * ⚠️ latestOfMany() 를 쓰지 않는다. one-of-many 서브쿼리로는 「is_primary 우선,
+     *    동률이면 최신」을 표현하려면 제약을 서브쿼리와 바깥 쿼리에 «두 벌» 써야 하고,
+     *    한쪽만 고치면 조용히 어긋난다. 정렬만으로도 지연로딩(first)과 이거로딩(키별 첫 행)
+     *    모두 같은 행을 고른다.
      */
     public function activeDispatch(): HasOne
     {
         return $this->hasOne(Dispatch::class)
-            ->whereIn('status', [
-                \App\Enums\DispatchStatus::ASSIGNED->value,
-                \App\Enums\DispatchStatus::ACCEPTED->value,
-                \App\Enums\DispatchStatus::EN_ROUTE->value,
-                \App\Enums\DispatchStatus::ARRIVED->value,
-            ])
-            ->latestOfMany();
+            ->whereIn('status', \App\Enums\DispatchStatus::activeValues())
+            ->orderByDesc('is_primary')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * 현재 활성 지령 «전부» (주담당 먼저, 그다음 최신순). ADR-0007 D4.
+     */
+    public function activeDispatches(): HasMany
+    {
+        return $this->hasMany(Dispatch::class)
+            ->whereIn('status', \App\Enums\DispatchStatus::activeValues())
+            ->orderByDesc('is_primary')
+            ->orderByDesc('id');
     }
 
     public function scopePending($query)

@@ -19,12 +19,13 @@ class Dispatch extends Model
 
     protected $fillable = [
         'request_id', 'project_id', 'assigned_by', 'paramedic_id',
-        'status', 'note', 'reject_reason',
+        'is_primary', 'status', 'note', 'reject_reason',
         'assigned_at', 'accepted_at', 'en_route_at', 'arrived_at', 'completed_at', 'rejected_at', 'cancelled_at',
     ];
 
     protected $casts = [
         'status' => DispatchStatus::class,
+        'is_primary' => 'boolean',
         'assigned_at' => 'datetime',
         'accepted_at' => 'datetime',
         'en_route_at' => 'datetime',
@@ -57,12 +58,19 @@ class Dispatch extends Model
     /** 활성(진행) 지령만. */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->whereIn('status', [
-            DispatchStatus::ASSIGNED->value,
-            DispatchStatus::ACCEPTED->value,
-            DispatchStatus::EN_ROUTE->value,
-            DispatchStatus::ARRIVED->value,
-        ]);
+        return $query->whereIn('status', DispatchStatus::activeValues());
+    }
+
+    /** 주담당 지령만 (ADR-0007 D4). */
+    public function scopePrimary(Builder $query): Builder
+    {
+        return $query->where('is_primary', true);
+    }
+
+    /** 보조 지령만 (ADR-0007 D4). */
+    public function scopeSupport(Builder $query): Builder
+    {
+        return $query->where('is_primary', false);
     }
 
     public function scopeForProject(Builder $query, int $projectId): Builder
