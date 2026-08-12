@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\RequestPriority;
+use App\Enums\RequestStatus;
 use App\Enums\RequestType;
 use App\Http\Controllers\Controller;
 use App\Models\Dispatch;
 use App\Models\Project;
 use App\Models\Request as RescueRequest;
 use App\Models\User;
+use App\Services\RequestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +23,6 @@ class AdminController extends Controller
         $stats = [
             'total_users' => User::count(),
             'total_admins' => User::role('admin')->count(),
-            'total_rescuers' => User::role('rescuer')->count(),
             'total_requests' => RescueRequest::count(),
             'pending_requests' => RescueRequest::where('status', 'pending')->count(),
             'in_progress_requests' => RescueRequest::where('status', 'in_progress')->count(),
@@ -227,7 +228,8 @@ class AdminController extends Controller
     public function memberEdit($id)
     {
         $member = User::findOrFail($id);
-        $roles = ['admin', 'rescuer'];
+        // 시스템 롤은 «일반회원 / 관리자회원» 둘뿐이다. 체크 해제 = 일반회원.
+        $roles = ['admin'];
 
         return view('admin.members.edit', compact('member', 'roles'));
     }
@@ -278,24 +280,45 @@ class AdminController extends Controller
             return response()->json($rescueRequest);
         }
 
-        $rescuers = User::role('rescuer')->get();
-
-        return view('admin.requests.show', compact('rescueRequest', 'rescuers'));
+        return view('admin.requests.show', compact('rescueRequest'));
     }
 
-    public function requestUpdate(Request $request, $id)
+    /**
+     * 관리자 화면의 신고 상태 변경.
+     *
+     * 🔑 예전에는 여기서 `$rescueRequest->update([...])` 를 직접 했다. 그래서 관리자
+     *    취소만 canBeCancelled() 검사를 건너뛰고, 활성 지령을 고아로 남기고, 아무에게도
+     *    알리지 않았다 — API 취소와 «같은 버튼처럼 보이는 다른 동작»이었다.
+     *    상태 변경은 서비스를 거친다.
+     */
+    public function requestUpdate(Request $request, $id, RequestService $requestService)
     {
         $rescueRequest = RescueRequest::findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'status' => ['required', 'in:pending,in_progress,completed,cancelled'],
-            'assigned_rescuer_id' => ['nullable', 'exists:users,id'],
+            'cancel_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $rescueRequest->update([
-            'status' => $request->status,
-            'assigned_rescuer_id' => $request->assigned_rescuer_id,
-        ]);
+        try {
+            if ($validated['status'] === RequestStatus::CANCELLED->value) {
+                $requestService->cancelRequest(
+                    $rescueRequest,
+                    $request->user(),
+                    $validated['cancel_reason'] ?? '관리자 취소'
+                );
+            } else {
+                // 🔑 assigned_rescuer_id 를 «건드리지 않는다». 예전에는 폼의 배정 셀렉트
+                //    값을 그대로 덮어썼는데, 그 셀렉트를 없앤 뒤에도 코드가 남아 있으면
+                //    상태만 바꿔도 기존 담당자 기록이 조용히 null 로 지워진다.
+                //    배정은 ADR-0003 이후 지령(Dispatch)이 단일 출처다.
+                $requestService->updateRequest($rescueRequest, [
+                    'status' => RequestStatus::from($validated['status']),
+                ], $request->user());
+            }
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->back()
             ->with('success', '구조 요청이 성공적으로 업데이트되었습니다.');
@@ -303,7 +326,8 @@ class AdminController extends Controller
 
     public function memberCreate()
     {
-        $roles = ['admin', 'rescuer'];
+        // 시스템 롤은 «일반회원 / 관리자회원» 둘뿐이다. 체크 해제 = 일반회원.
+        $roles = ['admin'];
 
         return view('admin.members.create', compact('roles'));
     }

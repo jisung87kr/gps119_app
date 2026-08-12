@@ -16,9 +16,10 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 // requests.global — 일반 신고(project_id=null)의 전역 관제 채널 (OI-1 확정 반영)
-// 시스템 admin·rescuer 가 구독한다.
+// ⚠️ 사실상 죽은 채널이다 — ADR-0005 의 creating 훅이 project_id 를 «항상» 채우므로
+//    RequestCreated::broadcastOn() 이 이 가지로 오지 않는다. 인가는 관리자만 남긴다.
 Broadcast::channel('requests.global', function (User $user) {
-    return $user->hasRole('admin') || $user->hasRole('rescuer');
+    return $user->hasRole('admin');
 });
 
 // event.{projectId}.control — 행사별 관제 채널 (SPEC-05a)

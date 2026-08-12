@@ -134,14 +134,66 @@ export class PersonMarkerPool {
         if (!entry) return false;
         entry.marker.setPosition(new kakao.maps.LatLng(Number(lat), Number(lng)));
         if (accuracy !== undefined) entry.row.last_accuracy = accuracy;
+        entry.left = false; // 위치가 오면 「나갔다」는 판정을 되돌린다
         return true;
+    }
+
+    /**
+     * presence 채널에서 나간 사람을 «즉시» 오프라인으로 본다.
+     *
+     * 🔑 마커를 «지우지» 않는다. 마지막으로 알려진 위치는 구조에서 여전히 값이 있다 —
+     *    연결이 끊긴 사람이야말로 찾아야 하는 사람일 수 있다. 지우는 것은 상황실이
+     *    「오프라인 숨기기」로 결정한다.
+     */
+    markLeft(userId) {
+        const entry = this.markers.get(userId);
+        if (!entry) return false;
+        entry.left = true;
+        this._applyState(entry);
+        return true;
+    }
+
+    /**
+     * 모든 마커의 online/stale/offline 을 «다시» 판정한다.
+     *
+     * 🔴 이게 없어서 지도와 숫자가 어긋났다. 상태 판정은 upsert() 안에만 있었고,
+     *    실시간 경로는 move() 만 부른다. WS 가 잘 붙어 있으면 roster 재조회가 영영
+     *    일어나지 않으므로, 30분 전에 사라진 사람의 핀이 «선명한 온라인 색» 그대로
+     *    남았다. 헤더의 온라인 수만 줄어들어, 상황실은 「7명 중 3명 온라인」인데
+     *    지도에는 7개가 똑같이 켜져 있는 화면을 봤다.
+     *
+     * @return {boolean} 하나라도 바뀌었으면 true
+     */
+    refreshPresence() {
+        let changed = false;
+        for (const [, entry] of this.markers) {
+            if (this._applyState(entry)) changed = true;
+        }
+        return changed;
+    }
+
+    /** 한 마커의 상태를 재판정해 이미지·투명도·표시 여부를 맞춘다. */
+    _applyState(entry) {
+        const state = this._stateOf(entry);
+        if (entry.state === state) return false;
+
+        entry.state = state;
+        entry.marker.setImage(this._image(entry.role, state));
+        entry.marker.setOpacity(this._opacity(state));
+        this._applyOne(entry);
+        return true;
+    }
+
+    /** presence 이탈은 last_seen_at 보다 «강하다» — 임계 시간을 기다릴 필요가 없다. */
+    _stateOf(entry) {
+        return entry.left ? 'offline' : presenceState(entry.row.last_seen_at);
     }
 
     // online 카운트(역할별) — 인력현황/필터 카운트용
     counts() {
         const result = {};
         for (const [, e] of this.markers) {
-            const st = presenceState(e.row.last_seen_at);
+            const st = this._stateOf(e);
             const r = e.row.role;
             result[r] = result[r] || { online: 0, total: 0 };
             result[r].total++;
@@ -153,7 +205,7 @@ export class PersonMarkerPool {
     onlineTotal() {
         let n = 0;
         for (const [, e] of this.markers) {
-            if (presenceState(e.row.last_seen_at) === 'online') n++;
+            if (this._stateOf(e) === 'online') n++;
         }
         return n;
     }
@@ -172,7 +224,7 @@ export class PersonMarkerPool {
 
     _shouldShow(entry) {
         if (!this.visibleRoles.has(entry.role)) return false;
-        if (this.hideOffline && presenceState(entry.row.last_seen_at) === 'offline') return false;
+        if (this.hideOffline && this._stateOf(entry) === 'offline') return false;
         return true;
     }
 

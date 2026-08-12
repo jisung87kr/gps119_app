@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Enums\DispatchStatus;
+use App\Enums\RequestStatus;
 use App\Events\RequestStatusUpdated;
 use App\Services\Push\PushMessage;
 use App\Services\PushService;
@@ -32,11 +33,15 @@ class PushRequestStatusToRequester implements ShouldQueue
             return;
         }
 
-        $body = match ($event->dispatch?->status) {
-            DispatchStatus::ACCEPTED => '구조대가 배정되었습니다. 곧 출발합니다.',
-            DispatchStatus::COMPLETED => '구조가 완료 처리되었습니다.',
-            default => '신고 상태가 변경되었습니다.',
-        };
+        // 취소는 지령이 아니라 신고 자체의 상태다 — dispatch 로 분기하면 「상태가
+        // 변경되었습니다」라는 무의미한 문구가 나간다. 신고 상태를 먼저 본다.
+        $body = $request->status === RequestStatus::CANCELLED
+            ? '신고가 취소되었습니다.'
+            : match ($event->dispatch?->status) {
+                DispatchStatus::ACCEPTED => '구조대가 배정되었습니다. 곧 출발합니다.',
+                DispatchStatus::COMPLETED => '구조가 완료 처리되었습니다.',
+                default => '신고 상태가 변경되었습니다.',
+            };
 
         // 🔴 담당 대원 «이름·연락처»를 담지 않는다(ADR-0004).
         //    신고자 본인 «채널»에는 실어도 되지만 푸시는 잠금화면에 뜬다 —

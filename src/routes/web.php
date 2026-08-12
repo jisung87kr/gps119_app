@@ -5,23 +5,16 @@ use App\Http\Controllers\Auth\SocialController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
-// 루트는 «이 사람이 여기 온 이유»로 보낸다.
+// 루트는 «이 사람이 여기 온 이유»로 보낸다. 판정은 LandingResolver 한 곳에만 있고
+// LoginResponse 도 같은 것을 부른다 — 예전에는 둘이 서로 다른 규칙이라 같은 사람이
+// 도메인을 직접 치고 들어왔을 때와 로그인 폼을 거쳤을 때 다른 화면을 봤다.
 //
-// 관리자는 관리 셸로. 그 밖의 로그인 사용자는 신고 작성(이 앱의 주 용도)으로.
 // 비로그인은 로그인으로 «직접» 보낸다 — 예전처럼 신고 작성으로 한 번 튕기면
 // auth 미들웨어가 intended=/requests/create 를 세션에 심고, 로그인 직후
 // LoginResponse 의 역할별 착지가 그 intended 에 밀려 무력화된다.
 // (도메인만 치고 들어오는 것이 가장 흔한 진입 경로라 실질적으로 늘 밀렸다.)
-Route::get('/', function () {
-    $user = Auth::user();
-
-    if (! $user) {
-        return redirect()->route('login');
-    }
-
-    return $user->hasRole('admin')
-        ? redirect()->route('admin.dashboard')
-        : redirect()->route('request.create');
+Route::get('/', function (\App\Services\LandingResolver $landing) {
+    return redirect($landing->for(Auth::user()));
 });
 
 // 법적 고지 — «비로그인도» 볼 수 있어야 한다. 로그인 화면에서 링크되고,
@@ -30,6 +23,15 @@ Route::view('/privacy', 'legal.privacy')->name('legal.privacy');
 Route::view('/location-terms', 'legal.location-terms')->name('legal.location-terms');
 
 Route::get('/requests/create', function () {
+    // 지금 «행사 중인 구급대»는 신고를 «올리지» 않는다 — 지령만 받는다.
+    // (2026-08-12 현장 결정. 차단 화면이 119·상황실 전화를 대신 제공한다.)
+    // 행사가 끝나면 그 사람도 평범한 사용자로 돌아가 신고할 수 있다.
+    if (Auth::user()->usesDispatchHome()) {
+        return response()->view('errors.paramedic-no-request', [
+            'controlTel' => '010-4794-0119',
+        ], 403);
+    }
+
     if (! Auth::user()->phone) {
         // 회원정보 변경 페이지 리다이렉트
         return view('errors.require-phone');
@@ -40,6 +42,13 @@ Route::get('/requests/create', function () {
 
 Route::get('/requests/create/{slug}', function ($slug) {
     $project = \App\Models\Project::where('slug', $slug)->firstOrFail();
+
+    if (Auth::user()->usesDispatchHome()) {
+        return response()->view('errors.paramedic-no-request', [
+            'project' => $project,
+            'controlTel' => data_get($project->settings, 'emergency_tel', '010-4794-0119'),
+        ], 403);
+    }
 
     // 프로젝트가 활성화되어 있는지 확인
     if (! $project->isActive()) {
@@ -54,6 +63,11 @@ Route::get('/requests/create/{slug}', function ($slug) {
 })->middleware(['auth'])->name('request.create.project');
 
 Route::get('/requests/{request}', function (\App\Models\Request $request) {
+    // 🔴 예전에는 여기 `auth` 말고 아무 검사가 없었다. 로그인만 하면 id 를 바꿔가며
+    //    남의 신고 좌표·주소·담당 대원 연락처를 그대로 읽을 수 있었다.
+    //    판정은 모델이 한다 — API 쪽도 같은 것을 읽는다(규칙이 두 벌이면 한쪽이 빈다).
+    abort_unless($request->isVisibleTo(Auth::user()), 403);
+
     // FE-3.4: 신고자 상태추적용 담당자/상황실 정보 동봉(웹 뷰 데이터 — 실시간 갱신은 채널)
     $request->load(['activeDispatch.paramedic', 'project']);
 
@@ -114,6 +128,50 @@ Route::get('/events/{id}/dispatch', function ($id) {
     ]);
 })->middleware(['auth'])->name('events.dispatch');
 
+// 구급대원 «홈» — 행사 횡단 출동 이력 (현장 피드백 #4·#6).
+//
+// 🔑 `/events/{id}/dispatch` 를 횡단으로 넓히지 않는다. 그 화면은 단일 행사 실시간
+//    작업 화면이다(개인 채널 1개 구독 + 지도 bounds 하나). 횡단으로 만들면 채널을 N개
+//    구독하게 되고 지도 전제가 무너진다. 여기는 실시간이 필요 없는 «목록»이라 분리한다.
+Route::get('/dispatches', function () {
+    $user = Auth::user();
+
+    $dispatches = \App\Models\Dispatch::where('paramedic_id', $user->id)
+        ->with(['request:id,type,priority,address,status', 'project:id,name'])
+        ->orderByDesc('id')
+        ->limit(50)
+        ->get();
+
+    $counts = \App\Models\Dispatch::where('paramedic_id', $user->id)
+        ->selectRaw('status, count(*) as aggregate')
+        ->groupBy('status')
+        ->pluck('aggregate', 'status');
+
+    $active = [\App\Enums\DispatchStatus::ACCEPTED, \App\Enums\DispatchStatus::EN_ROUTE, \App\Enums\DispatchStatus::ARRIVED];
+
+    $stats = [
+        // 「출동 요청 0건 완료 0건」이라는 지적이 여기다 — 신고 기준 숫자를 보여주고 있었다.
+        'assigned' => (int) ($counts[\App\Enums\DispatchStatus::ASSIGNED->value] ?? 0),
+        'in_progress' => (int) collect($active)->sum(fn ($s) => $counts[$s->value] ?? 0),
+        'completed_today' => \App\Models\Dispatch::where('paramedic_id', $user->id)
+            ->where('status', \App\Enums\DispatchStatus::COMPLETED)
+            ->whereDate('completed_at', today())
+            ->count(),
+        'completed_total' => (int) ($counts[\App\Enums\DispatchStatus::COMPLETED->value] ?? 0),
+    ];
+
+    // 지령을 받을 수 있는 활성 행사 — 실시간 작업 화면 진입점
+    $myEvents = \App\Models\EventParticipant::query()
+        ->where('user_id', $user->id)
+        ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
+        ->whereHas('project', fn ($q) => $q->active())
+        ->with('project:id,name')
+        ->get()
+        ->filter(fn ($p) => $p->project !== null && $p->role->canReceiveDispatch());
+
+    return view('dispatch.home', compact('dispatches', 'stats', 'myEvents'));
+})->middleware(['auth'])->name('dispatches.index');
+
 // 웹 관제 SPA (FE-2.1). 가드: 시스템 admin 또는 행사 controller(active).
 // admin → 활성 행사 전체, controller → 본인이 active CONTROLLER 인 활성 행사만.
 Route::get('/control', function () {
@@ -167,6 +225,12 @@ Route::get('/control', function () {
 
 Route::get('/dashboard', function () {
     $user = Auth::user();
+
+    // 구급 쪽 사람의 홈은 «내가 신고한 건수»가 아니라 출동 현황이다 (현장 피드백 #4).
+    // 판정은 User::usesDispatchHome() 한 곳 — 하단 탭도 같은 것을 본다.
+    if ($user->usesDispatchHome()) {
+        return redirect()->route('dispatches.index');
+    }
 
     $counts = $user->requests()
         ->selectRaw('status, count(*) as aggregate')
@@ -233,6 +297,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // 행사 참가자·역할 관리 (EventRole) — resource projects 보다 먼저 등록해 /{project}/participants 우선 매칭
     Route::get('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'index'])->name('projects.participants');
     Route::post('/projects/{project}/participants', [\App\Http\Controllers\Admin\EventParticipantController::class, 'store'])->name('projects.participants.store');
+    // 명단 CSV 일괄 등록 — 참가자 100명을 한 명씩 넣을 수는 없다(현장 피드백).
+    Route::post('/projects/{project}/participants/import', [\App\Http\Controllers\Admin\EventParticipantController::class, 'import'])->name('projects.participants.import');
+    Route::get('/projects/{project}/participants/template', [\App\Http\Controllers\Admin\EventParticipantController::class, 'importTemplate'])->name('projects.participants.template');
+    Route::delete('/projects/{project}/roster/{roster}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'rosterDestroy'])->name('projects.roster.destroy');
     Route::patch('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'update'])->name('projects.participants.update');
     Route::delete('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'destroy'])->name('projects.participants.destroy');
 

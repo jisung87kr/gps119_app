@@ -278,10 +278,6 @@
                         <p class="text-2xl font-bold tabular-nums text-slate-900">{{ $stats['total_admins'] }}</p>
                         <p class="mt-1 text-xs text-slate-500">관리자</p>
                     </div>
-                    <div class="rounded-xl bg-slate-50 py-4">
-                        <p class="text-2xl font-bold tabular-nums text-slate-900">{{ $stats['total_rescuers'] }}</p>
-                        <p class="mt-1 text-xs text-slate-500">구조대원</p>
-                    </div>
                 </div>
             </div>
         </div>

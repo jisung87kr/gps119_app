@@ -19,9 +19,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/requests/{id}', [RequestApiController::class, 'show'])->name('api.requests.show');
     Route::put('/requests/{id}', [RequestApiController::class, 'update'])->name('api.requests.update');
     Route::delete('/requests/{id}', [RequestApiController::class, 'destroy'])->name('api.requests.destroy');
-    // 구조대원 배정. 실시간 지령 에픽에서 POST /requests/{id}/dispatch 로 대체 예정(ADR-0003).
-    Route::post('/requests/{id}/assign', [RequestApiController::class, 'assignRescuer'])->name('api.requests.assign');
-
     // 푸시 수신 통로 등록/해제 (mobile-app N1).
     // 🔴 토큰은 «본문»으로만 받는다 — path 에 넣으면 액세스·프록시·에러 로그에 자격증명이 남는다.
     Route::post('/devices', [DeviceTokenApiController::class, 'store'])->name('api.devices.store');
@@ -59,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // 배정: 해당 신고 행사의 controller (event.role 은 {requestId}→신고→행사 해석)
     Route::post('/requests/{requestId}/dispatch', [DispatchApiController::class, 'store'])
         ->middleware('event.role:controller')->name('api.requests.dispatch');
+    // 보조 인원 «추가» 배정 (ADR-0007 D4 — 주담당 1명 + 보조 N명).
+    // 🔑 위 라우트의 플래그가 아니라 별도 URL 이다. 한 신고에 두 명이 붙는 것은 관제사의
+    //    명시적 결정이어야 하고, 같은 문에 옵션으로 달면 오탭·클라이언트 버그로 생긴다.
+    Route::post('/requests/{requestId}/dispatch/support', [DispatchApiController::class, 'storeSupport'])
+        ->middleware('event.role:controller')->name('api.requests.dispatch.support');
     // 가용 구급대원(거리순+보유지령수): controller
     Route::get('/requests/{requestId}/available-paramedics', [DispatchApiController::class, 'availableParamedics'])
         ->middleware('event.role:controller')->name('api.requests.available-paramedics');

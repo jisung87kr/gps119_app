@@ -24,9 +24,26 @@ class DispatchApiController extends Controller
     public function __construct(private DispatchService $service) {}
 
     /**
-     * POST /api/requests/{id}/dispatch  (event.role:controller)
+     * POST /api/requests/{id}/dispatch  (event.role:controller) — 주담당 배정.
      */
     public function store(Request $request, int $id): JsonResponse
+    {
+        return $this->createDispatch($request, $id, primary: true);
+    }
+
+    /**
+     * POST /api/requests/{id}/dispatch/support  (event.role:controller) — 보조 배정.
+     *
+     * 🔑 기존 배정 엔드포인트에 플래그를 얹지 않고 «별도 경로»로 둔다(ADR-0007 D4).
+     *    같은 문에 옵션으로 달면 클라이언트 버그 하나로 주담당이 둘이 되거나 보조가
+     *    실수로 생긴다 — 보조는 명시적으로 이 URL 을 부를 때만 만들어진다.
+     */
+    public function storeSupport(Request $request, int $id): JsonResponse
+    {
+        return $this->createDispatch($request, $id, primary: false);
+    }
+
+    private function createDispatch(Request $request, int $id, bool $primary): JsonResponse
     {
         $validated = $request->validate([
             'paramedic_id' => ['required', 'exists:users,id'],
@@ -35,16 +52,24 @@ class DispatchApiController extends Controller
 
         $rescueRequest = RescueRequest::findOrFail($id);
         $paramedic = User::findOrFail($validated['paramedic_id']);
+        $actor = Auth::user();
+        $note = $validated['note'] ?? null;
 
         try {
-            $dispatch = $this->service->assign($rescueRequest, $paramedic, Auth::user(), $validated['note'] ?? null);
+            $dispatch = $primary
+                ? $this->service->assign($rescueRequest, $paramedic, $actor, $note)
+                : $this->service->assignSupport($rescueRequest, $paramedic, $actor, $note);
         } catch (DispatchAuthorizationException $e) {
             return response()->error($e->getMessage(), 403);
         } catch (\RuntimeException $e) {
             return response()->error($e->getMessage(), 422);
         }
 
-        return response()->success($dispatch, '지령을 배정했습니다.', 201);
+        return response()->success(
+            $dispatch,
+            $primary ? '지령을 배정했습니다.' : '보조 인원을 추가 배정했습니다.',
+            201
+        );
     }
 
     /**

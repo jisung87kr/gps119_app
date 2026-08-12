@@ -7,7 +7,6 @@ use App\Enums\RequestStatus;
 use App\Enums\RequestType;
 use App\Http\Controllers\Controller;
 use App\Models\Request as RequestModel;
-use App\Models\User;
 use App\Services\RequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,34 +86,24 @@ class RequestApiController extends Controller
         }
     }
 
-    public function destroy(int $id): JsonResponse
-    {
-        try {
-            $request = RequestModel::findOrFail($id);
-            $cancelledRequest = $this->requestService->cancelRequest($request, Auth::user());
-
-            return response()->success($cancelledRequest, 'Request cancelled successfully');
-        } catch (\Exception $e) {
-            return response()->error($e->getMessage(), 403);
-        }
-    }
-
-    /**
-     * @deprecated ADR-0003 — 실시간 지령(POST /api/requests/{id}/dispatch + DispatchService)으로 대체.
-     *             레거시 호환을 위해 잠정 유지. 신규 코드는 DispatchService 를 사용할 것.
-     */
-    public function assignRescuer(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
-            'rescuer_id' => 'required|exists:users,id',
+            'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         try {
             $rescueRequest = RequestModel::findOrFail($id);
-            $rescuer = User::findOrFail($validated['rescuer_id']);
-            $updatedRequest = $this->requestService->assignRescuer($rescueRequest, $rescuer, Auth::user());
+            $cancelledRequest = $this->requestService->cancelRequest(
+                $rescueRequest,
+                Auth::user(),
+                $validated['reason'] ?? null
+            );
 
-            return response()->success($updatedRequest, 'Rescuer assigned successfully');
+            return response()->success($cancelledRequest, '신고를 취소했습니다.');
+        } catch (\RuntimeException $e) {
+            // 「배정 후라 직접 취소 불가」 같은 상태 충돌은 권한 문제가 아니다.
+            return response()->error($e->getMessage(), 422);
         } catch (\Exception $e) {
             return response()->error($e->getMessage(), 403);
         }

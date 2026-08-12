@@ -65,8 +65,10 @@ class EventReportController extends Controller
     {
         $project = Project::findOrFail($id);
 
+        // 「구분」이 없으면 한 신고에 지령이 여러 건일 때 사후 분석에서 «누가 그 환자를
+        // 책임졌는지»를 복원할 수 없다 — 다중 배차(ADR-0007 D4)의 핵심 정보다.
         $header = [
-            '지령ID', '신고ID', '구급대원', '발령자', '상태',
+            '지령ID', '신고ID', '구분', '구급대원', '발령자', '상태',
             '배정시각', '수락시각', '출동시각', '도착시각', '완료시각', '거절시각',
             '거절사유', '메모',
         ];
@@ -80,6 +82,7 @@ class EventReportController extends Controller
                         fputcsv($file, [
                             $d->id,
                             $d->request_id,
+                            $d->is_primary ? '주담당' : '보조',
                             $d->paramedic->name ?? '',
                             $d->assignedBy->name ?? '',
                             $d->status?->label() ?? '',

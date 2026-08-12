@@ -41,8 +41,9 @@ class BadgeCounter
      */
     public function for(User $user): int
     {
-        // 시스템 admin·rescuer 는 모든 행사의 모든 신고를 받는다(현재 정책, M-9 로 세분화 예정).
-        if ($user->hasRole('admin') || $user->hasRole('rescuer')) {
+        // 시스템 관리자는 모든 행사의 모든 신고를 받는다(현재 정책, M-9 로 세분화 예정).
+        // 상시 구급 인력은 「상시 운영」 행사의 구급대이므로 아래 행사 스코프로 잡힌다.
+        if ($user->hasRole('admin')) {
             return Request::query()->pending()->count();
         }
 

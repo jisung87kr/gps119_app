@@ -63,7 +63,6 @@
                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded">
                                     <span class="ml-2 text-sm text-slate-700">
                                         @if($role === 'admin') 관리자
-                                        @elseif($role === 'rescuer') 구조대
                                         @else {{ $role }}
                                         @endif
                                     </span>

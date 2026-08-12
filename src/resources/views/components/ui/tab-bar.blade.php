@@ -11,15 +11,46 @@
     $routeName = Route::currentRouteName() ?? '';
 
     $current = $active ?? match (true) {
-        $routeName === 'dashboard' => 'home',
-        str_starts_with($routeName, 'request.') => 'request',
+        $routeName === 'dashboard', str_starts_with($routeName, 'dispatches.') => 'home',
+        $routeName === 'control', str_starts_with($routeName, 'events.') => 'work',
+        str_starts_with($routeName, 'request.') => 'work',
         str_starts_with($routeName, 'profile.') => 'profile',
         default => null,
     };
 
+    // 🔑 탭은 «세 개 고정»이고 가운데 자리만 역할에 따라 바뀐다 (현장 피드백 #6).
+    //    개수를 바꾸면 같은 사람이 행사마다 다른 탭 수를 보게 되어 근육 기억이 깨진다.
+    //
+    //    판정은 «지금 활성 행사에서의 역할»이다 — 행사가 끝나면 구급대원도 평범한
+    //    사용자로 돌아간다. 시스템 롤은 일반/관리자 둘뿐이라 여기서 볼 것이 없다.
+    $user = auth()->user();
+    $eventRole = $user?->activeEventRole();
+    $isDispatchSide = (bool) $user?->usesDispatchHome();
+
+    // 홈은 「그 사람의 일」이 있는 곳이다. 구급 쪽은 신고 목록이 아니라 출동 현황이다.
+    $homeUrl = $isDispatchSide ? route('dispatches.index') : route('dashboard');
+
+    if ($eventRole === \App\Enums\EventRole::CONTROLLER) {
+        $middle = ['key' => 'work', 'label' => '관제', 'icon' => 'pin', 'url' => route('control')];
+    } elseif ($isDispatchSide) {
+        // 지령을 «받는» 화면은 행사 스코프다. 행사가 정확히 하나일 때만 직행한다 —
+        // 여럿일 때 잘못된 현장을 여는 비용이 탭 한 번보다 훨씬 크다.
+        $only = $user->eventParticipations()
+            ->where('status', \App\Enums\ParticipantStatus::ACTIVE)
+            ->whereHas('project', fn ($q) => $q->active())
+            ->get()
+            ->filter(fn ($p) => $p->role->isDispatchCandidate());
+
+        $middle = $only->count() === 1
+            ? ['key' => 'work', 'label' => '지령', 'icon' => 'ambulance', 'url' => route('events.dispatch', $only->first()->project_id)]
+            : ['key' => 'work', 'label' => '행사', 'icon' => 'pin', 'url' => route('events.join')];
+    } else {
+        $middle = ['key' => 'work', 'label' => '구조요청', 'icon' => 'ambulance', 'url' => route('request.create')];
+    }
+
     $tabs = [
-        ['key' => 'home', 'label' => '홈', 'icon' => 'home', 'url' => route('dashboard')],
-        ['key' => 'request', 'label' => '구조요청', 'icon' => 'ambulance', 'url' => route('request.create')],
+        ['key' => 'home', 'label' => '홈', 'icon' => 'home', 'url' => $homeUrl],
+        $middle,
         ['key' => 'profile', 'label' => '프로필', 'icon' => 'user', 'url' => route('profile.show')],
     ];
 @endphp

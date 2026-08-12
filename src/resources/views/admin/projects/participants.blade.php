@@ -74,7 +74,9 @@
                 <select name="user_id" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
                     <option value="">회원 선택…</option>
                     @foreach($addableUsers as $u)
-                        <option value="{{ $u->id }}">{{ $u->name }} @if($u->phone)· {{ $u->phone }}@endif</option>
+                        {{-- 셀렉트 옵션은 컴포넌트를 못 쓰므로 여기서 직접 가린다.
+                             동명이인 구분에 필요한 뒤 4자리만 남긴다. --}}
+                        <option value="{{ $u->id }}">{{ $u->name }}@if($u->phone) · ***{{ substr(preg_replace('/[^0-9]/', '', $u->phone), -4) }}@endif</option>
                     @endforeach
                 </select>
             </div>
@@ -94,6 +96,148 @@
         @error('user_id')<p class="px-6 pb-4 -mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
     </div>
 
+    {{-- 명단 일괄 등록 (CSV) --}}
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm" x-data="{ fileName: '' }">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <h2 class="text-base font-semibold text-slate-900">운영진 명단 일괄 등록</h2>
+            <p class="mt-0.5 text-xs text-slate-400">
+                운영진·경찰·자원봉사·구급대 등 <b class="text-slate-500">역할이 있는 사람</b>의 명단을 올립니다.
+                일반 참가자는 올릴 필요가 없습니다 — 입장 QR 로 들어오면 자동으로 참가자가 됩니다.
+                <b class="text-slate-500">엑셀에서 「다른 이름으로 저장 → CSV」</b>로 저장해 올려주세요(.xlsx 는 지원하지 않습니다).
+            </p>
+        </div>
+        <div class="p-6 space-y-4">
+            {{-- 형식 안내 --}}
+            <div class="rounded-xl bg-slate-50 ring-1 ring-slate-200/70 px-4 py-3.5 text-xs text-slate-500 space-y-1.5">
+                <p><b class="text-slate-700">컬럼 순서</b> · 이름, 전화번호, 역할 <span class="text-slate-400">(첫 줄에 제목행이 있어도 됩니다)</span></p>
+                <p><b class="text-slate-700">역할</b> · {{ collect($roles)->map(fn($r) => $r->label())->implode(' / ') }} <span class="text-slate-400">— 비워두면 참가자로 등록됩니다.</span></p>
+                <p><b class="text-slate-700">전화번호</b> · <span class="tabular-nums">010-1234-5678</span> 처럼 하이픈이 있어도 됩니다. <b class="text-slate-700">이 번호가 명단의 기준</b>이라 본인이 입장할 때 쓰는 번호와 같아야 합니다.</p>
+                <p><b class="text-slate-700">계정</b> · 계정을 미리 만들지 않습니다. 명단만 등록해 두면 <b class="text-slate-700">본인이 입장 QR 로 들어오는 순간 그 역할이 자동으로 붙습니다.</b> 이미 가입된 회원은 업로드 즉시 역할이 배정됩니다.</p>
+                <p><b class="text-slate-700">한도</b> · 최대 {{ number_format(\App\Services\ParticipantImportService::MAX_ROWS) }}행 / 1MB. 넘으면 파일을 나눠 올려주세요.</p>
+            </div>
+
+            <form action="{{ route('admin.projects.participants.import', $project->id) }}" method="POST" enctype="multipart/form-data"
+                  class="flex flex-col sm:flex-row sm:items-center gap-3">
+                @csrf
+                <label class="flex-1 min-w-0 flex items-center gap-2.5 px-3.5 py-2.5 border border-dashed border-slate-300 rounded-xl bg-white cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-colors">
+                    <svg class="w-4 h-4 text-slate-400 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+                    <span class="text-sm truncate" :class="fileName ? 'text-slate-800 font-medium' : 'text-slate-400'"
+                          x-text="fileName || 'CSV 파일 선택…'">CSV 파일 선택…</span>
+                    <input type="file" name="file" accept=".csv,text/csv,text/plain" required class="sr-only"
+                           @change="fileName = $event.target.files.length ? $event.target.files[0].name : ''">
+                </label>
+                <button type="submit" class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-600/20 flex-none transition-colors">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+                    업로드
+                </button>
+                <a href="{{ route('admin.projects.participants.template', $project->id) }}"
+                   class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 flex-none transition-colors">
+                    양식 다운로드
+                </a>
+            </form>
+
+            @error('file')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+
+        {{-- 결과 리포트 --}}
+        @if($report = session('importReport'))
+            <div class="border-t border-slate-100 p-6 space-y-4">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="rounded-xl bg-slate-50 ring-1 ring-slate-200/70 px-4 py-3">
+                        <p class="text-xs text-slate-400">총 행</p>
+                        <p class="mt-0.5 text-lg font-bold text-slate-800 tabular-nums">{{ number_format($report['total']) }}</p>
+                    </div>
+                    <div class="rounded-xl bg-emerald-50 ring-1 ring-emerald-200/70 px-4 py-3">
+                        <p class="text-xs text-emerald-600/70">역할 배정 완료</p>
+                        <p class="mt-0.5 text-lg font-bold text-emerald-700 tabular-nums">{{ number_format($report['joined']) }}</p>
+                    </div>
+                    <div class="rounded-xl bg-blue-50 ring-1 ring-blue-200/70 px-4 py-3">
+                        <p class="text-xs text-blue-600/70">입장 대기</p>
+                        <p class="mt-0.5 text-lg font-bold text-blue-700 tabular-nums">{{ number_format($report['pending']) }}</p>
+                    </div>
+                    <div class="rounded-xl {{ $report['failed'] ? 'bg-red-50 ring-red-200/70' : 'bg-slate-50 ring-slate-200/70' }} ring-1 px-4 py-3">
+                        <p class="text-xs {{ $report['failed'] ? 'text-red-600/70' : 'text-slate-400' }}">실패</p>
+                        <p class="mt-0.5 text-lg font-bold {{ $report['failed'] ? 'text-red-700' : 'text-slate-800' }} tabular-nums">{{ number_format($report['failed']) }}</p>
+                    </div>
+                </div>
+
+                {{-- 🔴 상황실은 전원의 실시간 위치와 신고자 연락처를 보는 자리다.
+                     엑셀로 부여하는 것을 허용했으므로, 몇 명에게 줬는지는 반드시 보이게 한다 —
+                     붙여넣기 사고는 단서가 없으면 영영 발견되지 않는다. --}}
+                @if(($report['controllers'] ?? 0) > 0)
+                    <div class="rounded-xl bg-amber-50 ring-1 ring-amber-200/70 px-4 py-3 text-sm text-amber-800">
+                        <b>상황실 권한 {{ number_format($report['controllers']) }}명</b>이 이 명단으로 부여됐습니다.
+                        상황실은 전원의 실시간 위치와 신고자 연락처를 볼 수 있습니다 — 의도한 인원이 맞는지 아래 목록에서 확인해 주세요.
+                    </div>
+                @endif
+
+                @if(!empty($report['errors']))
+                    <div class="rounded-xl ring-1 ring-red-200/70 overflow-hidden">
+                        <div class="px-4 py-2.5 bg-red-50 text-xs font-semibold text-red-700">
+                            처리하지 못한 행 — 아래 줄만 고쳐서 다시 올리면 됩니다 (성공한 행은 다시 올려도 중복되지 않습니다)
+                        </div>
+                        <div class="divide-y divide-red-100 max-h-80 overflow-y-auto bg-white">
+                            @foreach($report['errors'] as $err)
+                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5 text-xs">
+                                    <span class="font-mono font-semibold text-red-600 tabular-nums flex-none">{{ $err['line'] }}행</span>
+                                    <span class="text-slate-700 flex-1 min-w-[140px] truncate">{{ $err['raw'] }}</span>
+                                    <span class="text-red-600">{{ $err['reason'] }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                        @if($report['hidden_errors'] > 0)
+                            <div class="px-4 py-2.5 bg-red-50 text-xs text-red-600">
+                                외 {{ number_format($report['hidden_errors']) }}행이 더 실패했습니다. 위 항목부터 고친 뒤 다시 올려주세요.
+                            </div>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        @endif
+    </div>
+
+    {{-- 명단에 있는데 아직 입장하지 않은 사람.
+
+         🔑 이게 «전화번호 오타»를 잡는 유일한 장치다. 명단 매칭은 전화번호 기준이라
+            한 자리가 틀리면 그 운영진은 조용히 «참가자»로 입장하고 아무도 모른다.
+            행사 시작 전에 이 목록이 비어 가는지 보면 발견할 수 있다. --}}
+    @if($rosterPending->isNotEmpty())
+        <div class="bg-white rounded-2xl border border-amber-200/80 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-amber-100 bg-amber-50/60 flex items-baseline justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-amber-900">입장 대기 명단</h2>
+                    <p class="mt-0.5 text-xs text-amber-700/80">
+                        명단에는 있지만 아직 입장하지 않았습니다. 행사 시작 전에 이 목록이 줄어드는지 확인하세요 —
+                        <b>전화번호가 한 자리라도 다르면 그 사람은 «참가자»로 입장하고 이 줄은 그대로 남습니다.</b>
+                    </p>
+                </div>
+                <span class="flex-none text-sm font-bold text-amber-800 tabular-nums">
+                    {{ number_format($rosterPending->count()) }} / {{ number_format($rosterTotal) }}
+                </span>
+            </div>
+            <div class="divide-y divide-slate-100">
+                @foreach($rosterPending as $row)
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
+                        <span class="font-medium text-slate-800 min-w-[6rem]">{{ $row->name ?: '이름 없음' }}</span>
+                        <x-ui.phone :value="$row->phone" class="font-mono text-sm text-slate-500" />
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-semibold {{ $row->role->badgeClasses() }}">
+                            {{ $row->role->label() }}
+                        </span>
+                        <form action="{{ route('admin.projects.roster.destroy', [$project->id, $row->id]) }}" method="POST" class="ml-auto">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" onclick="return confirm('이 줄을 명단에서 삭제할까요?')"
+                                    class="text-xs font-medium text-slate-400 hover:text-red-600 transition-colors">삭제</button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+            @error('roster')
+                <p class="px-6 py-3 text-sm text-red-600 border-t border-slate-100">{{ $message }}</p>
+            @enderror
+        </div>
+    @endif
+
     {{-- 참가자 목록 --}}
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="flex items-center gap-2 px-6 py-4 border-b border-slate-100">
@@ -108,7 +252,7 @@
                     <span class="grid place-items-center w-9 h-9 rounded-full bg-blue-600 text-white text-sm font-semibold flex-none">{{ mb_substr($p->user->name ?? '?', 0, 1) }}</span>
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-slate-800 truncate">{{ $p->user->name ?? '알 수 없음' }}</p>
-                        <p class="text-xs text-slate-400 tabular-nums">{{ $p->user->phone ?? '-' }}</p>
+                        <p class="text-xs text-slate-400"><x-ui.phone :value="$p->user->phone" /></p>
                     </div>
                 </div>
 

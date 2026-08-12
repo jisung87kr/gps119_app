@@ -108,15 +108,16 @@
                             </div>
                         </div>
 
-                        <!-- QR Code Section -->
+                        <!-- QR Code Section — 행사 «입장» QR (2026-08-12 일원화) -->
                         <div class="text-center">
-                            <p class="block text-sm font-medium text-slate-700 mb-1.5">QR 코드</p>
+                            <p class="block text-sm font-medium text-slate-700 mb-1.5">행사 입장 QR</p>
                             <div class="inline-block p-3 bg-white border border-slate-200 rounded-2xl shadow-sm">
                                 <img src="{{ route('admin.projects.qrcode', $project->id) }}"
-                                     alt="QR Code"
+                                     alt="행사 입장 QR 코드"
                                      class="w-40 h-40">
                             </div>
-                            <p class="mt-1.5 text-xs text-slate-400">스캔하여 요청 페이지로 이동</p>
+                            <p class="mt-1.5 text-xs text-slate-400">스캔하면 이 행사에 입장합니다</p>
+                            <p class="mt-1 text-xs text-slate-400">명단에 있으면 그 역할로, 없으면 참가자로 들어옵니다</p>
                         </div>
                     </div>
                 </div>
@@ -357,7 +358,7 @@
                                 <dd class="mt-0.5 text-slate-800 break-all">
                                     {{ $request->user->name ?? '알 수 없음' }}
                                     @if($request->user?->formatted_phone)
-                                        <a href="tel:{{ $request->user->phone }}" class="block text-blue-600 tabular-nums">{{ $request->user->formatted_phone }}</a>
+                                        <x-ui.phone :value="$request->user->phone" tel class="block" />
                                     @endif
                                 </dd>
                             </div>
@@ -395,7 +396,7 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-slate-900">{{ $request->user->name ?? '알 수 없음' }}</div>
-                                    <div class="text-sm text-slate-500 tabular-nums">{{ $request->user->formatted_phone ?? '-' }}</div>
+                                    <div class="text-sm text-slate-500"><x-ui.phone :value="$request->user?->phone" /></div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {{-- $statusColors / $statusTexts 는 카드 리스트와 공유 (상단 @php) --}}

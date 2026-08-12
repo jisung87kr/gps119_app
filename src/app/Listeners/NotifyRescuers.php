@@ -79,7 +79,10 @@ class NotifyRescuers implements ShouldQueue
      */
     private function recipientsFor($request)
     {
-        $recipients = User::role(['rescuer', 'admin'])->get();
+        // 시스템 롤로 받는 사람은 관리자뿐이다. 상시 구급 인력은 「상시 운영」 행사의
+        // 구급대라, 아래 행사 스코프에서 잡힌다 — 이 대칭이 깨지면 길가 신고 알림이
+        // 조용히 끊긴다(화면은 멀쩡해 보인다).
+        $recipients = User::role('admin')->get();
 
         if ($request->project_id) {
             $eventUserIds = EventParticipant::forProject($request->project_id)
@@ -96,7 +99,7 @@ class NotifyRescuers implements ShouldQueue
             }
         }
 
-        // rescuer 이면서 admin 인 사람, 시스템 롤과 행사 역할을 겸한 사람이 두 번 받지 않도록.
+        // 관리자이면서 그 행사의 역할도 가진 사람이 두 번 받지 않도록.
         return $recipients->unique('id')->values();
     }
 

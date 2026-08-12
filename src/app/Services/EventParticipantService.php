@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\EventRole;
 use App\Enums\ParticipantStatus;
 use App\Models\EventParticipant;
+use App\Models\EventRoster;
 use App\Models\Project;
 use App\Models\User;
 use RuntimeException;
@@ -24,8 +25,10 @@ class EventParticipantService
      * - 비활성 행사면 거부(422 → 컨트롤러에서 처리).
      * - 전화번호 없으면 거부(05 require-phone 정책 계승).
      *
-     * Q1(사전명단 CSV 매칭)은 v1 범위 밖. 기본 participant 입장 + assignRole 수동배정으로 충분.
-     * TODO(후속): 전화번호 기반 사전명단 CSV 매칭 시 해당 역할로 입장(데이터소스 결정 후).
+     * 🔑 역할은 «사전명단»(event_rosters)이 정한다 (2026-08-12, 예전 TODO(Q1) 구현).
+     *    운영진과 참가자가 «같은» 입장 QR 을 쓴다 — 운영진에게 별도 동선을 만들면
+     *    현장 안내문에 QR 이 두 개 붙고, 그건 반드시 헷갈린다.
+     *    명단에 있으면 그 역할, 없으면 일반 참가자.
      */
     public function joinByCode(string $joinCode, User $user): EventParticipant
     {
@@ -44,14 +47,27 @@ class EventParticipantService
             throw new RuntimeException('전화번호가 등록되어야 행사에 참가할 수 있습니다.');
         }
 
+        // 명단 조회는 «정규화된» 번호로 한다. User::setPhoneAttribute 가 숫자만 저장하므로
+        // 보통은 그대로지만, 형식이 남아 있는 과거 행에서도 매칭이 깨지지 않게 한 번 더 건다.
+        // 여기서 못 찾으면 운영진이 조용히 «참가자»로 들어오고 아무도 그 사실을 모른다.
+        $phone = ParticipantImportService::normalizePhone($user->phone);
+        $roster = $phone ? EventRoster::findByPhone($project->id, $phone) : null;
+
         $participant = EventParticipant::firstOrCreate(
             ['project_id' => $project->id, 'user_id' => $user->id],
             [
-                'role' => EventRole::PARTICIPANT,
+                'role' => $roster?->role ?? EventRole::PARTICIPANT,
                 'status' => ParticipantStatus::ACTIVE,
                 'joined_at' => now(),
             ]
         );
+
+        // 명단 소진 기록. 이미 소진됐으면 덮지 않는다 — «처음 들어온 시각»이 기록이다.
+        // (재입장은 firstOrCreate 가 기존 참가 행을 그대로 돌려주므로 역할도 안 바뀐다.
+        //  관리자가 화면에서 바꾼 역할을 재입장이 되돌리면 안 되기 때문이다.)
+        if ($roster && ! $roster->isClaimed()) {
+            $roster->forceFill(['user_id' => $user->id, 'claimed_at' => now()])->save();
+        }
 
         return $participant->load('project');
     }

@@ -85,4 +85,16 @@ enum RequestStatus: string
     {
         return in_array($this, [self::PENDING, self::IN_PROGRESS], true);
     }
+
+    /**
+     * 종결 상태(완료/취소) 여부.
+     *
+     * 🔑 DispatchService 의 신고 상태 동기화 가드가 이 값을 읽는다. 종결된 신고는
+     *    뒤늦은 지령 전이가 되살릴 수 없어야 한다 — 취소된 신고에 배정돼 있던 대원이
+     *    나중에 「완료」를 누르면 취소가 완료로 덮여 쓰이던 버그가 정확히 여기였다.
+     */
+    public function isTerminal(): bool
+    {
+        return in_array($this, [self::COMPLETED, self::CANCELLED], true);
+    }
 }

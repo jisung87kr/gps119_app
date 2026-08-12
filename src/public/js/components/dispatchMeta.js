@@ -14,9 +14,13 @@ export const DISPATCH_STATUS_META = {
     arrived:   { label: '도착', badge: 'border border-ink-200 text-brand-600' },
     completed: { label: '완료', badge: 'border border-ink-200 text-success-600' },
     rejected:  { label: '거절', badge: 'border border-ink-200 text-ink-400' },
+    cancelled: { label: '회수', badge: 'border border-ink-200 text-warning-600' },
 };
 
 // 전이표(SPEC-02d): 현재 상태 → 가능한 다음 상태
+// 🔑 'cancelled'(회수)는 여기에 «목표»로 넣지 않는다. 회수는 상황실 권한이고
+//    대원 화면은 이 표로 자기 버튼을 만든다 — 넣으면 대원에게 회수 버튼이 생기고,
+//    눌러도 서버가 403 을 준다. 대원이 못 가는 상황은 'rejected' 다.
 export const TRANSITIONS = {
     assigned: ['accepted', 'rejected'],
     accepted: ['en_route', 'rejected'],
@@ -24,6 +28,7 @@ export const TRANSITIONS = {
     arrived: ['completed'],
     completed: [],
     rejected: [],
+    cancelled: [],
 };
 
 // 액션 버튼 라벨(주 액션) — reject 는 별도 처리

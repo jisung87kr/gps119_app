@@ -93,6 +93,68 @@ class User extends Authenticatable
     }
 
     /**
+     * 지금 «활성 행사»에서 가진 역할 중 가장 높은 것 (없으면 null).
+     *
+     * 화면 구성(하단 탭·착지)의 판정 기준이다. 시스템 롤이 아니라 행사 역할을 보는 이유는
+     * 행사가 끝나면 그 역할도 끝나기 때문이다 — 구급대원도 비번기엔 평범한 사용자다.
+     *
+     * 우선순위는 「지금 이 사람이 하는 일」 순: 상황실 > 구급대 > 그 외.
+     */
+    public function activeEventRole(): ?EventRole
+    {
+        $roles = $this->eventParticipations()
+            ->where('status', ParticipantStatus::ACTIVE)
+            ->whereHas('project', fn ($q) => $q->active())
+            ->pluck('role')
+            ->map(fn ($r) => $r instanceof EventRole ? $r : EventRole::tryFrom($r))
+            ->filter();
+
+        foreach ([EventRole::CONTROLLER, EventRole::PARAMEDIC] as $priority) {
+            if ($roles->contains($priority)) {
+                return $priority;
+            }
+        }
+
+        return $roles->first();
+    }
+
+    /**
+     * 이 사람의 홈이 «출동 현황»인가 (= 구급 쪽 사람인가).
+     *
+     * 하단 탭과 /dashboard 리다이렉트가 같은 판정을 써야 한다 — 둘이 어긋나면
+     * 탭이 보내는 곳과 실제로 열리는 곳이 달라진다.
+     */
+    public function usesDispatchHome(): bool
+    {
+        // 🔑 canReceiveDispatch()(구급대 + 자원봉사구급)가 아니라 isDispatchCandidate()
+        //    (구급대만)로 판정한다. 자원봉사(구급)는 배정 후보에서 빠졌으므로 새 지령이
+        //    갈 일이 없고, 현장 요구도 「자원봉사(구급) → 구조요청 화면」이다.
+        //    자격(canReceiveDispatch)은 진행 중인 지령 화면 접근용으로만 남는다.
+        return (bool) $this->activeEventRole()?->isDispatchCandidate();
+    }
+
+    /**
+     * 지금 «위치를 공유 중»인 행사 참가 1건 (없으면 null).
+     *
+     * 위치 송신을 특정 화면에 묶어 두면, 그 화면을 떠나는 순간 watchPosition 이 죽어
+     * 관제 지도의 그 사람 좌표가 그 자리에서 얼어붙는다. 실제로 일반 참가자는 행사
+     * 입장 시각의 좌표 한 건으로 남아 있었다. 셸(레이아웃)이 이 값을 읽어, 사용자가
+     * 앱 안 어느 화면에 있든 공유가 이어지게 한다.
+     *
+     * 🔑 «본인이 켠» 공유만 이어붙인다(sharing_location=true). 여기서 플래그를 켜지
+     *    않는다 — 동의는 활동 화면에서 받는 것이고, 셸은 그 결정을 따를 뿐이다.
+     */
+    public function sharingParticipation(): ?EventParticipant
+    {
+        return $this->eventParticipations()
+            ->where('status', ParticipantStatus::ACTIVE)
+            ->where('sharing_location', true)
+            ->whereHas('project', fn ($q) => $q->active())
+            ->latest('last_seen_at')
+            ->first();
+    }
+
+    /**
      * Get the formatted phone number.
      */
     public function getFormattedPhoneAttribute(): ?string

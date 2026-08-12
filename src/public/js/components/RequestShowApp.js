@@ -58,6 +58,10 @@ export default function createRequestShowApp(options = {}) {
                 controlTel: request.controlTel ?? '010-4794-0119',
                 statusWs: 'connecting', // connecting | ws | polling
                 showStageDetail: false,
+                // 신고 취소 — 배정 전에만. 배정 후에는 서버가 422 로 막고 전화 안내를 준다.
+                cancelling: false,
+                cancelError: '',
+                confirmingCancel: false,
                 // 🔑 내 위치는 «모른다»로 시작한다. 예전엔 제주 좌표(33.45, 126.57)가
                 //    기본값이었는데, setBounds 가 그 «가짜 점»까지 포함해 버려서
                 //    요청지가 강원도면 지도가 강원↔제주를 다 담는 축척으로 열렸다.
@@ -333,6 +337,39 @@ export default function createRequestShowApp(options = {}) {
                 }
             },
 
+            // ── 신고 취소 ────────────────────────────────────────
+            //
+            // 2단계로 나눈 이유: 이 화면은 사고 현장에서 한 손으로 보는 화면이고,
+            // 취소는 되돌릴 수 없다. 오탭 한 번으로 구조요청이 사라지면 안 된다.
+            requestCancelConfirm() {
+                this.cancelError = '';
+                this.confirmingCancel = true;
+            },
+            dismissCancelConfirm() {
+                this.confirmingCancel = false;
+            },
+
+            async submitCancel() {
+                if (this.cancelling || !this.requestId) return;
+                this.cancelling = true;
+                this.cancelError = '';
+
+                try {
+                    const res = await window.axios.delete(`/api/requests/${this.requestId}`, {
+                        headers: { Accept: 'application/json' },
+                    });
+                    this.reqStatus = res.data?.data?.status ?? 'cancelled';
+                    this.confirmingCancel = false;
+                } catch (e) {
+                    // 422 = 「이미 배정돼서 직접 취소 불가」. 서버 문구를 그대로 보여준다 —
+                    // 여기서 다시 쓰면 규칙이 두 군데가 되고, 규칙이 바뀔 때 화면만 옛말을 한다.
+                    this.cancelError = e?.response?.data?.message
+                        || '취소하지 못했습니다. 상황실로 전화해 주세요.';
+                } finally {
+                    this.cancelling = false;
+                }
+            },
+
             async _subscribeStatus() {
                 // 행사 신고만 실시간 추적(project_id 있을 때)
                 if (!this.projectId || !this.userId) return;
@@ -386,6 +423,9 @@ export default function createRequestShowApp(options = {}) {
                 return ({ pending: 0, in_progress: 1, completed: 2 })[this.reqStatus] ?? 0;
             },
             isCancelled() { return this.reqStatus === 'cancelled'; },
+            // 배정 전(pending)이고 담당자가 없을 때만 본인이 취소할 수 있다.
+            // 최종 판정은 서버(RequestService::assertCanCancel)가 한다 — 여기는 노출 조건일 뿐.
+            canCancel() { return this.reqStatus === 'pending' && !this.paramedicName; },
             // 배정 전 = 상황실, 배정 후 = 담당자
             callPhone() { return this.paramedicPhone || this.controlTel; },
             callLabel() { return this.paramedicPhone ? `담당자(${this.paramedicName || '구급대'})에게 전화` : '상황실에 전화'; },

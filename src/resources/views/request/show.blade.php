@@ -75,7 +75,30 @@
                                     <x-ui.icon name="phone" class="h-5 w-5" />
                                     @{{ callLabel }}
                                 </a>
-                                <p class="mt-2.5 text-center text-sm text-ink-400">
+                                {{-- 취소: 배정 «전»에만 본인이 할 수 있다. 배정 후에는 대원이
+                                     이미 이동 중이라 상황실 판단을 거친다(서버가 422로 막는다). --}}
+                                <template v-if="canCancel">
+                                    <button v-if="!confirmingCancel" type="button" @click="requestCancelConfirm"
+                                            class="mt-2.5 w-full rounded-2xl border border-ink-200 bg-white py-3 text-sm font-bold text-ink-500 active:bg-ink-50">
+                                        구조요청 취소
+                                    </button>
+                                    <div v-else class="mt-2.5 rounded-2xl border border-danger-200 bg-danger-50 p-4">
+                                        <p class="text-sm font-bold text-danger-700">정말 취소할까요?</p>
+                                        <p class="mt-1 text-sm text-danger-600">취소하면 되돌릴 수 없습니다.</p>
+                                        <div class="mt-3 grid grid-cols-2 gap-2">
+                                            <button type="button" @click="dismissCancelConfirm" :disabled="cancelling"
+                                                    class="rounded-xl border border-ink-200 bg-white py-3 text-sm font-bold text-ink-600 active:bg-ink-50 disabled:opacity-50">
+                                                아니오
+                                            </button>
+                                            <button type="button" @click="submitCancel" :disabled="cancelling"
+                                                    class="rounded-xl bg-danger-600 py-3 text-sm font-bold text-white active:bg-danger-700 disabled:opacity-50">
+                                                @{{ cancelling ? '취소 중...' : '네, 취소합니다' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p v-if="cancelError" class="mt-2 text-center text-sm font-bold text-danger-600">@{{ cancelError }}</p>
+                                </template>
+                                <p v-else class="mt-2.5 text-center text-sm text-ink-400">
                                     취소가 필요하면 상황실로 전화해 주세요.
                                 </p>
                             </div>

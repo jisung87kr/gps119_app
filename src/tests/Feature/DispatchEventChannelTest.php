@@ -80,7 +80,12 @@ class DispatchEventChannelTest extends TestCase
         $this->assertSame('dispatch.updated', $event->broadcastAs());
 
         $p = $event->broadcastWith();
-        $this->assertSame(['dispatch_id', 'request_id', 'status', 'paramedic_id', 'occurred_at'], array_keys($p));
+        // is_primary 는 다중 배차(ADR-0007 D4) 로 추가됐다 — 관제 화면이 「주담당 상태 +
+        // 보조 인원수」를 만드는 유일한 근거이고, 연락처가 아니라 구분 플래그다.
+        $this->assertSame(
+            ['dispatch_id', 'request_id', 'status', 'is_primary', 'paramedic_id', 'occurred_at'],
+            array_keys($p)
+        );
         // 연락처 키 부재
         $this->assertArrayNotHasKey('requester_phone', $p);
         $this->assertArrayNotHasKey('phone', $p);

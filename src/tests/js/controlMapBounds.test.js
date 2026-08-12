@@ -177,6 +177,7 @@ describe('관제 — 초기 조망 시점', () => {
             mapReady: false, map: null, pool: null, requestPins: null,
             _teardownRealtime: vi.fn(),
             closeAssign: vi.fn(),
+            cancelRecallConfirm: vi.fn(),
             _ensureMap: vi.fn(async () => {}),
             _applyFilterToPool: vi.fn(),
             fetchRoster: vi.fn(async () => { order.push('roster'); }),

@@ -17,6 +17,32 @@
          data-role-label="{{ $roleLabel }}"
          data-project-name="{{ $project->name }}">
 
+        {{-- 상황실 지령 회수 알림 (ADR-0007).
+
+             🔑 목록에서 «조용히 사라지게» 두면 이 기능은 아무것도 못 막는다 — 이미
+                현장으로 달리고 있는 대원은 화면을 안 보고 있고, 다음에 봤을 때는
+                「어? 없어졌네」로 끝난다. 그래서 (1) 진동·비프로 화면을 보게 만들고
+                (2) 목록 맨 위에 «멈추라»는 문장과 사유를 남긴다. 자동으로 사라지지
+                않고 대원이 [확인]을 눌러야 닫힌다. --}}
+        <div v-if="recalled.open"
+             class="flex items-start gap-3 rounded-2xl border-2 border-warning-500 bg-warning-50 p-4">
+            <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-warning-600">
+                <x-ui.icon name="x-circle" class="h-5 w-5" />
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="text-base font-extrabold text-ink-950">상황실이 지령을 회수했습니다</p>
+                <p class="mt-0.5 text-sm font-bold text-ink-800">
+                    <template v-if="recalled.requestId">신고 #@{{ recalled.requestId }} — </template>출동을 중지하세요.
+                </p>
+                <p v-if="recalled.reason" class="mt-1.5 break-keep text-sm text-ink-600">사유: @{{ recalled.reason }}</p>
+                <p v-else class="mt-1.5 text-sm text-ink-400">사유가 전달되지 않았습니다. 상황실에 확인하세요.</p>
+            </div>
+            <button type="button" v-on:click="dismissRecalled"
+                    class="min-h-[44px] shrink-0 rounded-xl border-2 border-warning-500 px-3 text-sm font-bold text-warning-600 active:bg-white">
+                확인
+            </button>
+        </div>
+
         {{-- 역할 + 연결 상태 --}}
         <div class="flex items-center justify-between gap-3">
             <div class="flex min-w-0 items-center gap-2">
@@ -195,6 +221,8 @@
                     errors: {},
                     wsState: 'connecting',
                     alert: { open: false, dispatch: null },
+                    // 상황실 회수 배너(ADR-0007). 대원이 [확인]을 누를 때까지 유지된다.
+                    recalled: { open: false, requestId: null, reason: '' },
                     reject: { open: false, dispatch: null, reason: '', custom: '' },
                     rejectPresets: ['이미 다른 출동중', '거리가 너무 멂', '장비/인력 부족'],
                 };
@@ -225,6 +253,12 @@
                         // 이 행사 + 활성/표시대상만(완료·거절도 보이되 최신 우선)
                         this.dispatches = all
                             .filter((d) => d.project && d.project.id === this.projectId)
+                            // 회수(cancelled)된 지령은 목록에서 뺀다. 대원이 취할 수 있는
+                            // 조작이 하나도 없고(전이표상 terminal), 회수 사실은 배너가
+                            // 이미 말했다. 남겨 두면 「배정」으로 잘못 표시되기도 한다 —
+                            // dispatchMeta.js 의 DISPATCH_STATUS_META 에 cancelled 항목이
+                            // 없어 statusMeta() 가 assigned 로 폴백한다.
+                            .filter((d) => d.status !== 'cancelled')
                             .map((d) => ({
                                 dispatch_id: d.dispatch_id,
                                 status: d.status,
@@ -243,7 +277,8 @@
 
                     const uid = window.__authUserId;
                     echo.private(`event.${this.projectId}.dispatch.${uid}`)
-                        .listen('.dispatch.assigned', (e) => this._onAssigned(e));
+                        .listen('.dispatch.assigned', (e) => this._onAssigned(e))
+                        .listen('.dispatch.recalled', (e) => this._onRecalled(e));
 
                     const conn = echo.connector?.pusher?.connection;
                     if (conn) {
@@ -289,6 +324,45 @@
                 },
 
                 dismissAlert() { this.alert.open = false; },
+
+                // 상황실이 지령을 회수했다(ADR-0007).
+                //
+                // 🔑 «회수 버튼은 여기 없다» — 회수는 관제의 결정이고 서버가 대원에게
+                //    403 을 준다. 대원이 못 가는 상황을 표현하는 건 기존 [거절]이다.
+                //    이 핸들러가 하는 일은 하나: 이미 달리고 있는 사람을 멈춰 세우는 것.
+                _onRecalled(payload) {
+                    if (!payload || !payload.dispatch_id) return;
+
+                    const target = this.dispatches.find((x) => x.dispatch_id === payload.dispatch_id);
+
+                    // 배정 알림과 «구분되는» 패턴(짧게 세 번). 같은 진동이면 새 지령으로 읽는다.
+                    if (navigator.vibrate) navigator.vibrate([120, 90, 120, 90, 120]);
+                    beep();
+
+                    // 회수된 그 지령을 풀스크린 알림/거절 모달이 붙잡고 있으면 먼저 놓는다.
+                    // (이미 사라진 지령을 수락·거절하면 서버가 422 로 돌려준다.)
+                    if (this.alert.open && this.alert.dispatch
+                        && this.alert.dispatch.dispatch_id === payload.dispatch_id) {
+                        this.alert.open = false;
+                    }
+                    if (this.reject.open && this.reject.dispatch
+                        && this.reject.dispatch.dispatch_id === payload.dispatch_id) {
+                        this.reject.open = false;
+                    }
+
+                    this.dispatches = this.dispatches.filter((x) => x.dispatch_id !== payload.dispatch_id);
+
+                    this.recalled = {
+                        open: true,
+                        requestId: payload.request_id || (target ? target.request.id : null),
+                        reason: payload.reason || '',
+                    };
+
+                    // 목록을 아래까지 스크롤한 채로 받으면 배너가 화면 밖이다.
+                    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+                },
+
+                dismissRecalled() { this.recalled.open = false; },
 
                 async transition(d, status) {
                     if (this.busy[d.dispatch_id]) return;
