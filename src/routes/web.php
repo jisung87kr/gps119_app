@@ -171,9 +171,15 @@ Route::get('/dispatches', function () {
         ->where('user_id', $user->id)
         ->where('status', \App\Enums\ParticipantStatus::ACTIVE->value)
         ->whereHas('project', fn ($q) => $q->active())
-        ->with('project:id,name')
+        // ⚠️ is_default 를 «반드시» select 에 넣는다. project:id,name 만 불러오면 아래
+        //    필터의 $p->project->is_default 가 null 이라 조용히 통과한다 — 필터가
+        //    있는데 아무것도 안 거르는 상태가 된다.
+        ->with('project:id,name,is_default')
         ->get()
-        ->filter(fn ($p) => $p->project !== null);
+        // 「상시 운영」은 내부 폴백 자리라 «참가자»로 속해 있는 건 사용자에게 의미가 없다.
+        // 다만 거기 배정된 상시 구급 인력에게는 지령 화면으로 가는 유일한 길이므로 남긴다.
+        ->filter(fn ($p) => $p->project !== null
+            && (! $p->project->is_default || $p->role->canReceiveDispatch()));
 
     return view('dispatch.home', compact('dispatches', 'stats', 'myEvents'));
 })->middleware(['auth'])->name('dispatches.index');

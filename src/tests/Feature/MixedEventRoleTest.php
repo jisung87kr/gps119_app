@@ -168,4 +168,40 @@ class MixedEventRoleTest extends TestCase
         $this->assertFalse($user->canFileRequestFor($b), 'B 에서는 구급대라 불가해야 한다');
         $this->assertSame([$a->id], $user->reportableEvents()->pluck('id')->all());
     }
+
+    /**
+     * 🔴 목록에 모든 행사를 넣으면서 버튼 라벨을 「지령·출동」으로 «고정»해 뒀었다.
+     *    참가자가 눌러도 활동 화면으로 튕기므로 «동작은» 하지만, 라벨이 거짓말을 하는 건
+     *    깨진 것보다 나쁘다 — 사용자는 자기가 지령을 받는 사람인 줄 알게 된다.
+     */
+    public function test_each_event_row_offers_the_action_that_matches_that_role(): void
+    {
+        [$user, $a, $b] = $this->mixedUser();
+
+        $html = $this->actingAs($user)->get('/dispatches')->getContent();
+
+        // 구급대인 행사 → 지령 화면 / 참가자인 행사 → 활동 화면
+        $this->assertStringContainsString(route('events.dispatch', $b->id), $html);
+        $this->assertStringContainsString(route('events.active', $a->id), $html);
+        $this->assertStringNotContainsString(route('events.dispatch', $a->id), $html);
+    }
+
+    /**
+     * 「상시 운영」은 내부 폴백 자리다. 참가자로 거기 속해 있는 것은 사용자에게 의미가
+     * 없으므로 「내 행사」에 띄우지 않는다 — 다만 거기 배정된 상시 구급 인력에게는
+     * 지령 화면으로 가는 유일한 길이라 그때는 남긴다.
+     */
+    public function test_the_always_on_event_is_hidden_from_participants_but_kept_for_medics(): void
+    {
+        [$user] = $this->mixedUser();
+        $this->join($user, Project::defaultEvent(), EventRole::PARTICIPANT);
+
+        $this->actingAs($user)->get('/dispatches')->assertDontSee('상시 운영');
+
+        $medic = User::factory()->create(['phone' => '01077778888']);
+        $medic->assignRole('user');
+        $this->join($medic, Project::defaultEvent(), EventRole::PARAMEDIC);
+
+        $this->actingAs($medic)->get('/dispatches')->assertSee('상시 운영');
+    }
 }

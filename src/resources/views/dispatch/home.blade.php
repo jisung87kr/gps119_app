@@ -42,9 +42,20 @@
                                         :title="$participant->project->name"
                                         :meta="$participant->role->label()">
                             <x-slot:trailing>
-                                <x-ui.button :href="route('events.dispatch', $participant->project_id)" size="sm">
-                                    지령·출동
-                                </x-ui.button>
+                                {{-- 🔑 역할별로 버튼이 갈린다. 이 목록에는 «참가 중인 행사 전부»가
+                                     오는데(그래야 참가자로 있는 행사에 갈 길이 생긴다), 라벨을
+                                     「지령·출동」으로 고정하면 참가자에게 거짓말이 된다 —
+                                     눌러도 활동 화면으로 튕기므로 «동작은» 하지만 그게 더 나쁘다. --}}
+                                @if ($participant->role->canReceiveDispatch())
+                                    <x-ui.button :href="route('events.dispatch', $participant->project_id)" size="sm">
+                                        지령·출동
+                                    </x-ui.button>
+                                @else
+                                    <x-ui.button :href="route('events.active', $participant->project_id)"
+                                                 variant="secondary" size="sm">
+                                        활동 화면
+                                    </x-ui.button>
+                                @endif
                             </x-slot:trailing>
                         </x-ui.list-item>
                     @endforeach
