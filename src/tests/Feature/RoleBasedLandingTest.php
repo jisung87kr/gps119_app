@@ -99,15 +99,30 @@ class RoleBasedLandingTest extends TestCase
 
     /**
      * 현장 요구 그대로: 운영진·경찰·자원봉사(코스)·자원봉사(구급) → 구조요청 화면.
+     *
+     * 🔴 참가 중인 행사가 있으면 «그 행사의» 신고 화면이다. 일반 경로로 보내면 화면에
+     *    행사 이름이 안 뜨고, 무엇보다 그 신고가 「상시 운영」으로 새던 버그가 여기서 시작됐다.
      */
-    public function test_support_roles_land_on_the_request_screen(): void
+    public function test_support_roles_land_on_their_events_request_screen(): void
     {
         foreach ([EventRole::STAFF, EventRole::POLICE, EventRole::VOLUNTEER_COURSE, EventRole::PARTICIPANT] as $role) {
             $user = User::factory()->create();
-            $this->inEvent($user, $role);
+            $project = $this->inEvent($user, $role);
 
-            $this->assertSame(route('request.create'), $this->landing->for($user), $role->value);
+            $this->assertSame(
+                route('request.create.project', $project->slug),
+                $this->landing->for($user),
+                $role->value
+            );
         }
+    }
+
+    public function test_a_user_with_no_event_lands_on_the_generic_request_screen(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('user');
+
+        $this->assertSame(route('request.create'), $this->landing->for($user));
     }
 
     /**
@@ -122,7 +137,7 @@ class RoleBasedLandingTest extends TestCase
         $user = User::factory()->create();
         $this->inEvent($user, EventRole::VOLUNTEER_MEDIC);
 
-        $this->assertSame(route('request.create'), $this->landing->for($user));
+        $this->assertStringContainsString('/requests/create/', $this->landing->for($user));
         $this->assertTrue(EventRole::VOLUNTEER_MEDIC->canReceiveDispatch());
     }
 

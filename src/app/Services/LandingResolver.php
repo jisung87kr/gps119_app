@@ -59,7 +59,15 @@ class LandingResolver
         }
 
         // 그 외(참가자·운영진·경찰·자원봉사, 그리고 행사 없는 일반 사용자) — 신고 화면.
-        return route('request.create');
+        //
+        // 🔴 참가 중인 행사가 있으면 «그 행사의» 신고 화면으로 보낸다. 일반 경로로 보내면
+        //    화면에 행사 이름이 안 뜨고, 신고자는 자기 신고가 어디로 가는지 알 수 없다.
+        //    (귀속 자체는 RequestService 가 보장한다 — 이건 «보이는 것»을 맞추는 것이다.)
+        $event = $user->soleActiveEvent();
+
+        return $event
+            ? route('request.create.project', $event->slug)
+            : route('request.create');
     }
 
     /**

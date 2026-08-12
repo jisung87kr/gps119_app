@@ -119,6 +119,29 @@ class User extends Authenticatable
     }
 
     /**
+     * 지금 참가 중인 «실제» 행사가 정확히 하나면 그 행사 (아니면 null).
+     *
+     * 세 곳이 같은 질문을 한다 — 신고를 어느 행사에 붙일지(RequestService), 어디로
+     * 착지시킬지(LandingResolver), 「구조요청」 탭을 어디로 보낼지(tab-bar).
+     * 규칙이 흩어지면 한쪽만 고쳐져서 어긋난다.
+     *
+     * ⚠️ 「상시 운영」(is_default)은 «폴백 자리»이지 선택지가 아니다. 항상 활성이라
+     *    여기서 세면, 상시 운영에 속한 사람이 실제 행사에 들어가는 순간 «2개»가 되어
+     *    조용히 폴백된다.
+     */
+    public function soleActiveEvent(): ?Project
+    {
+        $projects = Project::query()
+            ->active()
+            ->where('is_default', false)
+            ->whereHas('participants', fn ($q) => $q->where('user_id', $this->id)
+                ->where('status', ParticipantStatus::ACTIVE))
+            ->get();
+
+        return $projects->count() === 1 ? $projects->first() : null;
+    }
+
+    /**
      * 이 사람의 홈이 «출동 현황»인가 (= 구급 쪽 사람인가).
      *
      * 하단 탭과 /dashboard 리다이렉트가 같은 판정을 써야 한다 — 둘이 어긋나면

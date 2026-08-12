@@ -40,6 +40,19 @@ class RequestService
             throw new \RuntimeException('구급대 계정은 구조요청을 접수할 수 없습니다. 119 또는 상황실로 전화해 주세요.');
         }
 
+        // 🔴 행사에 «참가 중인» 사람의 신고는 그 행사로 간다.
+        //
+        //    화면 링크에 맡겼더니 실제로 깨졌다: 행사에 입장한 참가자가 「구조요청 하기」를
+        //    누르면 slug 없는 /requests/create 로 가고, 그 신고가 「상시 운영」에 붙어서
+        //    **정작 그 행사의 관제 화면에는 뜨지 않았다.** 신고는 접수됐는데 상황실은
+        //    모르는 상태 — 이 도메인에서 가장 나쁜 실패다.
+        //
+        //    링크는 9곳이었고 고쳐도 다음에 또 생긴다. 귀속 규칙을 여기 한 곳에 둔다.
+        //    (모델 creating 훅의 「상시 운영」 귀속은 그대로 최후 폴백으로 남는다 — ADR-0005)
+        if (empty($data['project_id'])) {
+            $data['project_id'] = $this->resolveEventFor($user);
+        }
+
         // type 미지정 시 기본값(other). priority 미지정 시 type->defaultPriority() 자동 매핑.
         // priority 가 명시되면 그 값을 우선(상황실 수동 상향).
         $type = isset($data['type']) ? RequestType::from($data['type']) : RequestType::OTHER;
@@ -65,6 +78,20 @@ class RequestService
         RequestCreated::dispatch($request->load('user'));
 
         return $request;
+    }
+
+    /**
+     * 화면이 행사를 지정하지 않았을 때 «이 사람의» 행사를 찾는다.
+     *
+     * 활성 행사 참가가 **정확히 하나**일 때만 귀속시킨다. 여럿이면 어느 현장인지
+     * 알 수 없고, 잘못된 행사에 신고를 붙이면 엉뚱한 상황실이 출동한다 —
+     * 그럴 바엔 「상시 운영」이 낫다(LandingResolver 의 「1개면 직행, 여럿이면 목록」과 같은 원칙).
+     *
+     * @return int|null 귀속할 행사 id. null 이면 모델 훅이 「상시 운영」으로 보낸다.
+     */
+    private function resolveEventFor(User $user): ?int
+    {
+        return $user->soleActiveEvent()?->id;
     }
 
     /**

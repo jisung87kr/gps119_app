@@ -71,38 +71,30 @@
 
                 <div class="mt-6 pt-6 border-t border-slate-100">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- URL Section -->
+                        <!-- 작업 버튼 -->
+                        {{-- 🔑 「프로젝트 URL」(/requests/create/{slug} — 신고 직행)을 화면에서 뺐다.
+                             QR 을 입장으로 일원화한 뒤로 배포 대상은 입장 링크 하나뿐인데,
+                             주소가 둘 보이면 현장 안내문에 «어느 쪽이든» 붙게 된다.
+                             신고 직행 QR 을 찍은 사람은 행사에 들어오지 않으므로 역할도
+                             위치 공유도 관제 표시도 없다 — 그게 어제 실제로 문제가 됐다.
+                             라우트 자체는 남긴다(이미 배포된 링크·인쇄물이 404 나면 안 된다).
+                             입장 링크·코드는 「참가자 관리」 화면에 있다. --}}
                         <div>
-                            <p class="block text-sm font-medium text-slate-700 mb-1.5">프로젝트 URL</p>
-                            <div class="flex gap-2 mb-3">
-                                <input type="text"
-                                       id="projectUrl"
-                                       value="{{ $project->getUrl() }}"
-                                       readonly
-                                       class="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
-                                <button onclick="copyUrl()"
-                                        class="inline-flex items-center gap-1.5 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 font-medium text-sm transition-colors">
-                                    복사
-                                </button>
-                            </div>
-                            <!-- Action Buttons -->
                             <div class="flex flex-wrap gap-2">
+                                <a href="{{ route('admin.projects.participants', $project->id) }}"
+                                   class="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm shadow-blue-600/20 transition-colors">
+                                    입장 링크·명단 관리
+                                </a>
                                 <form action="{{ route('admin.projects.clone', $project->id) }}" method="POST" class="inline">
                                     @csrf
                                     <button type="submit"
                                             onclick="return confirm('이 프로젝트를 복제하시겠습니까?')"
                                             class="inline-flex items-center gap-1.5 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 font-medium text-sm transition-colors">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                                        </svg>
                                         복제
                                     </button>
                                 </form>
                                 <a href="{{ route('admin.projects.export-csv', $project->id) }}"
                                    class="inline-flex items-center gap-1.5 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-50 font-medium text-sm transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
                                     CSV 다운로드
                                 </a>
                             </div>
@@ -427,24 +419,4 @@
         </div>
     </div>
 
-    <script>
-        function copyUrl() {
-            const urlInput = document.getElementById('projectUrl');
-            urlInput.select();
-            urlInput.setSelectionRange(0, 99999); // For mobile devices
-
-            try {
-                navigator.clipboard.writeText(urlInput.value).then(() => {
-                    alert('URL이 클립보드에 복사되었습니다!');
-                }).catch(() => {
-                    // Fallback for older browsers
-                    document.execCommand('copy');
-                    alert('URL이 클립보드에 복사되었습니다!');
-                });
-            } catch (err) {
-                console.error('Failed to copy:', err);
-                alert('URL 복사에 실패했습니다.');
-            }
-        }
-    </script>
 </x-layouts.admin>

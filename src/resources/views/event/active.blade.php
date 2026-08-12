@@ -91,10 +91,12 @@
                     <x-ui.icon name="ambulance" class="h-5 w-5" />
                     지령·출동 화면
                 </x-ui.button>
-                <x-ui.button :href="route('request.create')" variant="secondary">구조요청 화면으로</x-ui.button>
+                <x-ui.button :href="route('request.create.project', $project->slug)" variant="secondary">구조요청 화면으로</x-ui.button>
             @else
-                {{-- 이 화면에 머무는 동안 위치가 계속 공유된다. 신고는 여기서 바로 간다. --}}
-                <x-ui.button :href="route('request.create')">
+                {{-- 이 화면에 머무는 동안 위치가 계속 공유된다. 신고는 여기서 바로 간다.
+                     🔴 slug 경로로 보낸다. route('request.create') 로 보냈더니 이 행사에
+                        입장한 사람의 신고가 「상시 운영」에 붙어서 «그 행사 관제에 안 떴다». --}}
+                <x-ui.button :href="route('request.create.project', $project->slug)">
                     <x-ui.icon name="ambulance" class="h-5 w-5" />
                     구조요청 하기
                 </x-ui.button>

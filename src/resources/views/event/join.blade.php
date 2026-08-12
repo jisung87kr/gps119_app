@@ -115,6 +115,7 @@
                    class="inline-flex w-full items-center justify-center rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-sm active:bg-brand-700">
                     바로 이동
                 </a>
+                {{-- 이 화면은 slug 를 모른다. 귀속은 RequestService 가 보장하므로 일반 경로로 둔다. --}}
                 <x-ui.button :href="route('request.create')" variant="secondary">구조요청 화면으로</x-ui.button>
                 <x-ui.button :href="route('dashboard')" variant="ghost">홈으로</x-ui.button>
             </div>

@@ -45,7 +45,13 @@
             ? ['key' => 'work', 'label' => '지령', 'icon' => 'ambulance', 'url' => route('events.dispatch', $only->first()->project_id)]
             : ['key' => 'work', 'label' => '행사', 'icon' => 'pin', 'url' => route('events.join')];
     } else {
-        $middle = ['key' => 'work', 'label' => '구조요청', 'icon' => 'ambulance', 'url' => route('request.create')];
+        // 참가 중인 행사가 하나면 «그 행사의» 신고 화면으로. 화면에 행사 이름이 떠야
+        // 신고자가 자기 신고가 어디로 가는지 안다.
+        $soleEvent = $user?->soleActiveEvent();
+        $middle = [
+            'key' => 'work', 'label' => '구조요청', 'icon' => 'ambulance',
+            'url' => $soleEvent ? route('request.create.project', $soleEvent->slug) : route('request.create'),
+        ];
     }
 
     $tabs = [
