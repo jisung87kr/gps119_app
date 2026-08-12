@@ -74,19 +74,13 @@
                      「여기가 맞나 / 무슨 상황인가」 둘뿐이다. --}}
 
                 <location-info :latitude="lat" :longitude="long" :address="address"
-                               title="현재 발송 위치"></location-info>
+                               title="현재 발송 위치" action-label="주소 검색"
+                               v-on:action="execDaumPostcode"></location-info>
 
                 {{-- 주소 직접 검색 (Daum 우편번호) --}}
-                {{-- 🔑 예전에는 readonly input 에 v-model="address" 라, 바로 위 큰 글씨와
-                     «같은 주소»가 한 번 더 찍혔다. 이건 입력칸이 아니라 검색 진입 버튼이므로
-                     버튼으로 만든다 — 탭 타깃 크기는 그대로 두고 중복만 없앤다. --}}
-                <div class="px-5 py-3">
-                    <button type="button" v-on:click="execDaumPostcode"
-                            class="flex w-full items-center gap-2 rounded-2xl border-2 border-ink-200 bg-ink-50 px-4 py-3.5 text-base text-ink-500 active:bg-ink-100">
-                        <x-ui.icon name="pin" class="h-5 w-5 shrink-0 text-ink-400" />
-                        여기가 아니면 주소로 검색
-                    </button>
-                </div>
+                {{-- 주소 검색은 «예외 경로»다 — GPS 가 맞으면 쓰지 않는다.
+                     전체 폭 박스로 두면 화면에서 가장 큰 요소 중 하나가 되어 비중이 틀린다.
+                     라벨 줄의 「주소 검색」 버튼(location-info)으로 옮겼다. --}}
 
                 {{-- 접수 대상 안내 — 상황 버튼 «바로 위». 결정 직전에 보여야 의미가 있다.
                      처음엔 헤더 아래에 뒀는데, 지도만 밀어내고 헤더의 행사명과 중복이었다.
