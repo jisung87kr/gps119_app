@@ -390,8 +390,11 @@ class AdminParticipantImportTest extends TestCase
             ->get(route('admin.projects.participants', $project->id))
             ->assertOk()
             ->assertSee('입장 대기 명단')
-            ->assertSee('01099998888')
-            ->assertSee('01088887777');
+            // 관리자 화면의 연락처는 «가려서» 나간다(PhoneMaskingTest).
+            // 목록은 화면공유·스크린샷에 통째로 노출되는 자리라 토글도 주지 않는다.
+            ->assertSee('010-****-8888')
+            ->assertSee('010-****-7777')
+            ->assertDontSee('01099998888');
     }
 
     public function test_a_claimed_roster_row_cannot_be_deleted(): void

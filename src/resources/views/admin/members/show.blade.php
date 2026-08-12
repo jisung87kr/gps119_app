@@ -42,7 +42,7 @@
 
                         <div>
                             <p class="text-sm text-slate-500 mb-1.5">연락처</p>
-                            <p class="text-sm font-medium text-slate-800 tabular-nums">{{ $member->formatted_phone ?? '-' }}</p>
+                            <p class="text-sm font-medium text-slate-800"><x-ui.phone :value="$member->phone" reveal tel /></p>
                         </div>
 
                         @if($member->email)

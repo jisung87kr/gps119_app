@@ -101,7 +101,7 @@
 
                                 <div class="flex items-center justify-between gap-4 py-3">
                                     <span class="text-sm text-slate-500">연락처</span>
-                                    <span class="text-sm font-medium text-slate-800 tabular-nums">{{ $rescueRequest->user->formatted_phone }}</span>
+                                    <span class="text-sm font-medium text-slate-800"><x-ui.phone :value="$rescueRequest->user->phone" reveal tel /></span>
                                 </div>
 
                                 @if($rescueRequest->user->email)

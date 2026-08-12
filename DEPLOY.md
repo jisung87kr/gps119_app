@@ -214,18 +214,73 @@ cd ~/gps119_app && ./deploy.sh              # origin/main
 직전 릴리스의 커밋 + 그 배포 직전에 뜬 덤프로 되돌린다.
 **파괴적이다** — 배포 이후 들어온 구조요청·위치이력은 사라진다. DB 이름을 직접 입력해야 진행된다.
 
-## 4. 백업
+## 4. 백업 (암호화, 2026-08-12 변경)
 
-배포마다 자동으로 뜨지만, 그것만으로는 「배포하지 않은 날」이 비어 있다. 일일 백업을 건다:
+배포마다 자동으로 뜨지만, 그것만으로는 「배포하지 않은 날」이 비어 있다. 일일 백업을 건다.
+
+🔴 **덤프는 평문으로 남기지 않는다.** 이 DB 에는 이름·전화번호와 **위치 이력**이 들어 있다.
+덤프 파일 하나가 새면 그게 통째로 샌다. `backup-db.sh` 가 **공개키로 암호화**해서 남긴다.
+
+### 4.1 키 만들기 — 개인키는 «서버에 두지 않는다»
+
+**운영자 노트북에서** (서버 아님):
+
+```bash
+gpg --quick-generate-key "gps119-backup" default default never
+gpg --armor --export gps119-backup > gps119-backup.pub   # 이것만 서버로
+gpg --armor --export-secret-keys gps119-backup > ~/.gps119-keys/gps119-backup.key   # 절대 서버로 보내지 않는다
+```
+
+🔑 **비대칭인 이유**: 서버에는 공개키만 두므로 서버가 털려도 **과거 백업은 못 읽는다.**
+대칭키(암호)를 서버에 두면 그 순간 백업 전체가 같이 털린다.
+
+⚠️ **개인키를 잃으면 백업을 영원히 복구할 수 없다.** 서버가 아닌 곳에 최소 두 벌 보관한다.
+안드로이드 업로드 키스토어와 같은 자리(`~/.gps119-keys/`)를 쓰면 관리 지점이 하나로 준다.
+
+**서버에서**:
+
+```bash
+gpg --import gps119-backup.pub && rm gps119-backup.pub
+echo 'BACKUP_GPG_RECIPIENT=gps119-backup' >> ~/gps119_app/.env.deploy
+```
+
+### 4.2 크론
 
 ```bash
 crontab -e
-# 매일 04:10 KST
-10 4 * * * cd ~/gps119_app && docker compose --env-file .env.deploy -f docker-compose.prod.yml exec -T db sh -c 'exec mysqldump --single-transaction --quick -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' | gzip > backups/db-cron-$(date -u +\%Y\%m\%d).sql.gz 2>> backups/cron.log
+# 매일 04:10 KST — DB 백업(암호화)
+10 4 * * * cd ~/gps119_app && ./backup-db.sh >> backups/cron.log 2>&1
+# 매일 04:50 KST — 라라벨 스케줄러(위치 이력 보존기간 파기가 여기서 돈다)
+* * * * * cd ~/gps119_app && docker compose --env-file .env.deploy -f docker-compose.prod.yml exec -T app php artisan schedule:run >> /dev/null 2>&1
+```
+
+> ⚠️ **스케줄러 크론이 없으면 `location:purge` 가 영영 안 돈다.** 코드에는 등록돼 있지만
+> 「등록은 됐는데 아무 일도 안 하는」 상태가 된다 — 개인정보처리방침에 적은 보존기간을
+> 지키지 못하는 상태이므로 이건 기능 누락이 아니라 약속 위반이다.
+
+### 4.3 복구 (분기마다 한 번은 실제로 해볼 것)
+
+```bash
+# 개인키가 있는 곳에서
+gpg --decrypt db-20260812-190000Z.sql.gz.gpg | gunzip > restore.sql
+docker compose --env-file .env.deploy -f docker-compose.prod.yml exec -T db \
+  sh -c 'exec mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < restore.sql
+```
+
+**복구 훈련을 한 번도 안 해본 백업은 백업이 아니다.** 개인키 분실·키 만료·gpg 버전 차이는
+전부 「복구가 필요한 날」에만 드러난다.
+
+### 4.4 오프사이트
+
+`backup-db.sh` 는 `BACKUP_OFFSITE_CMD` 가 있으면 그것으로 파일을 반출한다:
+
+```bash
+echo 'BACKUP_OFFSITE_CMD=aws s3 cp "$1" s3://gps119-backup/' >> ~/gps119_app/.env.deploy
 ```
 
 인스턴스 스냅샷(Lightsail 자동 스냅샷)도 함께 켠다 — 덤프는 DB만 복구하지 서버는 복구하지 못한다.
-여유가 되면 덤프를 S3로 밀어두는 게 좋다. **같은 디스크에만 있는 백업은 디스크가 죽으면 같이 죽는다.**
+**같은 디스크에만 있는 백업은 디스크가 죽으면 같이 죽는다.** 아직 미설정이면 스크립트가
+매 실행마다 경고를 남긴다.
 
 ---
 

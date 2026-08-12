@@ -74,7 +74,9 @@
                 <select name="user_id" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
                     <option value="">회원 선택…</option>
                     @foreach($addableUsers as $u)
-                        <option value="{{ $u->id }}">{{ $u->name }} @if($u->phone)· {{ $u->phone }}@endif</option>
+                        {{-- 셀렉트 옵션은 컴포넌트를 못 쓰므로 여기서 직접 가린다.
+                             동명이인 구분에 필요한 뒤 4자리만 남긴다. --}}
+                        <option value="{{ $u->id }}">{{ $u->name }}@if($u->phone) · ***{{ substr(preg_replace('/[^0-9]/', '', $u->phone), -4) }}@endif</option>
                     @endforeach
                 </select>
             </div>
@@ -217,7 +219,7 @@
                 @foreach($rosterPending as $row)
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
                         <span class="font-medium text-slate-800 min-w-[6rem]">{{ $row->name ?: '이름 없음' }}</span>
-                        <span class="font-mono text-sm text-slate-500 tabular-nums">{{ $row->phone }}</span>
+                        <x-ui.phone :value="$row->phone" class="font-mono text-sm text-slate-500" />
                         <span class="px-2.5 py-1 rounded-lg text-xs font-semibold {{ $row->role->badgeClasses() }}">
                             {{ $row->role->label() }}
                         </span>
@@ -250,7 +252,7 @@
                     <span class="grid place-items-center w-9 h-9 rounded-full bg-blue-600 text-white text-sm font-semibold flex-none">{{ mb_substr($p->user->name ?? '?', 0, 1) }}</span>
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-slate-800 truncate">{{ $p->user->name ?? '알 수 없음' }}</p>
-                        <p class="text-xs text-slate-400 tabular-nums">{{ $p->user->phone ?? '-' }}</p>
+                        <p class="text-xs text-slate-400"><x-ui.phone :value="$p->user->phone" /></p>
                     </div>
                 </div>
 

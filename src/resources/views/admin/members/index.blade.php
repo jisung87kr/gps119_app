@@ -72,7 +72,6 @@
                             <div class="flex flex-wrap justify-end gap-1 flex-none">
                                 @if($member->hasRole('admin'))
                                     <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자회원</span>
-                                @endif
                                 @else
                                     <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                 @endif
@@ -85,7 +84,7 @@
                                 <dd class="mt-0.5 text-slate-700 tabular-nums">
                                     @if($member->formatted_phone)
                                         {{-- 구조 도메인이라 명단에서 바로 전화 거는 동선이 실제로 쓰인다 --}}
-                                        <a href="tel:{{ $member->phone }}" class="text-blue-600 hover:text-blue-700">{{ $member->formatted_phone }}</a>
+                                        <x-ui.phone :value="$member->phone" tel />
                                     @else
                                         -
                                     @endif
@@ -140,13 +139,12 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700 tabular-nums">
-                                    {{ $member->formatted_phone ?? '-' }}
+                                    <x-ui.phone :value="$member->phone" />
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex flex-wrap gap-1">
                                         @if($member->hasRole('admin'))
                                             <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">관리자회원</span>
-                                        @endif
                                         @else
                                             <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                         @endif

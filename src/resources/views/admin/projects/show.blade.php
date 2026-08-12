@@ -358,7 +358,7 @@
                                 <dd class="mt-0.5 text-slate-800 break-all">
                                     {{ $request->user->name ?? '알 수 없음' }}
                                     @if($request->user?->formatted_phone)
-                                        <a href="tel:{{ $request->user->phone }}" class="block text-blue-600 tabular-nums">{{ $request->user->formatted_phone }}</a>
+                                        <x-ui.phone :value="$request->user->phone" tel class="block" />
                                     @endif
                                 </dd>
                             </div>
@@ -396,7 +396,7 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-slate-900">{{ $request->user->name ?? '알 수 없음' }}</div>
-                                    <div class="text-sm text-slate-500 tabular-nums">{{ $request->user->formatted_phone ?? '-' }}</div>
+                                    <div class="text-sm text-slate-500"><x-ui.phone :value="$request->user?->phone" /></div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {{-- $statusColors / $statusTexts 는 카드 리스트와 공유 (상단 @php) --}}
