@@ -87,13 +87,24 @@ class RequestApiController extends Controller
         }
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
-        try {
-            $request = RequestModel::findOrFail($id);
-            $cancelledRequest = $this->requestService->cancelRequest($request, Auth::user());
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
 
-            return response()->success($cancelledRequest, 'Request cancelled successfully');
+        try {
+            $rescueRequest = RequestModel::findOrFail($id);
+            $cancelledRequest = $this->requestService->cancelRequest(
+                $rescueRequest,
+                Auth::user(),
+                $validated['reason'] ?? null
+            );
+
+            return response()->success($cancelledRequest, '신고를 취소했습니다.');
+        } catch (\RuntimeException $e) {
+            // 「배정 후라 직접 취소 불가」 같은 상태 충돌은 권한 문제가 아니다.
+            return response()->error($e->getMessage(), 422);
         } catch (\Exception $e) {
             return response()->error($e->getMessage(), 403);
         }

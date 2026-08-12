@@ -205,11 +205,17 @@
                             </form>
                         @endif
 
-                        @if($rescueRequest->status !== 'cancelled' && $rescueRequest->status !== 'completed')
+                        {{-- ⚠️ 예전 조건은 `$rescueRequest->status !== 'cancelled'` 였다. status 는 enum 이라
+                             문자열과의 비교가 «항상 참»이었고, 이미 취소·완료된 건에도 취소 버튼이 떴다.
+                             비교는 enum 케이스로 — 판정은 모델이 이미 갖고 있다. --}}
+                        @if($rescueRequest->canBeCancelled())
                             <form method="POST" action="{{ route('admin.requests.update', $rescueRequest->id) }}">
                                 @csrf
                                 @method('PATCH')
                                 <input type="hidden" name="status" value="cancelled">
+                                <input type="text" name="cancel_reason" maxlength="500"
+                                       placeholder="취소 사유 (기록에 남습니다)"
+                                       class="w-full mb-2 px-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-red-300 focus:ring-1 focus:ring-red-200 outline-none">
                                 <button type="submit"
                                         class="w-full inline-flex items-center justify-center gap-1.5 bg-white text-red-600 border border-red-200 px-4 py-2.5 rounded-xl hover:bg-red-50 font-medium text-sm transition-colors"
                                         onclick="return confirm('이 요청을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.')">

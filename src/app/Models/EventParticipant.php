@@ -58,11 +58,19 @@ class EventParticipant extends Model
     }
 
     /**
-     * 지령 수령 가능 역할(구급대/자원봉사 구급)만.
+     * 지령 수령 «자격»이 있는 역할(구급대/자원봉사 구급). 채널·화면 접근용.
      */
     public function scopeReceivers(Builder $query): Builder
     {
         return $query->whereIn('role', [EventRole::PARAMEDIC->value, EventRole::VOLUNTEER_MEDIC->value]);
+    }
+
+    /**
+     * 새 지령의 배정 «후보»(구급대만). EventRole::isDispatchCandidate() 와 짝.
+     */
+    public function scopeDispatchCandidates(Builder $query): Builder
+    {
+        return $query->where('role', EventRole::PARAMEDIC->value);
     }
 
     /**

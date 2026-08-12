@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Enums\RequestStatus;
 use App\Enums\RequestType;
 use App\Events\RequestCreated;
+use App\Events\RequestStatusUpdated;
 use App\Models\Request;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class RequestService
 {
+    public function __construct(private DispatchService $dispatchService) {}
+
     public function getAllRequests(User $user): Collection
     {
         if ($user->hasRole('admin') || $user->hasRole('rescuer')) {
@@ -67,6 +71,13 @@ class RequestService
 
         $this->assertCoordinatesUnchanged($request, $data);
 
+        // 🔑 취소는 이 문으로 들어올 수 없다. 여기로 들어오면 활성 지령 회수도, 신고자
+        //    통지도, 「누가 왜 껐는가」 기록도 전부 건너뛴다 — 같은 결과처럼 보이지만
+        //    취소의 절반이 빠진 상태다. 취소는 cancelRequest() 하나뿐이다.
+        if (($data['status'] ?? null) === RequestStatus::CANCELLED || ($data['status'] ?? null) === RequestStatus::CANCELLED->value) {
+            throw new \RuntimeException('신고 취소는 취소 전용 경로로만 처리할 수 있습니다.');
+        }
+
         $request->update($data);
 
         if (isset($data['status']) && $data['status'] === RequestStatus::IN_PROGRESS && ! $request->responded_at) {
@@ -114,22 +125,73 @@ class RequestService
         }
     }
 
-    public function cancelRequest(Request $request, User $user): Request
+    /**
+     * 신고 취소 — «모든» 취소 경로의 단일 진입점.
+     *
+     * 취소 권한(2026-08-12 결정):
+     *   - admin: 항상
+     *   - 그 행사 상황실(controller): 항상
+     *   - 신고자 본인: 활성 지령이 «없을 때만». 대원이 이미 수락하고 이동 중인데
+     *     신고자가 말없이 지워버리면, 그 사람은 아무도 없는 현장으로 계속 간다.
+     *     배정 후에는 상황실 판단을 거친다.
+     *
+     * 🔑 취소는 status 만 바꾸는 일이 아니다. 활성 지령을 같이 회수하지 않으면 그 지령은
+     *    고아가 되고(대원 화면은 신고 status 를 보지 않는다), 나중에 그 대원이 완료를
+     *    누르면 취소가 완료로 덮여 쓰인다. 그래서 회수 → 취소가 한 트랜잭션이다.
+     */
+    public function cancelRequest(Request $request, User $user, ?string $reason = null): Request
     {
-        if (! $request->isOwner($user) && ! $user->hasRole('admin')) {
-            throw new \Exception('Unauthorized to cancel this request');
-        }
-
         if (! $request->canBeCancelled()) {
             throw new \Exception('Request cannot be cancelled in current status');
         }
 
-        $request->update([
-            'status' => RequestStatus::CANCELLED,
-            'completed_at' => now(),
-        ]);
+        $this->assertCanCancel($request, $user);
 
-        return $request->fresh(['user', 'assignedRescuer']);
+        DB::transaction(function () use ($request, $user, $reason) {
+            // 먼저 회수한다. 회수 전이는 신고를 pending 으로 되돌리려 하지만, 바로 아래에서
+            // CANCELLED 로 확정되고 이후 전이는 종료상태 가드에 막힌다.
+            $this->dispatchService->recallAllForRequest($request, $user, $reason ?? '신고 취소');
+
+            $request->forceFill([
+                'status' => RequestStatus::CANCELLED,
+                'completed_at' => now(),
+                'cancelled_by' => $user->id,
+                'cancel_reason' => $reason,
+            ])->save();
+        });
+
+        $fresh = $request->fresh(['user', 'assignedRescuer']);
+
+        // 신고자·상황실에 알린다. 예전엔 취소가 아무 이벤트도 쏘지 않아서, 신고자 화면은
+        // 폴링이 돌 때까지 모르고 관제 화면은 끝까지 몰랐다.
+        RequestStatusUpdated::dispatch($fresh);
+
+        return $fresh;
+    }
+
+    /**
+     * 취소 권한 검사. 신고자 본인은 «배정 전»에만.
+     */
+    private function assertCanCancel(Request $request, User $user): void
+    {
+        if ($user->hasRole('admin')) {
+            return;
+        }
+
+        $role = $request->project ? $user->eventRoleIn($request->project) : null;
+        if ($role !== null && $role->canDispatch()) {
+            return; // 그 행사 상황실
+        }
+
+        if (! $request->isOwner($user)) {
+            throw new \Exception('Unauthorized to cancel this request');
+        }
+
+        if ($request->activeDispatch()->exists()) {
+            throw new \RuntimeException(
+                '이미 구조대가 배정되어 직접 취소할 수 없습니다. 상황실로 전화해 주세요.'
+            );
+        }
     }
 
     /**

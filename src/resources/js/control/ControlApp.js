@@ -71,6 +71,16 @@ export default {
                 confirming: false,
             },
 
+            // 지령 회수(ADR-0007). 배정과 «같은» 2단 확인을 쓴다 — 상황실 화면은 하루
+            // 종일 열려 있고, cancelled 는 terminal 이라 되돌릴 수 없다. 다른 점은
+            // 하나뿐: 회수는 사유(note)를 같이 보낸다(선택).
+            recall: {
+                dispatch: null,    // 확인 대기중인 지령(null 이면 닫힘)
+                reason: '',
+                submitting: false,
+                error: '',
+            },
+
             // FE-3.3 출동현황 보드
             dispatchStatusOrder: DISPATCH_STATUS_ORDER,
             board: { counts: {}, active: [], history: [], loading: false },
@@ -102,12 +112,9 @@ export default {
             return { gridTemplateColumns: cols };
         },
 
-        // 아직 배정되지 않은 신고(거절 포함 — 재지령 필요). 시트 peek 상태의 핵심 지표.
+        // 아직 배정되지 않은 신고(거절·회수 포함 — 재지령 필요). 시트 peek 상태의 핵심 지표.
         unassignedRequests() {
-            return this.requests.filter((r) => {
-                const s = this.requestStatus(r.request_id);
-                return !s || s === 'rejected';
-            });
+            return this.requests.filter((r) => this.needsAssign(r.request_id));
         },
 
         // 미배정 우선, 그다음 최신순. 폰에서는 스크롤 없이 보이는 첫 화면이 전부다.
@@ -115,8 +122,7 @@ export default {
             const unassigned = [];
             const rest = [];
             this.requests.forEach((r) => {
-                const s = this.requestStatus(r.request_id);
-                (!s || s === 'rejected') ? unassigned.push(r) : rest.push(r);
+                this.needsAssign(r.request_id) ? unassigned.push(r) : rest.push(r);
             });
             return unassigned.concat(rest);
         },
@@ -201,6 +207,7 @@ export default {
             this.requestCount = 0;
             this.requestStatusMap = {};
             this.closeAssign();
+            this.cancelRecallConfirm(); // 이전 행사의 지령이 확인창에 남지 않도록
 
             await this._ensureMap();
 
@@ -352,10 +359,11 @@ export default {
             // presence: 위치
             this._locCh = echo.join(`event.${pid}.locations`)
                 .listen('.participant.location', (e) => this._onLocation(e));
-            // private control: 신규 신고 + 지령 상태 갱신
+            // private control: 신규 신고 + 지령 상태 갱신 + 신고 자체의 상태 갱신
             this._ctrlCh = echo.private(`event.${pid}.control`)
                 .listen('.request.created', (e) => this._onRequestCreated(e))
-                .listen('.dispatch.updated', (e) => this._onDispatchUpdated(e));
+                .listen('.dispatch.updated', (e) => this._onDispatchUpdated(e))
+                .listen('.request.status.updated', (e) => this._onRequestStatusUpdated(e));
 
             // 연결 상태 → 인디케이터 + 폴백
             const conn = echo.connector?.pusher?.connection;
@@ -428,6 +436,55 @@ export default {
         /** 신고 건수 — 지도가 없으면 핀을 셀 수 없으므로 목록 길이로 센다. */
         _requestCount() {
             return this.requestPins ? this.requestPins.count() : this.requests.length;
+        },
+
+        // 신고 «자체»의 상태 변화(취소·완료). 지령 상태(.dispatch.updated)와 별개다.
+        //
+        // 🔑 이 이벤트가 신고자 채널로만 가던 때는 상황실이 취소를 끝까지 몰랐다 —
+        //    취소된 신고의 핀이 지도에 계속 떠 있고, 아무도 안 가는 좌표에 인력이
+        //    묶인다. 목록에서 지우는 게 아니라 «관제 화면 전체»에서 걷어내야 한다.
+        _onRequestStatusUpdated(payload) {
+            if (!payload || payload.request_id == null) return;
+
+            if (payload.status !== 'cancelled') {
+                // 취소가 아니면 목록은 그대로 둔다. 보드는 같은 전이에서 나가는
+                // .dispatch.updated 가 이미 다시 읽으므로 여기서 또 부르지 않는다.
+                return;
+            }
+
+            this._removeRequest(payload.request_id);
+            // 서버가 딸린 활성 지령을 자동 회수하므로 보드도 다시 읽는다.
+            this.loadBoard();
+        },
+
+        // 신고를 관제 화면에서 걷어낸다 — 목록 · 지도핀 · 상태맵 · 펼침 · 배정 패널.
+        _removeRequest(id) {
+            const rid = Number(id);
+            this.requests = this.requests.filter((r) => Number(r.request_id) !== rid);
+            this._removeRequestPin(rid);
+            delete this.requestStatusMap[id];
+            this.requestCount = this._requestCount();
+
+            if (Number(this.expandedRequestId) === rid) this.expandedRequestId = null;
+
+            // 배정 패널이 «그 신고»를 열어 둔 채면 닫는다. 안 닫으면 상황실이 이미
+            // 취소된 신고에 대원을 발령하고, 서버가 422 를 돌려줄 때까지 모른다.
+            if (this.assign.open && Number(this.assign.request?.request_id) === rid) {
+                this.closeAssign();
+            }
+        },
+
+        // 신고 고정핀 제거.
+        // ⚠ RequestPinLayer 에 remove(id) 가 없어 오버레이를 여기서 직접 내린다.
+        //   markerPool.js 에 remove(id) 가 생기면 이 메서드를 그걸로 교체할 것.
+        _removeRequestPin(id) {
+            if (!this.requestPins) return;
+            const pins = this.requestPins.pins;
+            const key = [...pins.keys()].find((k) => Number(k) === Number(id));
+            if (key === undefined) return;
+            const overlay = pins.get(key);
+            if (overlay && typeof overlay.setMap === 'function') overlay.setMap(null);
+            pins.delete(key);
         },
 
         // ── FE-3.3: 지령 배정 패널 ──────────────────────────────
@@ -542,6 +599,71 @@ export default {
 
         boardCount(s) { return this.board.counts?.[s] || 0; },
         requestStatus(id) { return this.requestStatusMap[id] || null; },
+
+        // 「이 신고를 (다시) 배정할 수 있는가」의 단일 출처 — 목록 정렬·미배정 카운트·
+        // 배정 버튼이 전부 여기를 본다.
+        //
+        // 🔑 cancelled(회수)가 여기 빠지면 회수한 신고를 다시 배정할 수 없어 회수 기능
+        //    자체가 무의미해진다. rejected(대원 거절)와 완전히 같은 자리에 둔다 —
+        //    「담당자가 없어서 지금 누군가 보내야 하는 신고」라는 점에서 동일하다.
+        needsAssign(id) {
+            const s = this.requestStatus(id);
+            return !s || s === 'rejected' || s === 'cancelled';
+        },
+
+        // 거절·회수 뒤에는 «다시» 보내는 것이라 [재배정]으로 부른다.
+        assignLabel(id) { return this.requestStatus(id) ? '재배정' : '배정'; },
+
+        // ── 지령 회수 (ADR-0007) ────────────────────────────────
+        // 🔑 arrived 에서는 회수 버튼을 «노출하지 않는다». 서버 전이표가 막아 422 를
+        //    돌려주므로(도착 기록을 없던 일로 만들지 않는다), 눌리는 버튼으로 두면
+        //    상황실은 "왜 안 되지"만 배우게 된다.
+        canRecall(d) {
+            return !!d && !!d.dispatch_id && d.status !== 'arrived';
+        },
+
+        // 1단계: 확인 요청. 2단계(submitRecall)에서 실제 회수.
+        requestRecallConfirm(d) {
+            if (!this.canRecall(d)) return;
+            this.recall.dispatch = d;
+            this.recall.reason = '';
+            this.recall.error = '';
+            this.recall.submitting = false;
+        },
+        cancelRecallConfirm() {
+            this.recall.dispatch = null;
+            this.recall.reason = '';
+            this.recall.error = '';
+        },
+
+        async submitRecall() {
+            const d = this.recall.dispatch;
+            if (!d || this.recall.submitting) return;
+            this.recall.submitting = true;
+            this.recall.error = '';
+            try {
+                // 새 엔드포인트가 아니라 기존 상태 전이 API 다 — 사유는 note 로 들어간다.
+                await window.axios.patch(
+                    `/api/dispatches/${d.dispatch_id}/status`,
+                    { status: 'cancelled', note: this.recall.reason || null },
+                    { headers: { Accept: 'application/json' } }
+                );
+                // 회수된 신고는 즉시 «미배정»으로 돌아가야 한다. loadBoard() 가 활성
+                // 지령 기준으로 맵을 통째로 다시 만들지만, 그 왕복 동안 옛 상태가
+                // 남아 [배정] 버튼이 사라져 있는 것을 막는다.
+                delete this.requestStatusMap[d.request_id];
+                this.cancelRecallConfirm();
+                await this.loadBoard();
+            } catch (e) {
+                const status = e.response?.status;
+                // 422: 이미 끝났거나(경합) arrived 로 넘어간 지령 / 403: 대원 본인 등
+                this.recall.error = status === 422
+                    ? (e.response?.data?.message || '회수할 수 없는 지령입니다.')
+                    : (status === 403 ? '회수 권한이 없습니다.' : '지령 회수에 실패했습니다.');
+            } finally {
+                this.recall.submitting = false;
+            }
+        },
 
         // 기록 다운로드 URL(BE-4.1) — 세션 쿠키로 GET 다운로드
         reportUrl(kind) {
@@ -911,11 +1033,11 @@ export default {
             </button>
             <div class="flex items-center gap-2 flex-shrink-0">
               <span class="text-xs text-gray-400">{{ fmtTime(req.created_at) }}</span>
-              <!-- 활성 배정 없으면 [배정], 거절상태면 [재배정] -->
-              <button v-if="!requestStatus(req.request_id) || requestStatus(req.request_id)==='rejected'"
+              <!-- 활성 배정 없으면 [배정], 거절/회수 상태면 [재배정] -->
+              <button v-if="needsAssign(req.request_id)"
                       @click="openAssign(req)"
                       class="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium">
-                {{ requestStatus(req.request_id)==='rejected' ? '재배정' : '배정' }}
+                {{ assignLabel(req.request_id) }}
               </button>
             </div>
           </div>
@@ -956,13 +1078,20 @@ export default {
         <div v-if="board.active.length === 0 && board.history.length === 0" class="p-6 text-center text-xs text-gray-300">
           진행 중인 지령이 없습니다.
         </div>
-        <div v-for="d in board.active" :key="'a'+d.dispatch_id" class="flex items-center justify-between px-3 py-2 border-b border-gray-50">
+        <div v-for="d in board.active" :key="'a'+d.dispatch_id" class="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-50">
           <span class="flex items-center gap-2 min-w-0">
             <span class="text-sm font-medium">#{{ d.request_id }}</span>
             <span class="text-xs text-gray-500">{{ d.request ? typeLabel(d.request.type) : '' }}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
           </span>
-          <span class="text-xs text-gray-500 truncate">{{ d.paramedic_name }}</span>
+          <span class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-xs text-gray-500 truncate max-w-[80px]">{{ d.paramedic_name }}</span>
+            <!-- 회수(ADR-0007). arrived 면 노출하지 않는다 — 서버 전이표가 막는다. -->
+            <button v-if="canRecall(d)" @click="requestRecallConfirm(d)"
+                    class="text-xs px-2 py-1 rounded border border-rose-200 text-rose-600 hover:bg-rose-50 font-medium">
+              회수
+            </button>
+          </span>
         </div>
         <!-- 완료 이력 -->
         <div v-if="board.history.length" class="px-3 py-1.5 text-[10px] text-gray-400 bg-gray-50">완료/종료 이력</div>
@@ -1040,10 +1169,10 @@ export default {
                     class="flex h-11 flex-1 items-center justify-center rounded-xl bg-gray-100 text-sm font-semibold text-gray-700 active:bg-gray-200">
               지도에서
             </button>
-            <button v-if="!requestStatus(req.request_id) || requestStatus(req.request_id)==='rejected'"
+            <button v-if="needsAssign(req.request_id)"
                     @click="openAssign(req)"
                     class="flex h-11 flex-1 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white active:bg-blue-700">
-              {{ requestStatus(req.request_id)==='rejected' ? '재배정' : '배정' }}
+              {{ assignLabel(req.request_id) }}
             </button>
           </div>
         </div>
@@ -1076,6 +1205,11 @@ export default {
           <span class="text-sm font-bold">#{{ d.request_id }}</span>
           <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="dispatchBadge(d.status)">{{ dispatchLabel(d.status) }}</span>
           <span class="ml-auto truncate text-xs text-gray-500">{{ d.paramedic_name }}</span>
+          <!-- 회수(ADR-0007) — 폰에서도 오탭 방지 2단 확인을 거친다 -->
+          <button v-if="canRecall(d)" @click="requestRecallConfirm(d)"
+                  class="flex h-11 flex-none items-center rounded-xl border border-rose-200 px-3 text-xs font-bold text-rose-600 active:bg-rose-50">
+            회수
+          </button>
         </div>
         <div v-if="board.history.length" class="bg-gray-50 px-4 py-1.5 text-[10px] text-gray-400">완료/종료 이력</div>
         <div v-for="d in board.history" :key="'mh'+d.dispatch_id" class="flex items-center gap-2 border-b border-gray-100 px-4 py-2 opacity-70">
@@ -1179,6 +1313,38 @@ export default {
             </button>
           </div>
         </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 지령 회수 확인 (ADR-0007) ══════════
+       배정(requestAssignConfirm)과 같은 2단 확인. 회수는 되돌릴 수 없고(cancelled 는
+       terminal), 상황실 화면은 하루 종일 열려 있어 스쳐 눌릴 위험이 배정과 같다.
+       배정 드로어(z-200)보다 위에 둔다 — 두 창이 겹칠 수 있는 동선은 없지만,
+       겹쳤을 때 «되돌릴 수 없는 쪽»이 뒤에 깔리면 안 된다. -->
+  <div v-if="recall.dispatch" class="fixed inset-0 z-[210] flex items-center justify-center px-5"
+       @click.self="cancelRecallConfirm">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+      <h3 class="text-base font-bold text-gray-900">지령 회수</h3>
+      <p class="mt-2 text-sm text-gray-700">
+        <b>{{ recall.dispatch.paramedic_name }}</b> 님의
+        신고 <b>#{{ recall.dispatch.request_id }}</b> 지령을 회수합니다.
+        <span class="mt-1 block text-xs text-gray-400">
+          대원 화면에서 지령이 즉시 사라지고, 신고는 다시 미배정으로 돌아갑니다. 되돌릴 수 없습니다.
+        </span>
+      </p>
+      <!-- 사유는 대원 화면에 그대로 표시된다(«왜 멈추라는지»가 없으면 대원은 계속 간다) -->
+      <input v-model="recall.reason" type="text" placeholder="회수 사유(선택) — 대원에게 표시됩니다"
+             class="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      <p v-if="recall.error" class="mt-2 text-xs text-rose-600">{{ recall.error }}</p>
+      <div class="mt-4 flex gap-2">
+        <button @click="cancelRecallConfirm" :disabled="recall.submitting"
+                class="h-12 flex-1 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">뒤로</button>
+        <button @click="submitRecall" :disabled="recall.submitting"
+                class="h-12 flex-1 rounded-md bg-rose-600 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50">
+          {{ recall.submitting ? '회수 중…' : '회수 확정' }}
+        </button>
       </div>
     </div>
   </div>

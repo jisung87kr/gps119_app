@@ -86,7 +86,7 @@ export function presenceState(lastSeenAt) {
 }
 
 // 지령 상태 메타 (control-map / dispatch-screens-spec). 백엔드 App\Enums\DispatchStatus 미러.
-export const DISPATCH_STATUS_ORDER = ['assigned', 'accepted', 'en_route', 'arrived', 'completed', 'rejected'];
+export const DISPATCH_STATUS_ORDER = ['assigned', 'accepted', 'en_route', 'arrived', 'completed', 'rejected', 'cancelled'];
 
 export const DISPATCH_STATUS_META = {
     assigned:  { label: '배정', badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', dot: 'bg-amber-500' },
@@ -95,6 +95,9 @@ export const DISPATCH_STATUS_META = {
     arrived:   { label: '도착', badge: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200', dot: 'bg-indigo-500' },
     completed: { label: '완료', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', dot: 'bg-emerald-500' },
     rejected:  { label: '거절', badge: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200', dot: 'bg-rose-500' },
+    // 회수 = 상황실이 발령을 되돌린 것(ADR-0007). 거절과 «다른 색»이어야 한다 —
+    // 같은 회색으로 묶으면 이력에서 「대원이 안 갔다」와 「관제가 뺐다」가 구분되지 않는다.
+    cancelled: { label: '회수', badge: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200', dot: 'bg-orange-400' },
 };
 
 export function dispatchStatusMeta(s) {

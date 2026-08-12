@@ -27,7 +27,13 @@ class RequestStatusUpdated implements ShouldBroadcast, ShouldDispatchAfterCommit
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel("event.{$this->request->project_id}.requester.{$this->request->user_id}")];
+        return [
+            new PrivateChannel("event.{$this->request->project_id}.requester.{$this->request->user_id}"),
+            // 상황실도 받아야 한다. 신고가 취소되면 관제 지도에서 그 핀이 사라져야 하는데,
+            // 이 이벤트가 신고자 채널로만 가던 때는 관제 화면이 끝까지 몰랐다.
+            // (ADR-0004 상 control 은 연락처 허용 채널이라 페이로드를 나눌 필요가 없다.)
+            new PrivateChannel("event.{$this->request->project_id}.control"),
+        ];
     }
 
     public function broadcastWith(): array

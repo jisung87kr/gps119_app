@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\DispatchStatus;
 use App\Enums\RequestStatus;
 use App\Events\DispatchAssigned;
+use App\Events\DispatchRecalled;
 use App\Events\DispatchStatusUpdated;
 use App\Events\RequestStatusUpdated;
 use App\Exceptions\DispatchAuthorizationException;
@@ -41,6 +42,13 @@ class DispatchService
             // OI-2: 신고 행 잠금으로 동시 배정 직렬화 → 활성 지령 1건 보장
             $locked = Request::where('id', $request->id)->lockForUpdate()->firstOrFail();
 
+            // 종결된 신고에는 배정하지 않는다. 이게 없으면 취소·완료된 신고에 지령이 붙고,
+            // 그 지령이 전이될 때 신고 상태 동기화 가드에 막혀 «활성 지령은 있는데
+            // 신고는 종결» 이라는 조용한 모순이 생긴다.
+            if ($locked->status->isTerminal()) {
+                throw new RuntimeException('종결된 신고에는 지령을 배정할 수 없습니다.');
+            }
+
             if ($this->hasActiveDispatch($locked->id)) {
                 throw new RuntimeException('이미 진행 중인 지령이 있습니다. 재지령을 사용하세요.');
             }
@@ -72,7 +80,7 @@ class DispatchService
         ?string $note = null,
         ?string $rejectReason = null
     ): Dispatch {
-        $this->assertCanTransition($dispatch, $actor);
+        $this->assertCanTransition($dispatch, $actor, $target);
 
         // OI-6: 동일 상태 재전송은 멱등 no-op
         if ($dispatch->status === $target) {
@@ -115,6 +123,13 @@ class DispatchService
             // 브로드캐스트: control 상태 갱신
             DispatchStatusUpdated::dispatch($fresh);
 
+            // 회수는 대원 «본인» 채널로 따로 알린다. control 갱신만으로는 이미 출동을
+            // 시작한 대원의 화면과 손 안의 알림이 그대로 남는다 — 그 사람은 계속 달린다.
+            if ($target === DispatchStatus::CANCELLED) {
+                $fresh->loadMissing('request', 'paramedic');
+                DispatchRecalled::dispatch($fresh);
+            }
+
             // accepted/completed 시 신고자에게도 알림(담당자 정보 포함)
             if (in_array($target, [DispatchStatus::ACCEPTED, DispatchStatus::COMPLETED], true)) {
                 $fresh->loadMissing('request', 'paramedic');
@@ -155,6 +170,35 @@ class DispatchService
 
             return $dispatch;
         });
+    }
+
+    /**
+     * 신고 취소에 딸린 활성 지령 일괄 회수.
+     *
+     * 🔑 취소가 dispatch 를 건드리지 않으면 그 지령은 «고아»가 된다. 담당 대원의 지령
+     *    화면은 신고 status 를 보지 않고 dispatch status 만 보기 때문에, 취소된 신고가
+     *    계속 출동 목록에 떠 있고 대원은 현장으로 간다. RequestService::cancelRequest
+     *    가 반드시 이걸 부른다.
+     *
+     * @return int 회수된 지령 수
+     */
+    public function recallAllForRequest(Request $request, User $actor, ?string $reason = null): int
+    {
+        $active = Dispatch::where('request_id', $request->id)->active()->get();
+
+        $count = 0;
+        foreach ($active as $dispatch) {
+            // ARRIVED 는 전이표상 회수 불가(도착 기록을 지우지 않는다). 그 건은
+            // 신고만 취소되고 지령은 대원이 완료로 종결한다.
+            if (! $dispatch->status->canTransitionTo(DispatchStatus::CANCELLED)) {
+                continue;
+            }
+
+            $this->transition($dispatch, DispatchStatus::CANCELLED, $actor, $reason);
+            $count++;
+        }
+
+        return $count;
     }
 
     /**
@@ -236,7 +280,7 @@ class DispatchService
     {
         $rows = EventParticipant::forProject($request->project_id)
             ->active()
-            ->receivers()
+            ->dispatchCandidates()
             ->with('user:id,name')
             ->get();
 
@@ -302,19 +346,33 @@ class DispatchService
     private function assertReceiverEligible(Request $request, User $paramedic): void
     {
         $role = $paramedic->eventRoleIn($request->project);
-        if ($role === null || ! $role->canReceiveDispatch()) {
-            throw new RuntimeException('대상이 지령을 받을 수 있는 구급 인력(active)이 아닙니다.');
+        if ($role === null || ! $role->isDispatchCandidate()) {
+            throw new RuntimeException('대상이 지령을 받을 수 있는 구급대(active)가 아닙니다.');
         }
     }
 
-    private function assertCanTransition(Dispatch $dispatch, User $actor): void
+    private function assertCanTransition(Dispatch $dispatch, User $actor, DispatchStatus $target): void
     {
-        if ($actor->hasRole('admin') || $dispatch->isOwnedBy($actor)) {
+        $isAdmin = $actor->hasRole('admin');
+        $role = $actor->eventRoleIn($dispatch->project);
+        $isController = $role !== null && $role->canDispatch();
+
+        // 🔑 회수는 관제의 결정이다. 대원 본인은 회수할 수 없다 — 대원이 못 가는 상황은
+        //    REJECTED(사유 필수)로 표현된다. 대원이 회수로 빠져나갈 수 있으면 사유 없이
+        //    지령을 지울 수 있고, 거절률 통계에도 안 잡힌다.
+        if ($target === DispatchStatus::CANCELLED) {
+            if ($isAdmin || $isController) {
+                return;
+            }
+
+            throw new DispatchAuthorizationException('지령 회수는 상황실만 할 수 있습니다.');
+        }
+
+        if ($isAdmin || $dispatch->isOwnedBy($actor)) {
             return;
         }
 
-        $role = $actor->eventRoleIn($dispatch->project);
-        if ($role !== null && $role->canDispatch()) {
+        if ($isController) {
             return; // 그 행사 controller 는 현장 대리 전이 가능
         }
 
@@ -329,6 +387,7 @@ class DispatchService
             DispatchStatus::ARRIVED => 'arrived_at',
             DispatchStatus::COMPLETED => 'completed_at',
             DispatchStatus::REJECTED => 'rejected_at',
+            DispatchStatus::CANCELLED => 'cancelled_at',
             DispatchStatus::ASSIGNED => 'assigned_at',
         };
     }
@@ -345,6 +404,13 @@ class DispatchService
 
         $request = $dispatch->request()->first();
         if (! $request) {
+            return;
+        }
+
+        // 🔴 종결된 신고는 뒤늦은 지령 전이가 되살릴 수 없다. 취소된 신고에 배정돼 있던
+        //    대원이 나중에 「완료」를 누르면 취소가 완료로 덮여 쓰였다 — 취소 기록이
+        //    사라지는 종류의 버그라 사후에 발견조차 어렵다.
+        if ($request->status->isTerminal()) {
             return;
         }
 

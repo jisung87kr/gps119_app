@@ -117,11 +117,27 @@ enum EventRole: string
     }
 
     /**
-     * 지령 수령 가능 역할 여부 (구급대 / 자원봉사 구급).
+     * 지령 수령 «자격» 여부 (구급대 / 자원봉사 구급).
+     *
+     * 🔑 이것은 «지령 화면·개인 채널에 들어올 수 있는가»이지 «새 지령의 배정 후보인가»가
+     *    아니다. 후보는 isDispatchCandidate() 다. 둘을 한 메서드로 겸하다가, 후보를
+     *    구급대로 좁히라는 요구가 오면 이미 지령을 받은 자원봉사 구급이 자기 지령 화면에서
+     *    쫓겨나고(진행 중 지령이 즉시 고아가 된다) 활동화면에서도 참가자로 강등되는
+     *    파급이 생긴다. 그래서 여기는 넓게 두고 후보만 좁힌다.
      */
     public function canReceiveDispatch(): bool
     {
         return in_array($this, [self::PARAMEDIC, self::VOLUNTEER_MEDIC], true);
+    }
+
+    /**
+     * 새 지령의 배정 «후보» 여부 — 구급대만.
+     *
+     * 현장 요구(2026-08-12): 자원봉사(구급)는 지령 대상에서 빼고 구조요청 화면만 쓴다.
+     */
+    public function isDispatchCandidate(): bool
+    {
+        return $this === self::PARAMEDIC;
     }
 
     /**

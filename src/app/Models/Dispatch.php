@@ -20,7 +20,7 @@ class Dispatch extends Model
     protected $fillable = [
         'request_id', 'project_id', 'assigned_by', 'paramedic_id',
         'status', 'note', 'reject_reason',
-        'assigned_at', 'accepted_at', 'en_route_at', 'arrived_at', 'completed_at', 'rejected_at',
+        'assigned_at', 'accepted_at', 'en_route_at', 'arrived_at', 'completed_at', 'rejected_at', 'cancelled_at',
     ];
 
     protected $casts = [
@@ -31,6 +31,7 @@ class Dispatch extends Model
         'arrived_at' => 'datetime',
         'completed_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     public function request(): BelongsTo

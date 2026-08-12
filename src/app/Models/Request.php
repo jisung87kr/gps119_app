@@ -31,6 +31,8 @@ class Request extends Model
         'requested_at',
         'responded_at',
         'completed_at',
+        'cancelled_by',
+        'cancel_reason',
     ];
 
     protected $casts = [
@@ -67,6 +69,11 @@ class Request extends Model
     public function assignedRescuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_rescuer_id');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function project(): BelongsTo

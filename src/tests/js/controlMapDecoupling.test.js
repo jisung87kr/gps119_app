@@ -39,6 +39,7 @@ describe('관제 — 지도 실패와 기능 분리', () => {
             // 호출 여부만 기록한다
             _teardownRealtime: vi.fn(),
             closeAssign: vi.fn(),
+            cancelRecallConfirm: vi.fn(),
             _ensureMap: vi.fn(async function () { this.mapReady = mapReady; }),
             _applyFilterToPool: vi.fn(),
             fetchRoster: vi.fn(async () => {}),
