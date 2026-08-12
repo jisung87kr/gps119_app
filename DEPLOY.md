@@ -16,7 +16,24 @@
 | 코드 | `/home/ubuntu/gps119_app` — `deploy.sh` 때문에 **detached HEAD 가 정상**이다 |
 | TLS | Let's Encrypt. 최초 standalone → **갱신 webroot 로 전환 완료**(dry-run 통과) |
 | swap | 2GB (`/swapfile`, `vm.swappiness=10`) |
-| 자동 백업 | DB 덤프 크론 매일 **04:10 KST** + Lightsail 스냅샷 매일 **05:00 KST** |
+| 자동 백업 | DB 덤프 크론 매일 **04:10 KST** (`backup-db.sh`, **공개키 암호화**) + Lightsail 스냅샷 **05:00 KST** |
+| 스케줄러 | `schedule:run` 매분. 현재 `location:purge`(위치 이력 180일 파기) 매일 **04:40 KST** |
+
+### 배포 이력
+
+| 날짜 | ref | 내용 |
+|---|---|---|
+| 2026-08-10 | — | 최초 설치(§1 수동 절차). `deploy.sh` 미경유 |
+| 2026-08-12 | `226f5b7` | **`deploy.sh` 첫 실전 실행.** 현장 피드백 7건 + 역할 정리 + 개인정보 보호조치. 마이그레이션 5건 |
+
+**2026-08-12 배포에서 확인한 것**
+- 마이그레이션 5건 전부 적용: `cancelled_at` / `cancellation` / `is_primary`(기존 지령 7건 전부 주담당 백필) / `event_rosters` / `move_rescuers`
+- 🔑 **rescuer 22명 중 14명만** 「상시 운영」 구급대가 됐다. 나머지 8명은 이미 그 행사에
+  다른 역할(상황실 2·운영진 2·자원봉사 2 등)로 참가 중이어서 **덮어쓰지 않았다** —
+  「관리자가 정한 역할을 마이그레이션이 되돌리지 않는다」는 규칙이 실제로 작동한 결과다
+- 남은 시스템 롤은 `admin`·`user` 둘뿐
+- 백업 암호화 왕복 실증: 서버(공개키) 암호화 → 노트북(개인키) 복호화 → 유효한 MySQL 덤프
+- ⚠️ 배포 전부터 있던 **평문 백업 6개**는 아직 서버에 남아 있다(정리 대상)
 
 **검증한 것** — https `/up` 200, 80→443 301, `/app` WebSocket 101(`X-Powered-By: Laravel Reverb`),
 HSTS·nosniff·Referrer-Policy, 지도(카카오 도메인 등록 확인), 네이버 로그인 302,
@@ -251,9 +268,12 @@ crontab -e
 # 매일 04:10 KST — DB 백업(암호화)
 10 4 * * * cd ~/gps119_app && ./backup-db.sh >> backups/cron.log 2>&1
 # 매일 04:50 KST — 라라벨 스케줄러(위치 이력 보존기간 파기가 여기서 돈다)
-* * * * * cd ~/gps119_app && docker compose --env-file .env.deploy -f docker-compose.prod.yml exec -T app php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /home/ubuntu/gps119_app && docker compose --env-file .env.deploy -f docker-compose.prod.yml exec -T app php artisan schedule:run >/dev/null 2>> /home/ubuntu/gps119_app/backups/schedule-err.log
 ```
 
+> 🔑 stdout 은 버리고 **stderr 만** 남긴다. `>/dev/null 2>&1` 로 묶으면 매분 「No scheduled
+> commands」 노이즈는 사라지지만 **실패도 같이 사라진다** — 크론 실패는 조용해서 위험하다.
+>
 > ⚠️ **스케줄러 크론이 없으면 `location:purge` 가 영영 안 돈다.** 코드에는 등록돼 있지만
 > 「등록은 됐는데 아무 일도 안 하는」 상태가 된다 — 개인정보처리방침에 적은 보존기간을
 > 지키지 못하는 상태이므로 이건 기능 누락이 아니라 약속 위반이다.
@@ -321,11 +341,13 @@ echo 'BACKUP_OFFSITE_CMD=aws s3 cp "$1" s3://gps119-backup/' >> ~/gps119_app/.en
   점검 모드가 «켜진 채»로 남아 사용자에게 503 이 나가는 것(깨진 코드가 열리지 않는 것),
   그리고 안내대로 `./deploy.sh rollback` 을 치면 직전 릴리스로 복구되고 점검 모드가 풀리는 것까지.
   로컬로 대체되지 않던 것(실발급 TLS·실도메인 DNS·4GB 빌드·재부팅 복귀)은 **2026-08-10 실제
-  배포에서 전부 통과했다.** → §0. **OPS-08 종료.** 남은 건 `deploy.sh` 를 «운영기에서» 한 번도
-  돌려본 적이 없다는 것뿐이다(최초 설치는 §1 수동 절차라 스크립트를 거치지 않는다).
-  다음 배포가 그 첫 실행이 된다 — 백업이 자동으로 뜨고 실패해도 점검 모드로 멈추므로 위험은
-  낮지만, **첫 실행은 사용자가 없는 시간에** 하는 게 좋다.
+  배포에서 전부 통과했다.** → §0. **OPS-08 종료.**
+- ✅ **`deploy.sh` 운영기 첫 실행 완료 (2026-08-12, 226f5b7).** 백업→점검 모드→체크아웃→
+  composer→vite→**마이그레이션 5건**→캐시 재생성→큐·Reverb 재기동→점검 해제→헬스체크(1회차)
+  까지 무수정으로 통과했다. 스크립트가 운영에서 검증된 것은 이번이 처음이다.
 - 🔴 **백업이 전부 같은 AWS 계정·같은 리전에 있다.** 덤프·스냅샷 모두 그렇다. 디스크 장애는
-  막지만 계정 사고나 리전 장애는 못 막는다. §4 의 S3 반출은 아직 안 했다 — 유료 고객이
-  붙으면 닫아야 할 구멍이다
+  막지만 계정 사고나 리전 장애는 못 막는다. `BACKUP_OFFSITE_CMD` 훅은 준비돼 있고 **목적지만
+  정하면 된다**(§4.4). 미설정이면 `backup-db.sh` 가 매 실행 경고를 남긴다.
+  ⚠️ 다만 덤프 «내용»은 2026-08-12 부터 공개키로 암호화된다 — 파일이 새는 것과 열리는 것은
+  이제 다른 문제다
 - **모니터링·알림 없음.** 서비스가 죽어도 알려주는 게 없다. 지금은 사람이 열어봐야 안다
