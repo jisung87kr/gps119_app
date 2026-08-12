@@ -13,6 +13,19 @@
 
     $heading = $project ? $project->name : '구조 요청';
 
+    // 🔴 「이 신고가 어디로 가는가」를 «항상» 보여준다.
+    //
+    //    2026-08-13 에 행사 참가자의 신고가 「상시 운영」으로 새고 있었는데, 아무도
+    //    몰랐던 이유가 정확히 이것이다 — 화면에 목적지가 안 적혀 있었다. 링크 하나가
+    //    잘못돼도 티가 안 나서, 관제 화면이 빈 걸 보고서야 알았다.
+    //    이 한 줄이 그 종류의 버그를 테스트가 아니라 «화면»으로 막는다.
+    //
+    //    $project 는 slug 로 들어온 경우(현수막 QR)이고, 없으면 RequestService 가
+    //    「지금 있는 행사」로 붙인다 — 그 판정과 같은 것을 여기서도 읽는다.
+    $requester = auth()->user();
+    $targetEvent = $project ?: $requester?->currentEvent();
+    $switchable = $requester ? $requester->activeEvents()->reject(fn ($p) => $targetEvent && $p->id === $targetEvent->id) : collect();
+
     // 상황 버튼별 Vue 핸들러. 긴급전화만 즉시 통화, 나머지는 주소확인 모달을 띄운다.
     $handlers = collect(RequestType::cases())
         ->mapWithKeys(fn (RequestType $t) => [
@@ -28,6 +41,37 @@
     <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
 
     <x-ui.page-header :heading="$heading" :back="route('dashboard')" class="shrink-0" />
+
+    {{-- 접수 대상 안내. 행사가 하나뿐이어도 «항상» 띄운다 — 안 띄우면 위 주석의 사고가 반복된다. --}}
+    <div class="shrink-0 px-5 pb-2" @if($switchable->isNotEmpty()) x-data="{ open: false }" @endif>
+        <div class="flex items-center gap-2 rounded-xl bg-ink-100 px-3.5 py-2.5">
+            <x-ui.icon name="pin" class="h-4 w-4 shrink-0 text-ink-400" />
+            <p class="min-w-0 flex-1 truncate text-sm text-ink-600">
+                @if ($targetEvent)
+                    <b class="font-bold text-ink-950">{{ $targetEvent->name }}</b> 으로 접수됩니다
+                @else
+                    행사와 무관한 <b class="font-bold text-ink-950">일반 신고</b>로 접수됩니다
+                @endif
+            </p>
+            @if ($switchable->isNotEmpty())
+                <button type="button" @click="open = !open"
+                        class="shrink-0 text-sm font-bold text-brand-600">변경</button>
+            @endif
+        </div>
+
+        @if ($switchable->isNotEmpty())
+            {{-- 참가 중인 행사만 고를 수 있다. 선택지가 늘수록 급할 때 잘못 고른다. --}}
+            <div x-show="open" x-cloak class="mt-2 overflow-hidden rounded-xl border border-ink-200 bg-white">
+                @foreach ($switchable as $alt)
+                    <a href="{{ route('request.create.project', $alt->slug) }}"
+                       class="flex items-center gap-2 border-b border-ink-100 px-3.5 py-3 text-sm text-ink-700 last:border-0 active:bg-ink-50">
+                        <x-ui.icon name="pin" class="h-4 w-4 text-ink-300" />
+                        {{ $alt->name }} 으로 접수
+                    </a>
+                @endforeach
+            </div>
+        @endif
+    </div>
 
     {{-- 지도가 남은 영역을 채우고 바텀시트가 그 위에 뜬다 (접으면 지도가 드러남) --}}
     <div class="relative flex-1">

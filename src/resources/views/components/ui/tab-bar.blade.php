@@ -47,10 +47,10 @@
     } else {
         // 참가 중인 행사가 하나면 «그 행사의» 신고 화면으로. 화면에 행사 이름이 떠야
         // 신고자가 자기 신고가 어디로 가는지 안다.
-        $soleEvent = $user?->soleActiveEvent();
+        $currentEvent = $user?->currentEvent();
         $middle = [
             'key' => 'work', 'label' => '구조요청', 'icon' => 'ambulance',
-            'url' => $soleEvent ? route('request.create.project', $soleEvent->slug) : route('request.create'),
+            'url' => $currentEvent ? route('request.create.project', $currentEvent->slug) : route('request.create'),
         ];
     }
 

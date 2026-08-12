@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -119,26 +120,46 @@ class User extends Authenticatable
     }
 
     /**
-     * 지금 참가 중인 «실제» 행사가 정확히 하나면 그 행사 (아니면 null).
-     *
-     * 세 곳이 같은 질문을 한다 — 신고를 어느 행사에 붙일지(RequestService), 어디로
-     * 착지시킬지(LandingResolver), 「구조요청」 탭을 어디로 보낼지(tab-bar).
-     * 규칙이 흩어지면 한쪽만 고쳐져서 어긋난다.
+     * 지금 참가 중인 «실제» 행사들 (최근 입장 순). 「상시 운영」은 제외.
      *
      * ⚠️ 「상시 운영」(is_default)은 «폴백 자리»이지 선택지가 아니다. 항상 활성이라
-     *    여기서 세면, 상시 운영에 속한 사람이 실제 행사에 들어가는 순간 «2개»가 되어
-     *    조용히 폴백된다.
+     *    여기 끼워 넣으면, 상시 운영에 속한 사람이 실제 행사에 들어가는 순간 판정이
+     *    조용히 어긋난다.
+     *
+     * @return \Illuminate\Support\Collection<int, Project>
      */
-    public function soleActiveEvent(): ?Project
+    public function activeEvents(): Collection
     {
-        $projects = Project::query()
+        return Project::query()
             ->active()
             ->where('is_default', false)
             ->whereHas('participants', fn ($q) => $q->where('user_id', $this->id)
                 ->where('status', ParticipantStatus::ACTIVE))
+            ->join('event_participants as ep', function ($j) {
+                $j->on('ep.project_id', '=', 'projects.id')->where('ep.user_id', $this->id);
+            })
+            ->orderByDesc('ep.last_entered_at')
+            ->orderByDesc('ep.joined_at')
+            ->select('projects.*')
             ->get();
+    }
 
-        return $projects->count() === 1 ? $projects->first() : null;
+    /**
+     * 「지금 이 사람이 있는 행사」 (없으면 null).
+     *
+     * 네 곳이 같은 질문을 한다 — 신고를 어느 행사에 붙일지(RequestService), 어디로
+     * 착지시킬지(LandingResolver), 「구조요청」 탭을 어디로 보낼지(tab-bar),
+     * 그리고 신고 화면이 「어디로 접수되는지」를 보여줄 때.
+     * 규칙이 흩어지면 한쪽만 고쳐져서 어긋난다.
+     *
+     * 🔑 동시에 두 행사에 참가 중이면 «마지막으로 입장한» 행사다. 응급 화면에서
+     *    드롭다운을 고르게 할 수는 없으므로, 마찰 없이 쓸 수 있는 근거는 그것뿐이다.
+     *    대신 «조용히» 정하지 않는다 — 신고 화면이 어느 행사인지 항상 보여주고,
+     *    둘 이상이면 「변경」을 준다.
+     */
+    public function currentEvent(): ?Project
+    {
+        return $this->activeEvents()->first();
     }
 
     /**

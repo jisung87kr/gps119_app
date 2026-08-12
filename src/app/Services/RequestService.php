@@ -83,15 +83,15 @@ class RequestService
     /**
      * 화면이 행사를 지정하지 않았을 때 «이 사람의» 행사를 찾는다.
      *
-     * 활성 행사 참가가 **정확히 하나**일 때만 귀속시킨다. 여럿이면 어느 현장인지
-     * 알 수 없고, 잘못된 행사에 신고를 붙이면 엉뚱한 상황실이 출동한다 —
-     * 그럴 바엔 「상시 운영」이 낫다(LandingResolver 의 「1개면 직행, 여럿이면 목록」과 같은 원칙).
+     * 여럿이면 «마지막으로 입장한» 행사다 (User::currentEvent). 응급 화면에서 드롭다운을
+     * 고르게 할 수는 없으므로, 마찰 없이 쓸 수 있는 근거는 그것뿐이다. 대신 조용히
+     * 정하지 않는다 — 신고 화면이 어느 행사로 접수되는지 항상 보여준다.
      *
      * @return int|null 귀속할 행사 id. null 이면 모델 훅이 「상시 운영」으로 보낸다.
      */
     private function resolveEventFor(User $user): ?int
     {
-        return $user->soleActiveEvent()?->id;
+        return $user->currentEvent()?->id;
     }
 
     /**

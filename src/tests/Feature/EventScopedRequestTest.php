@@ -50,11 +50,12 @@ class EventScopedRequestTest extends TestCase
         ]);
     }
 
-    private function join(User $user, Project $project, EventRole $role = EventRole::PARTICIPANT): void
+    private function join(User $user, Project $project, EventRole $role = EventRole::PARTICIPANT, ?string $enteredAt = null): void
     {
         EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id,
             'role' => $role, 'status' => ParticipantStatus::ACTIVE,
+            'last_entered_at' => $enteredAt ?? now(),
         ]);
     }
 
@@ -116,17 +117,46 @@ class EventScopedRequestTest extends TestCase
         $this->join($other, $event);
 
         $this->assertSame($event->id, $this->file($other)->project_id);
-        $this->assertSame($event->id, $other->soleActiveEvent()?->id);
+        $this->assertSame($event->id, $other->currentEvent()?->id);
     }
 
-    public function test_two_events_fall_back_instead_of_guessing(): void
+    /**
+     * 동시에 두 행사에 참가한 경우 — «마지막으로 입장한» 행사로 간다.
+     *
+     * 🔑 응급 화면에서 드롭다운을 고르게 할 수는 없다. 마찰 없이 쓸 수 있는 근거는
+     *    「마지막으로 입장 QR 을 찍은 곳」뿐이다. 대신 «조용히» 정하지 않는다 —
+     *    신고 화면이 어느 행사인지 보여주고 「변경」을 준다(아래 테스트).
+     */
+    public function test_two_events_use_the_most_recently_entered_one(): void
     {
         $user = User::factory()->create();
-        $this->join($user, $this->event('행사 A'));
-        $this->join($user, $this->event('행사 B'));
+        $first = $this->event('먼저 들어간 행사');
+        $latest = $this->event('나중에 들어간 행사');
+        $this->join($user, $first, EventRole::PARTICIPANT, now()->subHours(3)->toDateTimeString());
+        $this->join($user, $latest, EventRole::PARTICIPANT, now()->subMinutes(5)->toDateTimeString());
 
-        // 잘못된 행사에 붙이면 엉뚱한 상황실이 출동한다. 그럴 바엔 「상시 운영」이 낫다.
-        $this->assertSame(Project::defaultEvent()->id, $this->file($user)->project_id);
+        $this->assertSame($latest->id, $this->file($user)->project_id);
+        $this->assertSame($latest->id, $user->currentEvent()?->id);
+    }
+
+    /**
+     * 🔴 joined_at 으로는 안 된다. 그건 «최초» 입장이고 재입장해도 갱신되지 않아,
+     *    두 행사를 오가는 사람에게는 영원히 처음 들어간 쪽이 이긴다.
+     */
+    public function test_re_entering_the_other_event_moves_the_target(): void
+    {
+        $user = User::factory()->create(['phone' => '01044445555']);
+        $a = $this->event('행사 A');
+        $b = $this->event('행사 B');
+        $this->join($user, $a, EventRole::PARTICIPANT, now()->subHours(2)->toDateTimeString());
+        $this->join($user, $b, EventRole::PARTICIPANT, now()->subHours(1)->toDateTimeString());
+        $this->assertSame($b->id, $user->currentEvent()?->id);
+
+        // A 의 입장 QR 을 다시 찍었다.
+        app(\App\Services\EventParticipantService::class)->joinByCode($a->join_code, $user);
+
+        $this->assertSame($a->id, $user->currentEvent()?->id);
+        $this->assertSame($a->id, $this->file($user)->project_id);
     }
 
     public function test_a_finished_event_does_not_capture_the_request(): void
@@ -187,5 +217,70 @@ class EventScopedRequestTest extends TestCase
         $this->actingAs($user)->get('/dashboard')
             ->assertOk()
             ->assertSee("/requests/create/{$event->slug}", false);
+    }
+    // ── 접수 대상 배너 ───────────────────────────────────────
+
+    /**
+     * 🔴 이 배너가 이 버그를 «다시» 막는 장치다. 2026-08-13 에 신고가 「상시 운영」으로
+     *    새고 있었는데 아무도 몰랐던 이유가 화면에 목적지가 없었기 때문이다.
+     *    행사가 하나뿐이어도 띄운다.
+     */
+    public function test_the_request_screen_always_shows_where_it_will_be_filed(): void
+    {
+        $user = User::factory()->create(['phone' => '01011112222']);
+        $user->assignRole('user');
+        $event = $this->event('강원마라톤');
+        $this->join($user, $event);
+
+        $this->actingAs($user)->get('/requests/create')
+            ->assertOk()
+            ->assertSee('강원마라톤')
+            ->assertSee('으로 접수됩니다');
+    }
+
+    public function test_someone_with_no_event_is_told_it_is_a_general_request(): void
+    {
+        $user = User::factory()->create(['phone' => '01011112222']);
+        $user->assignRole('user');
+
+        // 「상시 운영」은 내부 개념이라 그대로 보여주면 사용자에게 아무 의미가 없다.
+        $this->actingAs($user)->get('/requests/create')
+            ->assertOk()
+            ->assertSee('일반 신고')
+            ->assertDontSee('상시 운영');
+    }
+
+    public function test_the_change_control_appears_only_with_a_second_event(): void
+    {
+        $user = User::factory()->create(['phone' => '01011112222']);
+        $user->assignRole('user');
+        $a = $this->event('행사 A');
+        $this->join($user, $a, EventRole::PARTICIPANT, now()->subHour()->toDateTimeString());
+
+        // 행사가 하나면 고를 것이 없다 — 급할 때 선택지는 적을수록 좋다.
+        $this->actingAs($user)->get('/requests/create')->assertDontSee('변경');
+
+        $b = $this->event('행사 B');
+        $this->join($user, $b, EventRole::PARTICIPANT, now()->toDateTimeString());
+
+        $this->actingAs($user)->get('/requests/create')
+            ->assertSee('변경')
+            ->assertSee('행사 B')                                  // 지금 대상(마지막 입장)
+            ->assertSee(route('request.create.project', $a->slug), false); // 다른 행사로 바꾸는 길
+    }
+
+    /** 「변경」 목록에는 참가 중인 행사만 — 「상시 운영」은 선택지가 아니다. */
+    public function test_the_change_list_only_offers_events_the_user_is_in(): void
+    {
+        $user = User::factory()->create(['phone' => '01011112222']);
+        $user->assignRole('user');
+        $this->join($user, $this->event('행사 A'), EventRole::PARTICIPANT, now()->subHour()->toDateTimeString());
+        $this->join($user, $this->event('행사 B'), EventRole::PARTICIPANT, now()->toDateTimeString());
+        $this->join($user, Project::defaultEvent());
+        $notMine = $this->event('참가 안 한 행사');
+
+        $this->actingAs($user)->get('/requests/create')
+            ->assertDontSee('참가 안 한 행사')
+            ->assertDontSee(route('request.create.project', $notMine->slug), false);
     }
 }

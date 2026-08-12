@@ -63,7 +63,7 @@ class LandingResolver
         // 🔴 참가 중인 행사가 있으면 «그 행사의» 신고 화면으로 보낸다. 일반 경로로 보내면
         //    화면에 행사 이름이 안 뜨고, 신고자는 자기 신고가 어디로 가는지 알 수 없다.
         //    (귀속 자체는 RequestService 가 보장한다 — 이건 «보이는 것»을 맞추는 것이다.)
-        $event = $user->soleActiveEvent();
+        $event = $user->currentEvent();
 
         return $event
             ? route('request.create.project', $event->slug)
