@@ -18,7 +18,7 @@ class EventParticipant extends Model
 
     protected $fillable = [
         'project_id', 'user_id', 'role', 'status',
-        'sharing_location', 'last_lat', 'last_lng', 'last_accuracy', 'joined_at', 'last_seen_at',
+        'sharing_location', 'last_lat', 'last_lng', 'last_accuracy', 'joined_at', 'last_entered_at', 'last_seen_at',
     ];
 
     protected $casts = [
@@ -28,6 +28,7 @@ class EventParticipant extends Model
         'last_lat' => 'decimal:8',
         'last_lng' => 'decimal:8',
         'joined_at' => 'datetime',
+        'last_entered_at' => 'datetime',
         'last_seen_at' => 'datetime',
     ];
 
