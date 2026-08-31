@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.co.gps119.app",
+      "sha256_cert_fingerprints": [
+        "A0:91:C9:E3:4B:26:F3:B6:0F:B7:A6:6C:F2:AA:FF:FB:5D:10:B2:BA:5C:9D:FE:E5:61:61:63:28:05:79:45:63"
+      ]
+    }
+  }
+]

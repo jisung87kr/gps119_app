@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["KWL346JAR4.kr.co.gps119.app"],
+        "components": [
+          { "/": "/.well-known/*", "exclude": true, "comment": "OS 가 가져가는 파일이다. 링크로 열릴 일이 없다" },
+          { "/": "*", "comment": "앱이 곧 이 웹이다(원격 URL 로딩). 경로를 가릴 이유가 없다" }
+        ]
+      }
+    ]
+  }
+}
