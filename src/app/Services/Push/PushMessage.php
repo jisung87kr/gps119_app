@@ -97,10 +97,30 @@ final class PushMessage
         //       그 명령으로는 이 결함이 드러나지 않는다 — 아래 테스트로 고정한다.
         //
         //    안드로이드: 같은 tag 면 대체. iOS: apns-collapse-id 가 같은 역할을 한다.
+        //    ⚠️ apns 는 «하위 키»로 대입한다. `$payload['apns'] = [...]` 로 통째 대입하면
+        //       아래 sound/interruption-level·badge 블록이 이 줄보다 먼저 실행될 때
+        //       조용히 덮어써진다 — 순서에 의존하는 구조를 남기지 않는다.
         if ($this->tag !== null) {
             $payload['android'] = ['notification' => ['tag' => $this->tag]];
-            $payload['apns'] = ['headers' => ['apns-collapse-id' => $this->tag]];
+            $payload['apns']['headers']['apns-collapse-id'] = $this->tag;
         }
+
+        // 🔴 **iOS 가 «잠금화면에서 조용»했던 이유** (실기기 QA 2026-08-31).
+        //    안드로이드는 채널을 IMPORTANCE_HIGH 로 만들어 heads-up 을 확보해 뒀는데
+        //    (셸의 MainActivity), iOS 에서 그 역할을 하는 건 채널이 아니라 «이 페이로드»다.
+        //    둘 다 비어 있어서 양 플랫폼이 다 된 것처럼 보였지만 iOS 는 반쪽이었다:
+        //
+        //      sound              없으면 무음으로 배달된다. 구조 지령이 소리 없이 온다.
+        //      interruption-level 기본값 active 는 집중 모드(수면·방해금지)를 못 뚫고
+        //                         알림 요약에 묶일 수 있다. time-sensitive 는 둘 다 넘는다.
+        //
+        //    🔴 앱에 `com.apple.developer.usernotifications.time-sensitive` entitlement 가
+        //       없으면 iOS 는 이 값을 «조용히 무시»한다 — 오류가 나지 않으므로 「보냈는데
+        //       왜 그대로지」로 돌아온다. 셸의 App.entitlements 와 한 쌍이고 따로 배포하면 안 된다.
+        //
+        //    critical(무음 스위치·집중 모드까지 무시)은 애플의 별도 승인이 필요해 쓰지 않는다.
+        $payload['apns']['payload']['aps']['sound'] = 'default';
+        $payload['apns']['payload']['aps']['interruption-level'] = 'time-sensitive';
 
         // 🔑 iOS 앱 아이콘 뱃지는 **APNs 페이로드의 `aps.badge` 로만** 정해진다.
         //    Capacitor 의 `presentationOptions: ['badge', …]` 는 「뱃지 갱신을 허용한다」는
