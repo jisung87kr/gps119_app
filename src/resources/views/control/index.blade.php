@@ -30,6 +30,8 @@
     <div id="control-app"
          data-projects='@json($projects)'
          data-role-meta='@json(\App\Enums\EventRole::mapMeta())'
+         {{-- 위치 추적 상태(M-5) 라벨·색·경보 여부. 역할 메타와 같은 이유로 서버가 준다 --}}
+         data-tracking-meta='@json(\App\Enums\TrackingState::mapMeta())'
          data-selected="{{ $selectedId ?? '' }}"
          data-back-url="{{ $backUrl ?? '' }}"></div>
 </body>

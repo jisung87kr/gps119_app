@@ -119,4 +119,29 @@ class TrackingStateTest extends TestCase
 
         $this->assertSame(TrackingState::STALE, $p->trackingState());
     }
+
+    public function test_🔑_관제로_주입되는_메타에_모든_상태가_들어간다(): void
+    {
+        // 🔴 하나라도 빠지면 그 상태인 참가자가 화면에서 «알 수 없음»으로 떨어진다.
+        //    상태를 추가하고 이 표를 안 고치는 실수를 여기서 잡는다.
+        $meta = TrackingState::mapMeta();
+
+        $this->assertCount(count(TrackingState::cases()), $meta);
+
+        foreach (TrackingState::cases() as $state) {
+            $this->assertArrayHasKey($state->value, $meta);
+            $this->assertSame($state->label(), $meta[$state->value]['label']);
+            $this->assertSame($state->needsAttention(), $meta[$state->value]['attention']);
+            $this->assertMatchesRegularExpression('/^#[0-9A-F]{6}$/', $meta[$state->value]['color']);
+        }
+    }
+
+    public function test_🔴_경보는_blocked_하나뿐이다(): void
+    {
+        // 관제의 경보 인원수가 이 판단을 그대로 쓴다. 여기가 늘어나면 화면도 같이
+        // 늘어나는데, 반대로 stale 을 경보로 올리면 잠깐의 끊김이 blocked 를 묻는다.
+        $attention = array_keys(array_filter(TrackingState::mapMeta(), fn ($m) => $m['attention']));
+
+        $this->assertSame([TrackingState::BLOCKED->value], $attention);
+    }
 }

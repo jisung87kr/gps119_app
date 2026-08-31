@@ -3,7 +3,7 @@
 import '../bootstrap';
 import { createApp } from 'vue/dist/vue.esm-browser.prod.js';
 import ControlApp from './ControlApp';
-import { initRoleMeta } from './roleMeta';
+import { initRoleMeta, initTrackingMeta } from './roleMeta';
 import { initNativePushRouting } from '../push-native';
 
 // 🔴 이 페이지는 `app.js` 를 «로드하지 않는다» — control/index.blade.php 의 @vite 는
@@ -35,6 +35,7 @@ if (el) {
     // ControlApp 의 data() 가 ROLE_ORDER/ROLE_META 참조를 잡으므로 «마운트 전에» 채운다.
     try {
         initRoleMeta(JSON.parse(el.dataset.roleMeta || 'null'));
+        initTrackingMeta(JSON.parse(el.dataset.trackingMeta || 'null'));
     } catch (e) {
         console.error('[control] data-role-meta 파싱 실패', e);
     }
