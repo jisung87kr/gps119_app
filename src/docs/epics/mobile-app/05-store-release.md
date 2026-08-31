@@ -102,3 +102,52 @@
 | M-15 | 위치정보사업 신고 대상 여부 (법무). 앱 이전에 웹 운영에도 걸리는 사안 |
 | M-16 | 웹뷰 내 JS 에러·성능 수집 도구 |
 | M-17 | 앱 이름·번들 ID 확정 (`kr.co.gps119.app` 등) |
+
+
+## Universal Links / App Links (2026-09-01)
+
+**QR 을 찍으면 브라우저가 아니라 앱이 열린다.** 이게 없으면 행사 현장에서 참가자가
+입장 QR 을 찍는 순간 앱이 있어도 Safari 로 떨어지고, **백그라운드 위치도 푸시도 그
+사람에게는 무의미해진다** — 앱을 만든 이유가 반감된다.
+
+| 무엇 | 어디 |
+|---|---|
+| `apple-app-site-association` | 웹 `public/.well-known/` (확장자 없음) |
+| `assetlinks.json` | 웹 `public/.well-known/` |
+| `com.apple.developer.associated-domains` | 셸 `ios/App/App/App.entitlements` |
+| `intent-filter android:autoVerify="true"` | 셸 `AndroidManifest.xml` |
+| `ForceType application/json` | 웹 `docker/apache/common.conf` |
+
+🔑 **실패가 조용하다.** OS 는 파일을 못 읽거나 지문이 안 맞으면 **그냥 브라우저로**
+떨어뜨린다. 오류도 로그도 없어서, 「왜 앱이 안 열리지」로만 보인다.
+
+### 🔴 밟기 쉬운 것 넷
+
+**① AASA 는 확장자가 없다.** 그대로 두면 Content-Type 이 «비어» 나가고 iOS 가 무시한다.
+Apple 은 `application/json` 을 요구한다 → Apache `ForceType`.
+
+**② `appIDs` 는 「팀ID.번들ID」다.** 번들ID 만 적으면 조용히 무시된다.
+
+**③ Play 로 배포하면 지문이 «달라진다».** Play 앱 서명이 업로드 키가 아닌 **구글 키로
+다시 서명**하기 때문이다. 지금 `assetlinks.json` 에는 **업로드 키 지문만** 있다 —
+사이드로드·내부 직접 설치에서는 되지만 **스토어 설치본에서는 안 된다.**
+🔴 **첫 업로드 후 Play Console 의 앱 서명 키 지문을 «추가»할 것**(교체가 아니라 추가 —
+내부 테스트용 사이드로드도 계속 쓴다).
+
+**④ iOS 는 AASA 를 «설치 시점»에 가져가 캐시한다.** 서버 쪽을 고쳤으면 앱을 지웠다 다시
+깔아야 반영된다. 안 그러면 「고쳤는데 그대로」가 된다.
+
+### 확인 방법
+
+```bash
+# 파일이 제대로 나가는가
+curl -sI https://gps119.co.kr/.well-known/apple-app-site-association | grep -i content-type
+#   → application/json  (비어 있으면 ① 을 의심)
+
+# 안드로이드가 실제로 검증했는가 (실기기)
+adb shell pm get-app-links kr.co.gps119.app
+#   → verified 가 아니면 지문 불일치(③)
+```
+
+⚠️ **`autoVerify` 는 「검증하겠다」는 선언일 뿐 보장이 아니다.** 설치 시 안드로이드가
+`assetlinks.json` 을 가져가 대조하고, 실패하면 일반 링크로 떨어진다.
