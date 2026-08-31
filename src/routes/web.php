@@ -109,6 +109,12 @@ Route::get('/events/{id}/active', function ($id) {
         'roleLabel' => $role->label(),
         // 구급대/자원봉사 구급이면 지령(출동) 화면 진입 링크 노출
         'canDispatch' => $role->canReceiveDispatch(),
+        // 🔴 **현재 공유 «의도»를 화면에 준다.** 이게 없어서 화면이 매번 enable() 을
+        //    불렀고, 사용자가 끈 공유가 «화면을 옮기는 것만으로» 되살아났다.
+        //    서버 값이 유일한 출처다 — 화면은 그걸 이어받기만 한다.
+        'sharing' => (bool) \App\Models\EventParticipant::where('project_id', $project->id)
+            ->where('user_id', $user->id)
+            ->value('sharing_location'),
     ]);
 })->middleware(['auth'])->name('events.active');
 

@@ -11,7 +11,8 @@
          data-project-id="{{ $project->id }}"
          data-role="{{ $role }}"
          data-role-label="{{ $roleLabel }}"
-         data-project-name="{{ $project->name }}">
+         data-project-name="{{ $project->name }}"
+         data-sharing="{{ $sharing ? '1' : '0' }}">
 
         {{-- 내 역할 --}}
         <div class="flex items-center gap-2">
@@ -144,8 +145,8 @@
                     role: root.dataset.role,
                     roleLabel: root.dataset.roleLabel,
                     projectName: root.dataset.projectName,
-                    // sharer state 미러
-                    sharing: false,
+                    // sharer state 미러. 초기값은 «서버가 아는 의도»다.
+                    sharing: root.dataset.sharing === '1',
                     permission: 'prompt',
                     sentCount: 0,
                     lastSentAt: null,
@@ -255,8 +256,14 @@
                 });
                 // 브라우저 QA용 전역 노출(셀렉터/제어 가능)
                 window.__locationShare = this.sharer;
-                // 입장 후 자동 시작 — 이게 «1단계»다(사용 중에만 허용).
-                this.sharer.enable();
+                // 🔑 **서버가 「공유 중」이라고 한 사람만 이어받는다.**
+                //    resume() 은 enable() 과 달리 PATCH 를 보내지 않는다 — 매번 켜면
+                //    사용자가 «끈» 공유가 화면을 옮기는 것만으로 되살아난다.
+                //    (그게 이 화면의 실제 결함이었다. 2026-08-31)
+                //    공유는 «참가할 때» 한 번 켜지고(joinByCode), 그 뒤로는 토글이 정한다.
+                if (this.sharing) {
+                    this.sharer.resume();
+                }
 
                 // 2·3단계는 여기서 갈린다. 🔴 공유를 켜기 «전»에도 읽는다 —
                 // 「켜고 나서야 막힌 걸 아는」 순서면 대원은 이미 현장에 있다.

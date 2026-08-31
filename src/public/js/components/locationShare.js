@@ -80,6 +80,32 @@ function webTracker(env = globalThis) {
             }
         },
 
+        /**
+         * 브라우저 권한이 바뀌면 알려준다.
+         *
+         * 🔴 **한 번 거부하면 브라우저는 다시 묻지 않는다.** 어떤 API 로도 프롬프트를
+         *    되살릴 수 없고, 사용자가 주소창 아이콘에서 직접 허용으로 바꿔야 한다.
+         *    그런데 바꾸고 나서도 «새로고침하기 전까지» 아무 일이 안 일어나면,
+         *    사용자는 고쳤는데도 화면이 그대로라 「안 되네」로 읽는다.
+         *    Permissions API 의 change 로 그 순간을 잡아 스스로 다시 시작한다.
+         *
+         * @returns {() => void} 해제 함수
+         */
+        onPermissionChange(handler) {
+            let status = null;
+            const onChange = () => handler(status.state);
+
+            try {
+                env.navigator.permissions?.query?.({ name: 'geolocation' })
+                    .then((s) => { status = s; s.addEventListener?.('change', onChange); })
+                    .catch(() => {});
+            } catch {
+                // 지원하지 않는 브라우저 — 새로고침 전까지는 못 잡는다.
+            }
+
+            return () => status?.removeEventListener?.('change', onChange);
+        },
+
         // 브라우저는 「항상 허용」을 줄 수 없다 — 탭이 죽으면 끝난다.
         // 그래서 최선이 when_in_use 이고, 그건 «사실»이다(M-5 의 foreground_only).
         async readPermission() {
@@ -240,6 +266,31 @@ export function createLocationSharer(config = {}) {
         emit();
     }
 
+    let stopPermissionWatch = null;
+
+    /**
+     * 권한이 «허용»으로 바뀌면 스스로 다시 시작한다.
+     *
+     * 🔑 사용자는 주소창에서 고친 뒤 «화면이 저절로 살아나기»를 기대한다.
+     *    새로고침을 요구하면 대부분 그냥 「안 되는구나」로 끝난다.
+     */
+    function watchPermission() {
+        if (stopPermissionWatch || typeof tracker.onPermissionChange !== 'function') return;
+
+        stopPermissionWatch = tracker.onPermissionChange((next) => {
+            if (next === 'granted') {
+                state.permission = 'granted';
+                state.error = null;
+                stopWatch();
+                startWatch();
+            } else if (next === 'denied') {
+                state.permission = 'denied';
+                stopWatch();
+            }
+            emit();
+        });
+    }
+
     function startWatch(opts) {
         tracker.start(handlePosition, handleError, opts);
     }
@@ -263,6 +314,7 @@ export function createLocationSharer(config = {}) {
             emit();
             await patchSharing(true);
             startWatch(opts);
+            watchPermission();
         },
 
         // 공유 «이어받기»: 서버에 이미 sharing_location=true 인 사람만 부른다.
@@ -307,6 +359,8 @@ export function createLocationSharer(config = {}) {
 
         destroy() {
             stopWatch();
+            stopPermissionWatch?.();
+            stopPermissionWatch = null;
         },
     };
 }

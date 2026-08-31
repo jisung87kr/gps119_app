@@ -345,6 +345,48 @@ describe('취득 위임 (N3 / 02 §3-3)', () => {
         expect(sharer.state.sharing).toBe(true);
     });
 
+    it('🔑 권한이 «허용»으로 바뀌면 스스로 다시 시작한다', async () => {
+        // 한 번 거부하면 브라우저는 다시 묻지 않는다. 사용자가 주소창에서 고친 뒤
+        // 새로고침을 요구하면 대부분 그냥 「안 되는구나」로 끝난다.
+        stubEnv();
+        let fire = null;
+        const tracker = fakeTracker({
+            onPermissionChange: (h) => { fire = h; return vi.fn(); },
+        });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        tracker.start.mockClear();
+        fire('granted');
+
+        expect(tracker.start).toHaveBeenCalledTimes(1);
+        expect(sharer.state.permission).toBe('granted');
+        expect(sharer.state.error).toBeNull();
+    });
+
+    it('권한이 거부로 바뀌면 감시를 멈춘다', async () => {
+        stubEnv();
+        let fire = null;
+        const tracker = fakeTracker({
+            onPermissionChange: (h) => { fire = h; return vi.fn(); },
+        });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        fire('denied');
+
+        expect(tracker.stop).toHaveBeenCalled();
+        expect(sharer.state.permission).toBe('denied');
+    });
+
+    it('구독을 지원하지 않는 트래커에서도 깨지지 않는다', async () => {
+        // 네이티브 트래커에는 onPermissionChange 가 없다.
+        stubEnv();
+        const tracker = fakeTracker();
+
+        await expect(createLocationSharer({ projectId: 1, tracker }).enable()).resolves.toBeUndefined();
+    });
+
     it('disable 은 트래커를 멈춘다', async () => {
         stubEnv();
         const tracker = fakeTracker();
