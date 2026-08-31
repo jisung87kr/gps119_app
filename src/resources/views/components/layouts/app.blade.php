@@ -120,7 +120,8 @@
 
 @if ($shellSharing)
     <script type="module">
-        import { createLocationSharer } from '/js/components/locationShare.js';
+        {{-- 캐시 버스팅 — public/ 원본 서빙이라 해시가 안 붙는다. 활동 화면과 «같은 이유». --}}
+        import { createLocationSharer } from '/js/components/locationShare.js?v={{ @filemtime(public_path('js/components/locationShare.js')) ?: time() }}';
 
         // 본인이 이미 켜 둔 공유만 이어받는다(resume 은 PATCH 를 보내지 않는다).
         // 끄는 것은 활동 화면의 토글에서만 — 셸은 동의를 만들지 않는다.

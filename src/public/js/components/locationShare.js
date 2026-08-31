@@ -80,6 +80,32 @@ function webTracker(env = globalThis) {
             }
         },
 
+        /**
+         * 브라우저 권한이 바뀌면 알려준다.
+         *
+         * 🔴 **한 번 거부하면 브라우저는 다시 묻지 않는다.** 어떤 API 로도 프롬프트를
+         *    되살릴 수 없고, 사용자가 주소창 아이콘에서 직접 허용으로 바꿔야 한다.
+         *    그런데 바꾸고 나서도 «새로고침하기 전까지» 아무 일이 안 일어나면,
+         *    사용자는 고쳤는데도 화면이 그대로라 「안 되네」로 읽는다.
+         *    Permissions API 의 change 로 그 순간을 잡아 스스로 다시 시작한다.
+         *
+         * @returns {() => void} 해제 함수
+         */
+        onPermissionChange(handler) {
+            let status = null;
+            const onChange = () => handler(status.state);
+
+            try {
+                env.navigator.permissions?.query?.({ name: 'geolocation' })
+                    .then((s) => { status = s; s.addEventListener?.('change', onChange); })
+                    .catch(() => {});
+            } catch {
+                // 지원하지 않는 브라우저 — 새로고침 전까지는 못 잡는다.
+            }
+
+            return () => status?.removeEventListener?.('change', onChange);
+        },
+
         // 브라우저는 「항상 허용」을 줄 수 없다 — 탭이 죽으면 끝난다.
         // 그래서 최선이 when_in_use 이고, 그건 «사실»이다(M-5 의 foreground_only).
         async readPermission() {
@@ -236,8 +262,33 @@ export function createLocationSharer(config = {}) {
 
     function handleError(err) {
         if (err && err.code === err.PERMISSION_DENIED) state.permission = 'denied';
-        state.error = geoErrorMessage(err);
+        state.error = geoErrorMessage(err, tracker.kind === 'native');
         emit();
+    }
+
+    let stopPermissionWatch = null;
+
+    /**
+     * 권한이 «허용»으로 바뀌면 스스로 다시 시작한다.
+     *
+     * 🔑 사용자는 주소창에서 고친 뒤 «화면이 저절로 살아나기»를 기대한다.
+     *    새로고침을 요구하면 대부분 그냥 「안 되는구나」로 끝난다.
+     */
+    function watchPermission() {
+        if (stopPermissionWatch || typeof tracker.onPermissionChange !== 'function') return;
+
+        stopPermissionWatch = tracker.onPermissionChange((next) => {
+            if (next === 'granted') {
+                state.permission = 'granted';
+                state.error = null;
+                stopWatch();
+                startWatch();
+            } else if (next === 'denied') {
+                state.permission = 'denied';
+                stopWatch();
+            }
+            emit();
+        });
     }
 
     function startWatch(opts) {
@@ -255,7 +306,7 @@ export function createLocationSharer(config = {}) {
         async enable(opts) {
             if (!tracker.supported) {
                 state.permission = 'unsupported';
-                state.error = '이 기기는 위치 기능을 지원하지 않습니다.';
+                state.error = '이 기기에서는 위치를 쓸 수 없습니다.';
                 emit();
                 return;
             }
@@ -263,6 +314,7 @@ export function createLocationSharer(config = {}) {
             emit();
             await patchSharing(true);
             startWatch(opts);
+            watchPermission();
         },
 
         // 공유 «이어받기»: 서버에 이미 sharing_location=true 인 사람만 부른다.
@@ -283,6 +335,10 @@ export function createLocationSharer(config = {}) {
         async disable() {
             state.sharing = false;
             lastSent = null;
+            // 🔑 **껐으면 이전 오류도 지운다.** 안 지우면 「공유 중지됨」 아래에
+            //    「위치 권한이 거부되었습니다」가 계속 남아, 끈 사람에게 고칠 것도 없는
+            //    경고를 보여준다(2026-08-31 실기기).
+            state.error = null;
             stopWatch();
             emit();
             await patchSharing(false);
@@ -307,17 +363,31 @@ export function createLocationSharer(config = {}) {
 
         destroy() {
             stopWatch();
+            stopPermissionWatch?.();
+            stopPermissionWatch = null;
         },
     };
 }
 
-function geoErrorMessage(err) {
+/**
+ * 오류 문구.
+ *
+ * 🔴 **웹과 앱은 «고치는 곳»이 다르다.** 앱에서 「브라우저 설정에서 허용해 주세요」라고
+ *    하면 사용자는 있지도 않은 주소창을 찾는다 — 앱 웹뷰에는 브라우저 UI 가 없다.
+ *    실제로 앱에서 그 문구가 떴다(2026-08-31).
+ *
+ * @param {boolean} isNative 앱(웹뷰) 안인가
+ */
+function geoErrorMessage(err, isNative = false) {
     if (!err) return '위치 오류';
     switch (err.code) {
-        case err.PERMISSION_DENIED: return '위치 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.';
-        case err.POSITION_UNAVAILABLE: return '위치 정보를 사용할 수 없습니다.';
-        case err.TIMEOUT: return '위치 확인 시간이 초과되었습니다(재시도).';
-        default: return '위치 오류가 발생했습니다.';
+        case err.PERMISSION_DENIED:
+            return isNative
+                ? '위치 권한이 꺼져 있습니다. 설정에서 허용해 주세요.'
+                : '위치 권한이 꺼져 있습니다. 주소창의 위치 아이콘에서 허용해 주세요.';
+        case err.POSITION_UNAVAILABLE: return '위치를 확인할 수 없습니다.';
+        case err.TIMEOUT: return '위치 확인이 늦어지고 있습니다. 다시 시도합니다.';
+        default: return '위치를 가져오지 못했습니다.';
     }
 }
 

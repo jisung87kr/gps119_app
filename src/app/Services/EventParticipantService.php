@@ -60,6 +60,15 @@ class EventParticipantService
                 'role' => $roster?->role ?? EventRole::PARTICIPANT,
                 'status' => ParticipantStatus::ACTIVE,
                 'joined_at' => now(),
+                // 🔑 **참가하면 위치 공유가 켜진 채로 시작한다.** 구조 지원이 이 행사의
+                //    목적이고, 참가자가 아무것도 누르지 않아도 상황실이 볼 수 있어야 한다.
+                //
+                // 🔴 **firstOrCreate 의 «생성» 값이라 재입장에는 적용되지 않는다.**
+                //    이게 요점이다 — 매번 켜면 사용자가 «끈» 공유가 재입장만으로
+                //    되살아난다. 실제로 활동 화면이 enable() 을 무조건 불러서 그렇게
+                //    되고 있었다(2026-08-31). 의도는 데이터에 한 번만 새기고,
+                //    그 뒤로는 서버 값을 따른다.
+                'sharing_location' => true,
             ]
         );
 

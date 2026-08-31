@@ -113,3 +113,112 @@ export function watchPermissionChanges(projectId, onChange, env = globalThis) {
 
     return () => env.document?.removeEventListener?.('visibilitychange', handler);
 }
+
+/**
+ * 참가자 화면의 「지금 내 위치가 어떻게 되고 있나」 한 줄.
+ *
+ * 🔴 **예전에는 상태가 `sharing` 만 보고 「위치 공유 중」이라 말했다.** 권한이 거부돼도
+ *    초록 불이 켜졌고, 바로 아래에서는 「전혀 전달되지 않습니다」라고 말하고 있었다 —
+ *    M-5 가 관제에서 막으려던 «거짓 안심»을 참가자 본인 화면에서 하고 있었던 셈이다.
+ *
+ * 🔑 **판정 표를 새로 만들지 않는다.** `decidePermissionStep` 의 결과와 `sharing` 만
+ *    조합한다. 매트릭스를 두 벌로 만들면 0-8 처럼 어긋난다.
+ *
+ * 🔑 **조치는 «필요할 때만» 나온다.** 항상 떠 있으면 공유 토글과 다시 경쟁하게 되고,
+ *    그게 정확히 이 화면이 혼란스러웠던 이유였다(의도 vs 권한이 동급 버튼이었다).
+ *
+ * @returns {{label: string, hint: string|null, action: 'settings'|'always'|null, tone: string}}
+ */
+export function shareStatus({
+    sharing = false,
+    permissionStep = 'none',
+    osPermission = null,
+    webPermission = null,
+    native = false,
+} = {}) {
+    if (!sharing) {
+        // 끈 사람에게 붉은 경고를 띄우면 진짜 이상이 묻힌다.
+        return { label: '위치 공유 꺼짐', hint: null, action: null, tone: 'muted' };
+    }
+
+    if (permissionStep === 'guide_settings') {
+        return {
+            // 기기 위치가 꺼진 경우와 권한 거부는 «안내가 달라야» 한다 —
+            // 앱 설정만 들여다보다 영영 못 고치는 일을 막는다.
+            label: osPermission === 'services_off'
+                ? '기기 위치 서비스가 꺼져 있습니다'
+                : '위치 권한이 꺼져 있습니다',
+            hint: '지금은 상황실에 위치가 전달되지 않습니다.',
+            action: 'settings',
+            tone: 'danger',
+        };
+    }
+
+    // 🔴 **웹의 권한 신호도 봐야 한다.** decidePermissionStep 은 웹에서 항상 'none' 이다
+    //    (브라우저엔 「항상 허용」이라는 개념이 없으니 의도한 동작이다). 그것만 보면
+    //    브라우저가 위치를 «거부»했는데도 「위치 공유 중」이라고 말하게 된다 —
+    //    실제로 PC 에서 초록 불과 빨간 오류가 함께 떴다(2026-08-31).
+    //    앱에서도 이 값은 채워지므로, 위 네이티브 분기 «뒤»에 둬서 순서를 지킨다.
+    if (webPermission === 'unsupported') {
+        return {
+            label: '위치를 쓸 수 없는 브라우저입니다',
+            hint: '다른 브라우저에서 열어 주세요.',
+            action: null,
+            tone: 'danger',
+        };
+    }
+
+    if (webPermission === 'denied') {
+        return {
+            label: '위치 권한이 꺼져 있습니다',
+            // 🔴 **고치는 곳이 웹과 앱이 다르다.** 앱에서 「주소창」을 안내하면
+            //    사용자는 있지도 않은 UI 를 찾는다 — 웹뷰에는 브라우저 UI 가 없다.
+            hint: native
+                ? '지금은 상황실에 위치가 전달되지 않습니다. 설정에서 허용해 주세요.'
+                : '지금은 상황실에 위치가 전달되지 않습니다. 주소창의 위치 아이콘에서 허용해 주세요.',
+            // 🔑 웹에는 설정을 열 방법이 없다. 누를 수 없는 버튼을 두지 않는다.
+            action: native ? 'settings' : null,
+            tone: 'danger',
+        };
+    }
+
+    if (webPermission === 'prompt') {
+        // 아직 한 건도 못 보낸 상태다. 「공유 중」이라고 말하면 그것도 거짓이다.
+        return {
+            label: '위치 허용을 기다리는 중입니다',
+            hint: '위치 사용 안내가 뜨면 허용을 눌러 주세요.',
+            action: null,
+            tone: 'warning',
+        };
+    }
+
+    if (permissionStep === 'explain_always') {
+        return {
+            label: '앱을 열어둔 동안만 공유됩니다',
+            hint: '화면을 끄거나 다른 앱을 쓰면 위치가 멈춥니다.',
+            action: 'always',
+            tone: 'warning',
+        };
+    }
+
+    return { label: '위치 공유 중', hint: null, action: null, tone: 'ok' };
+}
+
+/** 위치를 «전혀» 못 얻는 값들. LocationPermission::blocksTracking() 과 같은 목록이다. */
+const BLOCKED = ['denied', 'services_off', 'not_determined'];
+
+/**
+ * 권한이 «막힘 → 쓸 수 있음»으로 바뀌었나 (= 지금 추적을 다시 시작해야 하나).
+ *
+ * 🔴 **iOS 는 한 번 거부되면 앱 안에서 프롬프트를 다시 못 띄운다.** 사용자는 설정으로
+ *    가서 고치고 돌아오는데, 그때 앱이 «스스로» 다시 시작하지 않으면 화면은 그대로다 —
+ *    고쳤는데도 아무 일이 없으니 「역시 안 되네」로 끝난다.
+ *
+ * 🔑 **첫 보고(prev === null)에는 재시작하지 않는다.** 그때는 이미 enable()/resume() 이
+ *    감시를 시작한 뒤라, 여기서 또 restart 하면 불필요하게 끊었다 잇는다.
+ */
+export function shouldRestartTracking(prev, next) {
+    if (!next || BLOCKED.includes(next)) return false;
+
+    return prev !== null && prev !== undefined && BLOCKED.includes(prev);
+}

@@ -345,6 +345,91 @@ describe('취득 위임 (N3 / 02 §3-3)', () => {
         expect(sharer.state.sharing).toBe(true);
     });
 
+    it('🔑 권한이 «허용»으로 바뀌면 스스로 다시 시작한다', async () => {
+        // 한 번 거부하면 브라우저는 다시 묻지 않는다. 사용자가 주소창에서 고친 뒤
+        // 새로고침을 요구하면 대부분 그냥 「안 되는구나」로 끝난다.
+        stubEnv();
+        let fire = null;
+        const tracker = fakeTracker({
+            onPermissionChange: (h) => { fire = h; return vi.fn(); },
+        });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        tracker.start.mockClear();
+        fire('granted');
+
+        expect(tracker.start).toHaveBeenCalledTimes(1);
+        expect(sharer.state.permission).toBe('granted');
+        expect(sharer.state.error).toBeNull();
+    });
+
+    it('권한이 거부로 바뀌면 감시를 멈춘다', async () => {
+        stubEnv();
+        let fire = null;
+        const tracker = fakeTracker({
+            onPermissionChange: (h) => { fire = h; return vi.fn(); },
+        });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        fire('denied');
+
+        expect(tracker.stop).toHaveBeenCalled();
+        expect(sharer.state.permission).toBe('denied');
+    });
+
+    it('구독을 지원하지 않는 트래커에서도 깨지지 않는다', async () => {
+        // 네이티브 트래커에는 onPermissionChange 가 없다.
+        stubEnv();
+        const tracker = fakeTracker();
+
+        await expect(createLocationSharer({ projectId: 1, tracker }).enable()).resolves.toBeUndefined();
+    });
+
+    it('🔴 공유를 끄면 이전 오류도 지운다', async () => {
+        // 안 지우면 「공유 중지됨」 아래에 「위치 권한이 거부되었습니다」가 계속 남아,
+        // 끈 사람에게 «고칠 것도 없는» 경고를 보여준다(2026-08-31 실기기).
+        stubEnv();
+        let onError = null;
+        const tracker = fakeTracker({ start: vi.fn((f, e) => { onError = e; }) });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        onError({ code: 1, PERMISSION_DENIED: 1 });
+        expect(sharer.state.error).not.toBeNull();
+
+        await sharer.disable();
+
+        expect(sharer.state.error).toBeNull();
+    });
+
+    it('🔴 앱에서는 «브라우저 설정»을 안내하지 않는다', async () => {
+        // 앱 웹뷰에는 주소창이 없다. 그 문구를 보면 사용자는 있지도 않은 UI 를 찾는다.
+        stubEnv();
+        let onError = null;
+        const tracker = fakeTracker({ kind: 'native', start: vi.fn((f, e) => { onError = e; }) });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        onError({ code: 1, PERMISSION_DENIED: 1 });
+
+        expect(sharer.state.error).not.toContain('브라우저');
+        expect(sharer.state.error).toContain('설정');
+    });
+
+    it('웹에서는 주소창을 안내한다', async () => {
+        stubEnv();
+        let onError = null;
+        const tracker = fakeTracker({ kind: 'web', start: vi.fn((f, e) => { onError = e; }) });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        onError({ code: 1, PERMISSION_DENIED: 1 });
+
+        expect(sharer.state.error).toContain('주소창');
+    });
+
     it('disable 은 트래커를 멈춘다', async () => {
         stubEnv();
         const tracker = fakeTracker();

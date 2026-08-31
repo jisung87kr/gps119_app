@@ -89,7 +89,7 @@ class ShellLocationSharingTest extends TestCase
         $this->actingAs($user)->get('/dashboard')
             ->assertOk()
             ->assertSee('locationShare.js')
-            ->assertSee('sharer.resume()', false);
+            ->assertSee('window.__shellLocationShare', false);
     }
 
     public function test_the_shell_stays_out_of_the_screen_that_owns_the_sharer(): void
@@ -101,7 +101,7 @@ class ShellLocationSharingTest extends TestCase
         // 순서 경합은 언젠가 반드시 진다.)
         $this->actingAs($user)->get("/events/{$project->id}/active")
             ->assertOk()
-            ->assertDontSee('sharer.resume()', false);
+            ->assertDontSee('window.__shellLocationShare', false);
     }
 
     public function test_a_user_sharing_nothing_gets_no_sender(): void
@@ -110,7 +110,7 @@ class ShellLocationSharingTest extends TestCase
 
         $this->actingAs($user)->get('/dashboard')
             ->assertOk()
-            ->assertDontSee('sharer.resume()', false);
+            ->assertDontSee('window.__shellLocationShare', false);
     }
 
     /**
