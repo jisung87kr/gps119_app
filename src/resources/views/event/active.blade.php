@@ -67,6 +67,12 @@
                     </button>
                 </p>
 
+                <p v-if="alwaysPromptUnavailable" class="mt-2 text-sm leading-relaxed text-ink-600">
+                    이 기기에서는 앱이 «항상 허용»을 다시 물어볼 수 없습니다.
+                    <button type="button" v-on:click="openSettings"
+                            class="font-bold text-brand-600 underline underline-offset-2">설정에서 바꾸기 →</button>
+                </p>
+
                 <p v-if="settingsOpenFailed" class="mt-1.5 text-xs text-ink-500">
                     설정을 열지 못했습니다. 기기 설정 → GPS119 → 위치 에서 직접 허용해 주세요.
                 </p>
@@ -157,6 +163,9 @@
                     osPermission: null,
                     permissionStep: 'none',
                     settingsOpenFailed: false,
+                    // 승격을 시도했는데 권한이 그대로였다 = iOS 가 프롬프트를 안 띄웠다.
+                    alwaysPromptUnavailable: false,
+                    requesting: false,
                 };
             },
             watch: {
@@ -208,6 +217,7 @@
                 applyPermission(permission) {
                     const prev = this.osPermission;
                     this.osPermission = permission;
+                    if (permission !== prev) this.alwaysPromptUnavailable = false;
 
                     // 🔑 **설정에서 고치고 돌아온 순간 스스로 다시 시작한다.**
                     //    iOS 는 거부된 뒤 프롬프트를 다시 못 띄우므로 사용자는 설정으로
@@ -230,10 +240,29 @@
                 //    권한을 요청하므로(requestPermissions), 추적을 «다시 시작»하는 것이
                 //    곧 요청이다. 그래서 껐다 켠다.
                 async requestAlways() {
-                    // 🔑 공유를 끄지 «않는다». 취득만 다시 시작하면서 이번에는 권한을
-                    //    요청한다 — 이 플러그인은 addWatcher 가 유일한 프롬프트 통로다.
-                    await this.sharer.restart({ requestPermissions: true });
-                    await this.syncPermission();
+                    // 🔑 연타 방지. 프롬프트가 안 뜨면 사용자는 계속 누르는데, 매번
+                    //    권한 보고가 나가 스로틀(429)에 걸리고 위치 ping 까지 밀려난다
+                    //    (2026-08-31 실기기에서 그렇게 됐다).
+                    if (this.requesting) return;
+                    this.requesting = true;
+
+                    const before = this.osPermission;
+                    try {
+                        // 공유를 끄지 «않는다». 취득만 다시 시작하면서 이번에는 권한을
+                        // 요청한다 — 이 플러그인은 addWatcher 가 유일한 프롬프트 통로다.
+                        await this.sharer.restart({ requestPermissions: true });
+                        await this.syncPermission();
+                    } finally {
+                        this.requesting = false;
+                    }
+
+                    // 🔴 **눌렀는데 그대로면 iOS 가 프롬프트를 «안 띄운» 것이다.**
+                    //    「사용 중 → 항상」 승격 프롬프트는 앱 설치당 사실상 한 번뿐이고,
+                    //    소진된 뒤에는 요청해도 아무 일도 일어나지 않는다(오류도 없다).
+                    //    화면이 그 사실을 말하지 않으면 사용자는 계속 누른다.
+                    if (this.osPermission === before) {
+                        this.alwaysPromptUnavailable = true;
+                    }
                 },
 
                 // 3단계 — 설정 앱으로 보낸다.
