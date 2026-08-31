@@ -230,9 +230,9 @@ class ProjectController extends Controller
         $originalProject = Project::findOrFail($id);
 
         // 새 프로젝트 생성 (요청은 복제하지 않음)
+        // slug·join_code·is_default 는 Project::replicate() 가 비운다(유니크 충돌 방지).
         $newProject = $originalProject->replicate();
         $newProject->name = $originalProject->name.' (복제본)';
-        $newProject->slug = null; // slug는 자동 생성되도록
         $newProject->created_by = Auth::id();
 
         // 날짜를 현재 날짜 기준으로 조정
