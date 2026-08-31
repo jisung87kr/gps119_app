@@ -148,7 +148,14 @@
     </div>
 
     <script type="module">
-        import { createLocationSharer } from '/js/components/locationShare.js';
+        {{--
+            🔴 **캐시 버스팅이 필요하다.** 이 파일은 Vite 번들이 아니라 public/ 에서
+               «원본 그대로» 서빙되므로 해시가 안 붙는다. 그래서 파일을 고쳐도 웹뷰가
+               옛 사본을 계속 쓴다 — 실기기에서 3시간 전 사본을 물고 있어 새로 추가한
+               메서드가 없었고, 버튼을 눌러도 «아무 일도 안 일어났다»(2026-08-31).
+               증상이 「버튼이 안 눌린다」 하나뿐이라 UI 문제로 오진하기 쉽다.
+        --}}
+        import { createLocationSharer } from '/js/components/locationShare.js?v={{ @filemtime(public_path('js/components/locationShare.js')) ?: time() }}';
 
         const { createApp } = Vue;
 
@@ -174,6 +181,15 @@
                     permissionStep: 'none',
                     settingsOpenFailed: false,
                 };
+            },
+            watch: {
+                // 🔴 공유를 껐다 켜면 단계가 «낡은 채로» 남는다. decidePermissionStep 은
+                //    sharing 을 조건으로 쓰는데(끄고 있는 사람에게 배경 권한을 조르지
+                //    않으려고), 토글이 바뀔 때 다시 계산하지 않으면 카드가 사라진 채
+                //    돌아오지 않는다. 실기기에서 토글을 만지다 발견했다(2026-08-31).
+                sharing() {
+                    this.applyPermission(this.osPermission);
+                },
             },
             computed: {
                 lastSentLabel() {
@@ -211,8 +227,9 @@
                 //    권한을 요청하므로(requestPermissions), 추적을 «다시 시작»하는 것이
                 //    곧 요청이다. 그래서 껐다 켠다.
                 async requestAlways() {
-                    await this.sharer.disable();
-                    await this.sharer.enable();
+                    // 🔑 공유를 끄지 «않는다». 취득만 다시 시작하면서 이번에는 권한을
+                    //    요청한다 — 이 플러그인은 addWatcher 가 유일한 프롬프트 통로다.
+                    await this.sharer.restart({ requestPermissions: true });
                     await this.syncPermission();
                 },
 

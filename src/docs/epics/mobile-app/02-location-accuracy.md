@@ -219,9 +219,45 @@ iOS 는 `CLLocationManager.authorizationStatus`, Android 는 `ACCESS_BACKGROUND_
 둘 다 `denied` 로 답한다. `blocksTracking()` 이 둘을 같게 취급하므로 관제 판정은 같고,
 사용자 안내 문구만 덜 정확해진다.
 
-⚠️ **실기기 미검증이다.** 빌드에 들어간 것까지 확인했을 뿐
-(`isPluginAvailable('Gps119LocationPermission')` 이 런타임에 참인지는 아직),
-그 전까지 앱에서도 `permission` 은 계속 `null`(= `unknown`)이다.
+#### ✅ 실기기 검증 완료 (2026-08-31, iPhone 16 Pro / iOS 26.6.1)
+
+```
+perm=when_in_use  →  state=foreground_only   (앱 열려 있을 때만)
+설정에서 「항상」으로 변경 → 앱 복귀
+perm=always       →  state=tracking          (추적 중)
+```
+
+🔑 **설정에서 바꾼 것을 앱이 «복귀만으로» 감지했다.** `watchPermissionChanges()` 가
+실제로 도는 것을 확인한 것이고, 이는 M-5 의 핵심 시나리오(iOS 재확인 프롬프트로
+「사용 중」으로 강등되는 것을 잡기)를 **반대 방향으로 검증한 셈**이다.
+
+⚠️ **두 행사에 참가한 사람은 «화면을 연 행사»만 갱신된다.** 실측에서 project 6 은
+`always`, project 7 은 `when_in_use` 로 남았다. 권한을 (행사, 참가자)에 저장하기로 한
+[ADR-0008](../../adr/0008-location-permission-as-separate-axis.md) D1 의 파생 결과다 —
+관제가 다른 행사를 볼 때 낡은 값을 볼 수 있다.
+
+⚠️ **iOS 「사용 중 → 항상」 승격 프롬프트는 앱당 사실상 한 번만 뜬다.** 이미 소진됐으면
+`requestAlwaysAuthorization()` 을 불러도 **아무 일도 일어나지 않는다**(오류도 없다).
+그때는 설정에서 직접 바꾸는 수밖에 없고, 3단계 안내가 그래서 필요하다.
+
+### 🔴 실기기에서만 드러난 것 다섯 (2026-08-31)
+
+**전부 테스트가 통과하는 상태에서 안 돌았다.** 하루의 대부분이 이걸 찾는 데 들어갔다.
+
+| # | 무엇 | 증상 |
+|---|---|---|
+| 1 | 네이티브 플러그인 등록 4관문 (아래) | 플러그인이 웹에 «안 보임» |
+| 2 | `Capacitor.Plugins` 접근 방식 오해 | 트래커가 조용히 `null` — 배경 위치가 한 번도 안 돎 |
+| 3 | `requestPermissions` 를 넘길 «수단» 부재 | 「항상 허용」 버튼이 프롬프트를 영영 안 띄움 |
+| 4 | 공유 토글 변경 시 단계 재계산 누락 | 카드가 사라진 채 안 돌아옴 |
+| 5 | `public/` 원본 서빙 모듈에 캐시 버스팅 없음 | **「버튼이 안 눌린다」** — 3시간 전 JS 가 돌고 있었다 |
+
+🔑 **5번이 가장 고약하다 — 증상이 UI 문제처럼 보인다.** `/js/components/*` 는 Vite 번들이
+아니라 원본 그대로 서빙돼 해시가 안 붙는다. 파일을 고쳐도 웹뷰가 옛 사본을 계속 쓴다.
+**같은 위험이 8곳에 더 있다**(`RequestMapApp.js` · `RequestShowApp.js` · `kakaoNavi.js` 등).
+
+🔑 **진단은 「화면에 한 줄 띄우기」로 뚫렸다.** 서버 로그만으로는 어느 «층»에서 끊기는지
+가릴 수 없었다. `plugins=` 목록 한 줄이 「네이티브 등록 실패」를 즉시 확정했다.
 
 🔴 **`event_participants.sharing_location` 은 앱 권한 상태와 별개다.** **«공유 켬 + OS 권한 없음»** 상태를 구분해 표현해야 한다.
 

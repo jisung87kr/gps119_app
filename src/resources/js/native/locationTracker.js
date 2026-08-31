@@ -14,6 +14,18 @@
 
 import { hasNativeCapability, isNativeApp, NativeCapability } from './bridge';
 
+// 📌 **`Capacitor.Plugins[name]` 로 접근하는 것이 «맞다».**
+//    웹뷰의 전역 `Capacitor` 는 네이티브가 주입하는 `native-bridge.js` 이고, npm 의
+//    `@capacitor/core` 와 «다르다». 그쪽에서는 `Plugins` 가 `registerPlugin()` 을 부른
+//    뒤에만 채워지지만, 주입 브리지에는 `registerPlugin` 자체가 없고 네이티브가
+//    `Plugins` 를 직접 채운다 — `isPluginAvailable` 이 그 키 존재 여부일 뿐인 것이 증거다:
+//
+//        cap.isPluginAvailable = (name) => Object.prototype.hasOwnProperty.call(cap.Plugins, name);
+//
+//    ⚠️ 2026-08-31 에 npm 판 구현을 근거로 「registerPlugin 을 불러야 한다」고 오진해
+//       한참 헤맸다. 진짜 원인은 웹이 아니라 셸의 «네이티브 등록»이었다(SceneDelegate).
+//       여기 접근 방식을 바꾸려 하기 전에 `plugins=` 목록부터 확인할 것.
+
 /** 셸이 노출하는 플러그인 객체 이름. 갈아끼울 때 바뀌는 유일한 문자열. */
 const PLUGIN = 'BackgroundGeolocation';
 
@@ -129,7 +141,7 @@ export function createNativeLocationTracker(env = globalThis) {
          *    무변환이고 적응은 네이티브 쪽에서만 일어난다. 안쪽 코드가 「앱인지
          *    웹인지」를 영영 몰라도 되는 것이 요점이다.
          */
-        async start(onFix, onError) {
+        async start(onFix, onError, opts = {}) {
             if (watcherId != null) return;
 
             watcherId = await plugin.addWatcher(
@@ -138,7 +150,13 @@ export function createNativeLocationTracker(env = globalThis) {
                     // 없으면 플러그인이 백그라운드 취득을 시작하지 못한다.
                     backgroundMessage: '구조 지원을 위해 위치를 공유하는 중입니다.',
                     backgroundTitle: 'GPS119 위치 공유',
-                    requestPermissions: false, // 권한 요청은 UX 단계에서 따로 한다
+                    // 🔴 **권한 프롬프트는 여기서만 뜬다.** 이 플러그인에는 「권한만
+                    //    요청」하는 API 가 없어서, addWatcher 가 유일한 통로다.
+                    //    기본값을 false 로 두는 이유는 «언제 물을지»를 웹의 3단계 UX 가
+                    //    정하기 때문이고(02 §4), 승격 시점에 true 로 다시 시작한다.
+                    //    ⚠️ 이 값을 넘길 «수단»이 없으면 3단계가 아무 일도 못 한다 —
+                    //       실제로 그래서 「항상 허용으로 바꾸기」가 먹통이었다(2026-08-31).
+                    requestPermissions: opts.requestPermissions === true,
                     stale: false,
                     distanceFilter: 0,         // 전송 판정은 locationShare 가 한다
                 },

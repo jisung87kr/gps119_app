@@ -95,6 +95,27 @@ describe('createNativeLocationTracker — 위치를 안쪽 계약대로 넘긴�
         expect(err.code).toBe(err.PERMISSION_DENIED);
     });
 
+    it('🔴 기본으로는 권한을 «요청하지 않는다»', async () => {
+        // 언제 물을지는 웹의 3단계 UX 가 정한다(02 §4). 감시를 시작할 때마다 물으면
+        // 입장 직후에 「항상 허용」이 튀어나와 거절률이 급등한다.
+        const { tracker, plugin } = scene();
+
+        await tracker.start(vi.fn(), vi.fn());
+
+        expect(plugin.addWatcher.mock.calls[0][0].requestPermissions).toBe(false);
+    });
+
+    it('🔴 승격할 때는 권한을 요청한다 — 이게 «유일한» 프롬프트 통로다', async () => {
+        // 이 플러그인에는 「권한만 요청」하는 API 가 없다. addWatcher 의 이 옵션을
+        // 넘길 수단이 없으면 3단계 UX 가 아무 일도 못 한다 — 실제로 그래서
+        // 「항상 허용으로 바꾸기」 버튼이 눌러도 먹통이었다(2026-08-31 실기기).
+        const { tracker, plugin } = scene();
+
+        await tracker.start(vi.fn(), vi.fn(), { requestPermissions: true });
+
+        expect(plugin.addWatcher.mock.calls[0][0].requestPermissions).toBe(true);
+    });
+
     it('start 를 두 번 불러도 watcher 는 하나다', async () => {
         const { tracker, plugin } = scene();
         await tracker.start(vi.fn(), vi.fn());

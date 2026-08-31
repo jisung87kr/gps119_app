@@ -66,6 +66,8 @@ function webTracker(env = globalThis) {
         supportsBackground: false,
         get supported() { return Boolean(env.navigator && 'geolocation' in env.navigator); },
 
+        // 세 번째 인자(opts)는 «네이티브 전용»이다. 브라우저는 watchPosition 이
+        // 알아서 프롬프트를 띄우므로 받을 것이 없다.
         start(onFix, onError) {
             if (watchId != null) return;
             watchId = env.navigator.geolocation.watchPosition(onFix, onError, GEO_OPTIONS);
@@ -238,8 +240,8 @@ export function createLocationSharer(config = {}) {
         emit();
     }
 
-    function startWatch() {
-        tracker.start(handlePosition, handleError);
+    function startWatch(opts) {
+        tracker.start(handlePosition, handleError, opts);
     }
 
     function stopWatch() {
@@ -250,7 +252,7 @@ export function createLocationSharer(config = {}) {
         get state() { return { ...state }; },
 
         // 공유 시작: sharing on(PATCH) + watch 시작
-        async enable() {
+        async enable(opts) {
             if (!tracker.supported) {
                 state.permission = 'unsupported';
                 state.error = '이 기기는 위치 기능을 지원하지 않습니다.';
@@ -260,7 +262,7 @@ export function createLocationSharer(config = {}) {
             state.sharing = true;
             emit();
             await patchSharing(true);
-            startWatch();
+            startWatch(opts);
         },
 
         // 공유 «이어받기»: 서버에 이미 sharing_location=true 인 사람만 부른다.
@@ -284,6 +286,19 @@ export function createLocationSharer(config = {}) {
             stopWatch();
             emit();
             await patchSharing(false);
+        },
+
+        /**
+         * 취득만 다시 시작한다. **공유 상태(sharing)는 건드리지 않는다.**
+         *
+         * 🔴 예전에는 권한 승격을 disable()+enable() 로 했다. 그러면 sharing 이 잠깐
+         *    «꺼짐»으로 서버에 기록되고(PATCH 2회), 관제는 그 순간 이 사람을 「공유
+         *    꺼짐」으로 본다. 구조 앱에서 버튼 한 번에 위치가 끊기면 안 된다.
+         *    재시작마다 위치가 몰려 나가 스로틀(429)에 걸리는 부작용도 있었다.
+         */
+        async restart(opts) {
+            stopWatch();
+            startWatch(opts);
         },
 
         async toggle() {
