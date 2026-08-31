@@ -154,6 +154,20 @@ build_and_migrate() {
     log "큐 워커 · Reverb 재기동"
     art queue:restart || true
     dc restart queue reverb
+
+    # 🔑 **Apache 설정도 다시 읽힌다.** docker/apache/ 는 컨테이너에 마운트돼 있어
+    #    체크아웃만으로 «파일»은 바뀌지만, 이미 떠 있는 Apache 는 옛 설정을 메모리에
+    #    들고 계속 돈다. 그래서 vhost·헤더 규칙을 고쳐도 배포 후 반영되지 않는다.
+    #
+    #    🔴 실패가 조용하다. 예: apple-app-site-association 의 ForceType 이 안 먹으면
+    #       Content-Type 없이 나가고 iOS 가 그 파일을 «무시»한다 — 오류도 로그도 없이
+    #       「배포했는데 QR 이 여전히 브라우저로 열린다」로만 보인다(2026-09-01).
+    #
+    #    restart 가 아니라 graceful 이다. 처리 중인 요청을 끊지 않고 새 설정을 적용한다.
+    #    설정이 깨져 있으면 graceful 은 «거부»하고 옛 설정으로 계속 돈다 — 그때는
+    #    configtest 결과가 로그에 남으므로 아래 헬스체크에서 잡힌다.
+    log "Apache 설정 반영 (graceful)"
+    dc exec -T app apache2ctl -t && dc exec -T app apache2ctl graceful
 }
 
 # ---------------------------------------------------------------- rollback
