@@ -173,6 +173,56 @@ public/js/components/locationShare.js   config.tracker 주입, 없으면 웹 경
 
 **iOS 는 «항상 허용»을 OS 가 나중에 다시 물어본다**(재확인 프롬프트). 여기서 사용자가 «사용 중»으로 되돌리는 것을 감지해 관제에 «백그라운드 추적 불가» 상태로 표시해야 한다. 안 그러면 상황실이 «보이고 있다」고 착각한다.
 
+#### ✅ 3단계 UX 구현됨 (2026-08-31)
+
+| 단계 | 구현 |
+|---|---|
+| 1 | 입장 후 `sharer.enable()` — 기존 자동 시작이 그대로 1단계다 |
+| 2 | `permissionStep === 'explain_always'` → 설명 카드 → 「항상 허용」 |
+| 3 | `permissionStep === 'guide_settings'` → 제한 안내 + `openSettings()` |
+
+판정은 `resources/js/native/locationPermission.js` 의 **순수 함수**(`decidePermissionStep`)가
+하고 화면은 결과만 그린다. **화면에서 조합하면 「그럴듯하지만 틀린」 안내가 나오는데,
+사람 눈으로는 안 걸린다.**
+
+- **웹에서는 아무것도 하지 않는다** — 브라우저에 「항상 허용」이 없어서, 설명 화면을 띄우면
+  «고칠 수 없는 것»을 요구하게 된다.
+- 🔴 **보고가 없으면(`null`) 아무것도 하지 않는다** — 「모른다」를 「거부됨」으로 읽고 설정으로
+  보내면 멀쩡한 사용자가 고칠 것도 없는 설정을 뒤진다.
+- 🔴 **`denied`·`services_off` 는 공유를 켜기 «전»에도 띄운다** — 「켜고 나서야 막힌 걸 아는」
+  순서면 대원은 이미 현장에 있고, 그때는 고칠 시간이 없다.
+- **`when_in_use` 는 공유를 «켤 때만»** 승격을 권한다. 끄고 있는 사람에게 배경 권한을 조르면
+  거절률만 올라간다.
+- **`services_off` 와 `denied` 의 문구를 가른다** — 기기 위치가 꺼진 사람에게 「권한 거부」라고
+  하면 앱 설정만 들여다보다 영영 못 고친다.
+
+🔴 **재확인 프롬프트 대응**: `watchPermissionChanges()` 가 포그라운드 복귀마다 다시 읽어
+서버에 보고한다. 강등은 **앱 안에서 아무 일도 일으키지 않으므로**, 복귀 시점에 읽지 않으면
+관제는 끊긴 사람을 계속 「추적 중」으로 본다.
+
+### 🔴 셸에 권한 «읽기» 메서드가 따로 있다 (M-4 플러그인의 구멍)
+
+`@capacitor-community/background-geolocation` 의 API 는 셋뿐이다 —
+`addWatcher` · `removeWatcher` · `openSettings`. **`checkPermissions()` 가 없다.**
+
+그래서 watcher 가 `NOT_AUTHORIZED` 로 실패하는지만 알 수 있고, **「항상 허용」과
+「사용 중만」을 구분할 수 없다.** 구분이 없으면 M-5 의 `tracking` 과 `foreground_only` 가
+합쳐져 **관제가 «화면 닫으면 끊기는 사람»을 「추적 중」으로 본다.** 반대로 안전하게 전부
+`foreground_only` 로 두면 「추적 중」이 영영 안 떠서 신호가 죽는다.
+
+→ 셸에 **읽기 전용** 플러그인 `Gps119LocationPermission.check()` 를 뒀다.
+iOS 는 `CLLocationManager.authorizationStatus`, Android 는 `ACCESS_BACKGROUND_LOCATION`
+부여 여부를 그대로 읽는다. **권한을 «요청»하지는 않는다** — 요청은 배경 위치 플러그인이
+하고, 요청할지 말지는 웹이 정한다(푸시와 같은 분담).
+
+⚠️ **안드로이드는 「아직 안 물어봤다」를 못 읽는다.** 거부인지 미요청인지 구분할 API 가 없어
+둘 다 `denied` 로 답한다. `blocksTracking()` 이 둘을 같게 취급하므로 관제 판정은 같고,
+사용자 안내 문구만 덜 정확해진다.
+
+⚠️ **실기기 미검증이다.** 빌드에 들어간 것까지 확인했을 뿐
+(`isPluginAvailable('Gps119LocationPermission')` 이 런타임에 참인지는 아직),
+그 전까지 앱에서도 `permission` 은 계속 `null`(= `unknown`)이다.
+
 🔴 **`event_participants.sharing_location` 은 앱 권한 상태와 별개다.** **«공유 켬 + OS 권한 없음»** 상태를 구분해 표현해야 한다.
 
 #### ✅ M-5 해소 (2026-08-31) — 권한을 별도 축으로, 상태는 서버에서 파생 → [ADR-0008](../../adr/0008-location-permission-as-separate-axis.md)

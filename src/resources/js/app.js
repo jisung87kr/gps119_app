@@ -1,8 +1,15 @@
 import './bootstrap';
+import { isNativeApp } from './native/bridge';
 import { initPwa } from './pwa';
 import { initPushToggles } from './push-toggle';
 import { initNativePushRouting } from './push-native';
 import { createNativeLocationTracker } from './native/locationTracker';
+import {
+    decidePermissionStep,
+    openLocationSettings,
+    reportLocationPermission,
+    watchPermissionChanges,
+} from './native/locationPermission';
 
 // PWA: 서비스워커 등록 + 설치 온보딩 (참가자 셸)
 initPwa();
@@ -27,4 +34,12 @@ initNativePushRouting();
 window.__gps119Bridge = {
     ...(window.__gps119Bridge || {}),
     locationTracker: createNativeLocationTracker(),
+
+    // 권한 3단계 UX (02 §4). 화면은 「지금 어느 단계인가」만 물어보고 그린다 —
+    // 판정은 여기(순수 함수)에 있고 Vitest 가 지킨다.
+    isNativeApp: isNativeApp(),
+    decidePermissionStep,
+    reportLocationPermission,
+    openLocationSettings,
+    watchPermissionChanges,
 };
