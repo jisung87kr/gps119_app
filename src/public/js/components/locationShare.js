@@ -306,7 +306,7 @@ export function createLocationSharer(config = {}) {
         async enable(opts) {
             if (!tracker.supported) {
                 state.permission = 'unsupported';
-                state.error = '이 기기는 위치 기능을 지원하지 않습니다.';
+                state.error = '이 기기에서는 위치를 쓸 수 없습니다.';
                 emit();
                 return;
             }
@@ -383,11 +383,11 @@ function geoErrorMessage(err, isNative = false) {
     switch (err.code) {
         case err.PERMISSION_DENIED:
             return isNative
-                ? '위치 권한이 거부되었습니다. 설정 → GPS119 → 위치 에서 허용해 주세요.'
-                : '위치 권한이 거부되었습니다. 주소창의 위치 아이콘에서 허용해 주세요.';
-        case err.POSITION_UNAVAILABLE: return '위치 정보를 사용할 수 없습니다.';
-        case err.TIMEOUT: return '위치 확인 시간이 초과되었습니다(재시도).';
-        default: return '위치 오류가 발생했습니다.';
+                ? '위치 권한이 꺼져 있습니다. 설정에서 허용해 주세요.'
+                : '위치 권한이 꺼져 있습니다. 주소창의 위치 아이콘에서 허용해 주세요.';
+        case err.POSITION_UNAVAILABLE: return '위치를 확인할 수 없습니다.';
+        case err.TIMEOUT: return '위치 확인이 늦어지고 있습니다. 다시 시도합니다.';
+        default: return '위치를 가져오지 못했습니다.';
     }
 }
 

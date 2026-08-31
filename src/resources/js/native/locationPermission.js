@@ -138,7 +138,7 @@ export function shareStatus({
 } = {}) {
     if (!sharing) {
         // 끈 사람에게 붉은 경고를 띄우면 진짜 이상이 묻힌다.
-        return { label: '공유 중지됨', hint: null, action: null, tone: 'muted' };
+        return { label: '위치 공유 꺼짐', hint: null, action: null, tone: 'muted' };
     }
 
     if (permissionStep === 'guide_settings') {
@@ -146,9 +146,9 @@ export function shareStatus({
             // 기기 위치가 꺼진 경우와 권한 거부는 «안내가 달라야» 한다 —
             // 앱 설정만 들여다보다 영영 못 고치는 일을 막는다.
             label: osPermission === 'services_off'
-                ? '기기의 위치 서비스가 꺼져 있습니다'
-                : '위치 권한이 없습니다',
-            hint: '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다.',
+                ? '기기 위치 서비스가 꺼져 있습니다'
+                : '위치 권한이 꺼져 있습니다',
+            hint: '지금은 상황실에 위치가 전달되지 않습니다.',
             action: 'settings',
             tone: 'danger',
         };
@@ -161,8 +161,8 @@ export function shareStatus({
     //    앱에서도 이 값은 채워지므로, 위 네이티브 분기 «뒤»에 둬서 순서를 지킨다.
     if (webPermission === 'unsupported') {
         return {
-            label: '이 기기에서는 위치를 쓸 수 없습니다',
-            hint: '브라우저나 기기가 위치 기능을 지원하지 않습니다.',
+            label: '위치를 쓸 수 없는 브라우저입니다',
+            hint: '다른 브라우저에서 열어 주세요.',
             action: null,
             tone: 'danger',
         };
@@ -170,12 +170,12 @@ export function shareStatus({
 
     if (webPermission === 'denied') {
         return {
-            label: '위치 권한이 없습니다',
+            label: '위치 권한이 꺼져 있습니다',
             // 🔴 **고치는 곳이 웹과 앱이 다르다.** 앱에서 「주소창」을 안내하면
             //    사용자는 있지도 않은 UI 를 찾는다 — 웹뷰에는 브라우저 UI 가 없다.
             hint: native
-                ? '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다. 설정 → GPS119 → 위치 에서 허용해 주세요.'
-                : '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다. 주소창의 위치 아이콘에서 허용으로 바꿔 주세요.',
+                ? '지금은 상황실에 위치가 전달되지 않습니다. 설정에서 허용해 주세요.'
+                : '지금은 상황실에 위치가 전달되지 않습니다. 주소창의 위치 아이콘에서 허용해 주세요.',
             // 🔑 웹에는 설정을 열 방법이 없다. 누를 수 없는 버튼을 두지 않는다.
             action: native ? 'settings' : null,
             tone: 'danger',
@@ -185,8 +185,8 @@ export function shareStatus({
     if (webPermission === 'prompt') {
         // 아직 한 건도 못 보낸 상태다. 「공유 중」이라고 말하면 그것도 거짓이다.
         return {
-            label: '위치 권한을 기다리는 중',
-            hint: '위치 사용을 물어보면 허용해 주세요.',
+            label: '위치 허용을 기다리는 중입니다',
+            hint: '위치 사용 안내가 뜨면 허용을 눌러 주세요.',
             action: null,
             tone: 'warning',
         };
@@ -194,8 +194,8 @@ export function shareStatus({
 
     if (permissionStep === 'explain_always') {
         return {
-            label: '앱 열려 있을 때만 전달됩니다',
-            hint: '주머니에 넣거나 다른 앱을 쓰면 상황실에서 내 위치가 멈춥니다.',
+            label: '앱을 열어둔 동안만 공유됩니다',
+            hint: '화면을 끄거나 다른 앱을 쓰면 위치가 멈춥니다.',
             action: 'always',
             tone: 'warning',
         };

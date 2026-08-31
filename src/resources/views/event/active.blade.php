@@ -63,18 +63,18 @@
                     <button v-if="shareStatus.action" type="button"
                             v-on:click="shareStatus.action === 'settings' ? openSettings() : requestAlways()"
                             class="font-bold text-brand-600 underline underline-offset-2">
-                        @{{ shareStatus.action === 'settings' ? '설정 열기' : '항상 허용으로 바꾸기' }} →
+                        @{{ shareStatus.action === 'settings' ? '설정 열기' : '항상 허용으로 바꾸기' }}
                     </button>
                 </p>
 
                 <p v-if="alwaysPromptUnavailable" class="mt-2 text-sm leading-relaxed text-ink-600">
-                    이 기기에서는 앱이 «항상 허용»을 다시 물어볼 수 없습니다.
+                    권한 창이 뜨지 않았습니다. 설정에서 「항상 허용」을 선택해 주세요.
                     <button type="button" v-on:click="openSettings"
-                            class="font-bold text-brand-600 underline underline-offset-2">설정에서 바꾸기 →</button>
+                            class="font-bold text-brand-600 underline underline-offset-2">설정 열기</button>
                 </p>
 
                 <p v-if="settingsOpenFailed" class="mt-1.5 text-xs text-ink-500">
-                    설정을 열지 못했습니다. 기기 설정 → GPS119 → 위치 에서 직접 허용해 주세요.
+                    설정을 열지 못했습니다. 설정 앱에서 GPS119 › 위치를 열어 주세요.
                 </p>
 
                 {{-- 사용자에게 의미 있는 둘만. 「대기 중」은 네트워크가 끊겼을 때

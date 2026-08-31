@@ -41,7 +41,8 @@ describe('shareStatus — 상태가 «진실»을 말한다', () => {
         // 끈 사람에게 붉은 경고를 띄우면 진짜 이상이 묻힌다.
         const s = shareStatus({ sharing: false, permissionStep: 'guide_settings', osPermission: 'denied' });
 
-        expect(s.label).toBe('공유 중지됨');
+        // 🔑 문구가 아니라 «톤과 조치»로 판정한다. 카피는 바뀌어도 계약은 그대로다.
+        expect(s.tone).toBe('muted');
         expect(s.action).toBeNull();
     });
 
@@ -75,7 +76,7 @@ describe('shareStatus — 상태가 «진실»을 말한다', () => {
         const s = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'prompt' });
 
         expect(s.tone).toBe('warning');
-        expect(s.label).toContain('기다리는');
+        expect(s.action).toBeNull();  // 기다리는 중에는 누를 것이 없다
     });
 
     it('위치를 지원하지 않는 기기도 구분한다', () => {
