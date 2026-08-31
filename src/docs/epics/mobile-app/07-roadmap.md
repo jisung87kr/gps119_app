@@ -306,7 +306,7 @@ Android 실기기 logcat + 서버 로그가 오늘 고친 것 셋을 그대로 �
 | M-1 | [01](01-webview-strategy.md) | 운영 도메인·포트 (`SANCTUM_STATEFUL_DOMAINS`) | N2 |
 | M-2 | [01](01-webview-strategy.md) | A안 심사 실패 시 B안 전환 비용 수용 여부 | 리스크 |
 | M-3 | [01](01-webview-strategy.md) | 최소 지원 OS 버전 | N2 |
-| M-4 | [02](02-location-accuracy.md) | 백그라운드 지오로케이션 플러그인 선정 | N3 |
+| ~~M-4~~ | [02](02-location-accuracy.md) | ~~백그라운드 지오로케이션 플러그인 선정~~ ✅ **해소(2026-08-31)** — `@capacitor-community/background-geolocation`(MIT). Capacitor 8 에서 양 OS 빌드·링크 실측 | ~~N3~~ |
 | M-5 | [02](02-location-accuracy.md) | 「공유 켬 + 권한 없음」 데이터 모델 | N3 |
 | M-6 | [02](02-location-accuracy.md) | 위치 이력 보존기간·삭제 요청 경로 — **«파기 대상»과 «보존 의무 대상»을 가르는 것 포함**([02 §6-1](02-location-accuracy.md)) | **N0** |
 | M-7 | [02](02-location-accuracy.md) | 배터리 허용치 | N3 |

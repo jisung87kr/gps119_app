@@ -72,7 +72,43 @@ Laravel 의 `throttle:maxAttempts,decayMinutes` 이므로 `throttle:2,1` 은 **�
 | **Android** | **Foreground Service** (`FOREGROUND_SERVICE_LOCATION`) + 상시 알림. Android 8+ 는 백그라운드 위치 취득 빈도가 제한되므로 포그라운드 서비스가 사실상 필수 |
 | **iOS** | `UIBackgroundModes: ["location"]` + `allowsBackgroundLocationUpdates` + **파란 상태바 인디케이터** |
 
-Capacitor 생태계에서는 `@capacitor/geolocation` 이 **백그라운드를 지원하지 않는다.** 백그라운드 지오로케이션 전용 커뮤니티 플러그인이 필요하다 → **플러그인 선정이 미결(M-4)**. 유지보수 상태·라이선스·두 OS 지원 여부를 반드시 실측할 것.
+Capacitor 생태계에서는 `@capacitor/geolocation` 이 **백그라운드를 지원하지 않는다.** 백그라운드 지오로케이션 전용 커뮤니티 플러그인이 필요하다.
+
+#### ✅ M-4 해소 (2026-08-31) — `@capacitor-community/background-geolocation`
+
+「유지보수·라이선스·양 OS 를 반드시 실측하라」는 요구대로 **버릴 브랜치에서 실제로 붙여 빌드했다.** 후보는 둘이었다.
+
+| | `@capacitor-community/…` | `@transistorsoft/…` |
+|---|---|---|
+| 라이선스 | **MIT** | CUSTOM — 릴리스 빌드는 **유료 구매** |
+| Capacitor peer | `>=3.0.0` | `^8.0.0` |
+| 최근 릴리스 | `1.2.26` · **2025-08-28 (1년 전)** | `9.4.0` · 2026-08-30 |
+
+⚠️ npm 의 `time.modified` 는 커뮤니티 쪽이 2026-01 로 찍힌다. **메타데이터만 건드린 것**이고 실제 배포는 2025-08 이 마지막이다 — 그 필드만 보면 「최근까지 관리된다」로 **오독한다.**
+
+**실측 결과 (Capacitor 8.5.0):**
+
+| 관문 | 결과 |
+|---|---|
+| Android `assembleDebug` | ✅ `BUILD SUCCESSFUL` |
+| iOS `xcodebuild` | ✅ `** BUILD SUCCEEDED **` (`exit=0`) |
+| SPM 해석 | ✅ `capacitor-swift-pm @ 8.5.0` |
+| **실제 링크** | ✅ `App.debug.dylib` 에 심볼 165개 (`addWatcher` 등). 대조군 `AppDelegate` 97개 |
+
+🔑 **「빌드 성공」에서 멈추면 안 된다.** 플러그인이 링크에서 조용히 빠져도 빌드는 통과한다.
+바이너리까지 봐야 한다 — 그리고 **`App.app/App` 이 아니라 `App.app/App.debug.dylib` 을 본다.**
+Xcode 16+ 에서 앞엣것은 92KB 껍데기라 우리 `AppDelegate` 조차 안 나온다(대조군을 같이 세면
+방법이 틀린 걸 바로 안다).
+
+**무료를 고른 근거 — 「1년째 공백」은 오늘의 결함이 아니라 내일의 위험이고, 그 위험은
+아래 §3-3 브리지가 이미 흡수한다.** 플러그인은 `bridge.js` 뒤에만 있으므로 나중에 깨지면
+브리지 안쪽만 갈아끼우면 되고 전송 정책·권한 UX 는 안 흔들린다. **지금 돈을 쓸 근거가
+실측으로는 없다.** 유료 쪽은 스파이크하지 않았다 — `^8.0.0` 을 선언하니 빌드는 당연히 되고,
+확인해도 「예상대로」밖에 안 나온다.
+
+⚠️ **되돌릴 조건을 미리 적어 둔다.** Android 16 / iOS 27 대응이 필요해졌는데 업스트림이
+여전히 멈춰 있으면 그때 유료로 간다. 그 판단을 「불편해서」가 아니라 **「OS 가 요구하는데
+업스트림이 안 따라온다」** 로 한다.
 
 ### 3-3. 브리지 설계
 
@@ -165,7 +201,7 @@ resources/js/native/bridge.js
 
 | ID | 질문 |
 |---|---|
-| M-4 | 백그라운드 지오로케이션 플러그인 선정 (유지보수·라이선스·양 OS) |
+| ~~M-4~~ | ~~백그라운드 지오로케이션 플러그인 선정~~ → ✅ **해소(2026-08-31)** — `@capacitor-community/background-geolocation`(MIT). 실측 근거는 위 §3-2 |
 | M-5 | 「공유 켬 + OS 권한 없음」 상태의 데이터 모델·관제 표시 |
 | M-6 | 위치 이력 보존기간·자동파기(선행 에픽 Q2 승계) · 앱 내 삭제 요청 경로 |
 | M-7 | 배터리 소모 실측 기준(행사 4시간 기준 허용치) |
