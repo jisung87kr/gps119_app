@@ -113,3 +113,50 @@ export function watchPermissionChanges(projectId, onChange, env = globalThis) {
 
     return () => env.document?.removeEventListener?.('visibilitychange', handler);
 }
+
+/**
+ * 참가자 화면의 「지금 내 위치가 어떻게 되고 있나」 한 줄.
+ *
+ * 🔴 **예전에는 상태가 `sharing` 만 보고 「위치 공유 중」이라 말했다.** 권한이 거부돼도
+ *    초록 불이 켜졌고, 바로 아래에서는 「전혀 전달되지 않습니다」라고 말하고 있었다 —
+ *    M-5 가 관제에서 막으려던 «거짓 안심»을 참가자 본인 화면에서 하고 있었던 셈이다.
+ *
+ * 🔑 **판정 표를 새로 만들지 않는다.** `decidePermissionStep` 의 결과와 `sharing` 만
+ *    조합한다. 매트릭스를 두 벌로 만들면 0-8 처럼 어긋난다.
+ *
+ * 🔑 **조치는 «필요할 때만» 나온다.** 항상 떠 있으면 공유 토글과 다시 경쟁하게 되고,
+ *    그게 정확히 이 화면이 혼란스러웠던 이유였다(의도 vs 권한이 동급 버튼이었다).
+ *
+ * @returns {{label: string, hint: string|null, action: 'settings'|'always'|null, tone: string}}
+ */
+export function shareStatus({ sharing = false, permissionStep = 'none', osPermission = null } = {}) {
+    if (!sharing) {
+        // 끈 사람에게 붉은 경고를 띄우면 진짜 이상이 묻힌다.
+        return { label: '공유 중지됨', hint: null, action: null, tone: 'muted' };
+    }
+
+    if (permissionStep === 'guide_settings') {
+        return {
+            // 기기 위치가 꺼진 경우와 권한 거부는 «안내가 달라야» 한다 —
+            // 앱 설정만 들여다보다 영영 못 고치는 일을 막는다.
+            label: osPermission === 'services_off'
+                ? '기기의 위치 서비스가 꺼져 있습니다'
+                : '위치 권한이 없습니다',
+            hint: '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다.',
+            action: 'settings',
+            tone: 'danger',
+        };
+    }
+
+    if (permissionStep === 'explain_always') {
+        return {
+            label: '앱 열려 있을 때만 전달됩니다',
+            hint: '주머니에 넣거나 다른 앱을 쓰면 상황실에서 내 위치가 멈춥니다.',
+            action: 'always',
+            tone: 'warning',
+        };
+    }
+
+    // 웹(step=none)도 여기다 — 브라우저는 탭이 열려 있는 동안 정상 동작이다.
+    return { label: '위치 공유 중', hint: null, action: null, tone: 'ok' };
+}

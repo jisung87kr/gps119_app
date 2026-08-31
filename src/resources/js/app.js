@@ -8,6 +8,7 @@ import {
     decidePermissionStep,
     openLocationSettings,
     reportLocationPermission,
+    shareStatus,
     watchPermissionChanges,
 } from './native/locationPermission';
 
@@ -42,4 +43,5 @@ window.__gps119Bridge = {
     reportLocationPermission,
     openLocationSettings,
     watchPermissionChanges,
+    shareStatus,
 };

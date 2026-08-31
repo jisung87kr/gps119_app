@@ -41,82 +41,46 @@
             </div>
 
             {{--
-                2단계 — 「항상 허용」을 요구하기 «전에» 왜 필요한지 우리 화면으로 설명한다.
-                🔑 OS 다이얼로그는 이유를 못 담는다. 곧바로 띄우면 거절률이 급등하고,
-                   iOS 는 «한 번 거부하면 앱 안에서 다시 못 묻는다».
-            --}}
-            <div v-if="permissionStep === 'explain_always'"
-                 class="mt-5 rounded-2xl border border-warning-500/30 bg-warning-50 p-4">
-                <p class="text-sm font-bold text-warning-600">화면을 끄면 위치가 끊깁니다</p>
-                <p class="mt-1 text-sm leading-relaxed text-ink-600">
-                    지금은 앱을 보고 있을 때만 위치가 전달됩니다.
-                    주머니에 넣거나 다른 앱을 쓰면 상황실에서 내 위치가 멈춥니다.
-                    <strong class="font-bold text-ink-950">「항상 허용」</strong>으로 바꾸면
-                    화면이 꺼져 있어도 전달됩니다.
-                </p>
-                <button type="button" v-on:click="requestAlways"
-                        class="mt-3 w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white">
-                    「항상 허용」으로 바꾸기
-                </button>
-            </div>
+                🔑 **컨트롤은 토글 «하나»다.** 예전에는 토글 옆에 「항상 허용으로 바꾸기」·
+                   「설정 열기」가 전체 너비 버튼으로 나란히 있어서, 서로 다른 축(공유 «의도»
+                   vs OS «권한»)이 동급으로 보였다 — 사용자는 무엇을 눌러야 공유가 켜지는지
+                   알 수 없었다. 권한 조치는 «상태에 딸린 조치»로 내린다.
 
-            {{--
-                3단계 — 거부됐거나 기기 위치가 꺼진 상태. 기능 제한을 알리고 설정으로 보낸다.
-                🔴 공유를 켜기 «전»에도 뜬다. 켜고 나서야 막힌 걸 알면 그때는 이미 현장이다.
+                🔴 그리고 상태가 sharing 만 보고 「위치 공유 중」이라 말하고 있었다.
+                   권한이 거부돼도 초록 불이 켜졌다 — 바로 아래에서 「전혀 전달되지
+                   않습니다」라고 말하면서. M-5 가 막으려던 그 거짓 안심을 참가자 본인
+                   화면에서 하고 있었다. 이제 상태는 권한까지 보고 말한다.
             --}}
-            <div v-if="permissionStep === 'guide_settings'"
-                 class="mt-5 rounded-2xl border border-danger-200 bg-danger-50 p-4">
-                <p class="text-sm font-bold text-danger-700">
-                    @{{ osPermission === 'services_off' ? '기기의 위치 서비스가 꺼져 있습니다' : '위치 권한이 거부되어 있습니다' }}
-                </p>
-                <p class="mt-1 text-sm leading-relaxed text-ink-600">
-                    지금 상태로는 <strong class="font-bold text-ink-950">위치가 상황실에 전혀 전달되지 않습니다.</strong>
-                    사고가 났을 때 마지막 위치를 알 수 없습니다.
-                </p>
-                <button type="button" v-on:click="openSettings"
-                        class="mt-3 w-full rounded-xl bg-danger-600 px-4 py-2.5 text-sm font-bold text-white">
-                    설정 열기
-                </button>
-                <p v-if="settingsOpenFailed" class="mt-2 text-xs text-ink-500">
-                    설정을 열지 못했습니다. 기기 설정 → GPS119 → 위치 에서 직접 허용해 주세요.
-                </p>
-            </div>
-
-            {{-- 상태 --}}
-            <div class="mt-5 rounded-2xl p-4" :class="sharing ? 'bg-brand-50' : 'bg-ink-50'">
+            <div class="mt-5 rounded-2xl p-4" :class="shareStatus.bg">
                 <div class="flex items-center gap-2">
-                    <span class="h-2.5 w-2.5 rounded-full"
-                          :class="sharing ? 'animate-pulse bg-brand-600' : 'bg-ink-300'"></span>
-                    <span class="text-sm font-bold" :class="sharing ? 'text-brand-600' : 'text-ink-500'">
-                        @{{ sharing ? '위치 공유 중' : '공유 중지됨' }}
-                    </span>
+                    <span class="h-2.5 w-2.5 rounded-full" :class="shareStatus.dot"></span>
+                    <span class="text-sm font-bold" :class="shareStatus.text">@{{ shareStatus.label }}</span>
                 </div>
 
-                <dl v-if="sharing" class="mt-3 grid grid-cols-2 gap-3">
-                    <div>
-                        <dt class="text-xs font-bold text-ink-400">전송 횟수</dt>
-                        <dd class="mt-0.5 text-sm font-bold text-ink-950">@{{ sentCount }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-bold text-ink-400">마지막 전송</dt>
-                        <dd class="mt-0.5 text-sm font-bold text-ink-950">@{{ lastSentLabel }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-bold text-ink-400">정확도</dt>
-                        <dd class="mt-0.5 text-sm font-bold text-ink-950">@{{ accuracyLabel }}</dd>
-                    </div>
-                    <div v-if="bufferedCount">
-                        <dt class="text-xs font-bold text-ink-400">대기 중</dt>
-                        <dd class="mt-0.5 text-sm font-bold text-warning-600">@{{ bufferedCount }}건</dd>
-                    </div>
-                </dl>
+                <p v-if="shareStatus.hint" class="mt-1.5 text-sm leading-relaxed text-ink-600">
+                    @{{ shareStatus.hint }}
+                    <button v-if="shareStatus.action" type="button"
+                            v-on:click="shareStatus.action === 'settings' ? openSettings() : requestAlways()"
+                            class="font-bold text-brand-600 underline underline-offset-2">
+                        @{{ shareStatus.action === 'settings' ? '설정 열기' : '항상 허용으로 바꾸기' }} →
+                    </button>
+                </p>
+
+                <p v-if="settingsOpenFailed" class="mt-1.5 text-xs text-ink-500">
+                    설정을 열지 못했습니다. 기기 설정 → GPS119 → 위치 에서 직접 허용해 주세요.
+                </p>
+
+                {{-- 사용자에게 의미 있는 둘만. 「대기 중」은 네트워크가 끊겼을 때
+                     유일한 단서라 그때만 덧붙인다. --}}
+                <p v-if="sharing" class="mt-3 text-xs text-ink-500">
+                    마지막 전송 @{{ lastSentLabel }} · 정확도 @{{ accuracyLabel }}
+                    <span v-if="bufferedCount" class="font-bold text-warning-600">
+                        · 대기 @{{ bufferedCount }}건
+                    </span>
+                </p>
             </div>
 
-            {{-- 안내/에러 --}}
             <p v-if="error" class="mt-3 text-sm font-bold text-danger-600">@{{ error }}</p>
-            <p v-else-if="permission === 'prompt'" class="mt-3 text-sm text-ink-400">
-                위치 권한을 허용하면 공유가 시작됩니다.
-            </p>
         </x-ui.card>
 
         {{-- 🔑 예전에는 여기에 「3초 후 구조요청 화면으로 이동」 카운트다운이 있었다.
@@ -159,6 +123,14 @@
 
         const { createApp } = Vue;
 
+        // 톤 → 클래스. «판정»은 번들에, «표현»은 화면에 둔다.
+        const TONE = {
+            ok:      { bg: 'bg-brand-50',   dot: 'animate-pulse bg-brand-600', text: 'text-brand-600' },
+            warning: { bg: 'bg-warning-50', dot: 'bg-warning-600',             text: 'text-warning-600' },
+            danger:  { bg: 'bg-danger-50',  dot: 'bg-danger-600',              text: 'text-danger-700' },
+            muted:   { bg: 'bg-ink-50',     dot: 'bg-ink-300',                 text: 'text-ink-500' },
+        };
+
         const root = document.getElementById('eventActiveApp');
 
         createApp({
@@ -192,6 +164,20 @@
                 },
             },
             computed: {
+                /**
+                 * 상태 한 줄 — 판정은 번들의 shareStatus() 가 한다(Vitest 로 고정).
+                 * 여기에 매트릭스를 두면 두 벌이 되어 어긋난다(0-8 의 교훈).
+                 */
+                shareStatus() {
+                    const s = window.__gps119Bridge?.shareStatus?.({
+                        sharing: this.sharing,
+                        permissionStep: this.permissionStep,
+                        osPermission: this.osPermission,
+                    }) ?? { label: this.sharing ? '위치 공유 중' : '공유 중지됨', hint: null, action: null, tone: this.sharing ? 'ok' : 'muted' };
+
+                    return { ...s, ...TONE[s.tone] };
+                },
+
                 lastSentLabel() {
                     if (!this.lastSentAt) return '-';
                     try {
