@@ -269,7 +269,7 @@ Android 실기기 logcat + 서버 로그가 오늘 고친 것 셋을 그대로 �
 
 - 푸시 SDK 연동 + 토큰 등록 + **딥링크 착지**(`?request=` 규약 재사용)
 - 백그라운드 위치 플러그인 + 포그라운드 서비스(Android) / `UIBackgroundModes`(iOS)
-- 권한 3단계 UX + **「공유 켬 + OS 권한 없음」 상태 표현**
+- 권한 3단계 UX + **「공유 켬 + OS 권한 없음」 상태 표현** — 🟡 **서버는 끝났다**([ADR-0008](../../adr/0008-location-permission-as-separate-axis.md)). 남은 건 **앱의 권한 보고 배선**(`PATCH /events/{id}/location-permission`)과 **관제 배지**
 - ~~정확도(accuracy) 저장 및 관제 노출~~ → **N0 에서 완료.** 여기서는 «백그라운드 픽스의 정확도가 포그라운드보다 나쁜지» 실측만
 - **스로틀·백오프 값 재실측** (N0 의 `30/분` 은 웹 기준 추정치)
 - 배터리 실측 (행사 4시간 기준)
@@ -307,7 +307,7 @@ Android 실기기 logcat + 서버 로그가 오늘 고친 것 셋을 그대로 �
 | M-2 | [01](01-webview-strategy.md) | A안 심사 실패 시 B안 전환 비용 수용 여부 | 리스크 |
 | M-3 | [01](01-webview-strategy.md) | 최소 지원 OS 버전 | N2 |
 | ~~M-4~~ | [02](02-location-accuracy.md) | ~~백그라운드 지오로케이션 플러그인 선정~~ ✅ **해소(2026-08-31)** — `@capacitor-community/background-geolocation`(MIT). Capacitor 8 에서 양 OS 빌드·링크 실측 | ~~N3~~ |
-| M-5 | [02](02-location-accuracy.md) | 「공유 켬 + 권한 없음」 데이터 모델 | N3 |
+| ~~M-5~~ | [ADR-0008](../../adr/0008-location-permission-as-separate-axis.md) | ~~「공유 켬 + 권한 없음」 데이터 모델~~ ✅ **해소(2026-08-31)** — 서버까지 완료. **앱 보고 배선·관제 배지는 N3** | ~~N3~~ |
 | M-6 | [02](02-location-accuracy.md) | 위치 이력 보존기간·삭제 요청 경로 — **«파기 대상»과 «보존 의무 대상»을 가르는 것 포함**([02 §6-1](02-location-accuracy.md)) | **N0** |
 | M-7 | [02](02-location-accuracy.md) | 배터리 허용치 | N3 |
 | 🟡 M-8 | [03](03-push-notifications.md)·[05](05-store-release.md) | ~~스토어·인증서·FCM 명의 주체~~ → **Apple 은 «개인» 명의로 확정(2026-08-09).** 신원 확인(신분증)까지 마쳐 멤버십이 열렸고 APNs 키를 발급했다.<br>🔴 **남은 질문 둘**: ① **Google Play 도 같은 개인 명의로 갈 것인가** ② 나중에 법인으로 옮길 계획이 있는가 — Apple 은 계정 «전환»이 불가하고 조직 계정을 새로 만들어 App Transfer 를 해야 한다 | 🟡 **N0 부분 해소** |
