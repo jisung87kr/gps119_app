@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shareStatus } from '../../resources/js/native/locationPermission.js';
+import { shareStatus, shouldRestartTracking } from '../../resources/js/native/locationPermission.js';
 
 /**
  * 참가자 화면의 「지금 내 위치가 어떻게 되고 있나」 한 줄 (N3 / 02 §4).
@@ -117,5 +117,31 @@ describe('shareStatus — 상태가 «진실»을 말한다', () => {
         // 항상 떠 있으면 토글과 다시 경쟁하게 된다.
         expect(shareStatus({ sharing: true, permissionStep: 'none' }).action).toBeNull();
         expect(shareStatus({ sharing: false, permissionStep: 'none' }).action).toBeNull();
+    });
+});
+
+describe('shouldRestartTracking — 설정에서 고치고 돌아왔을 때', () => {
+    it('🔴 막힘 → 허용으로 바뀌면 다시 시작한다', () => {
+        // iOS 는 거부된 뒤 프롬프트를 못 띄운다. 사용자는 설정에서 고치고 돌아오는데,
+        // 그때 스스로 다시 시작하지 않으면 「역시 안 되네」로 끝난다.
+        expect(shouldRestartTracking('denied', 'always')).toBe(true);
+        expect(shouldRestartTracking('denied', 'when_in_use')).toBe(true);
+        expect(shouldRestartTracking('services_off', 'always')).toBe(true);
+    });
+
+    it('🔑 첫 보고(null)에는 재시작하지 않는다', () => {
+        // 그 시점엔 이미 enable()/resume() 이 감시를 시작한 뒤다. 또 restart 하면
+        // 불필요하게 끊었다 잇는다.
+        expect(shouldRestartTracking(null, 'always')).toBe(false);
+        expect(shouldRestartTracking(undefined, 'when_in_use')).toBe(false);
+    });
+
+    it('여전히 막혀 있으면 시작하지 않는다', () => {
+        expect(shouldRestartTracking('denied', 'denied')).toBe(false);
+        expect(shouldRestartTracking('when_in_use', 'denied')).toBe(false);
+    });
+
+    it('이미 쓸 수 있었으면 다시 시작하지 않는다 — 승격은 restart 가 따로 한다', () => {
+        expect(shouldRestartTracking('when_in_use', 'always')).toBe(false);
     });
 });

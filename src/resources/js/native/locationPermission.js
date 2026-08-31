@@ -203,3 +203,22 @@ export function shareStatus({
 
     return { label: '위치 공유 중', hint: null, action: null, tone: 'ok' };
 }
+
+/** 위치를 «전혀» 못 얻는 값들. LocationPermission::blocksTracking() 과 같은 목록이다. */
+const BLOCKED = ['denied', 'services_off', 'not_determined'];
+
+/**
+ * 권한이 «막힘 → 쓸 수 있음»으로 바뀌었나 (= 지금 추적을 다시 시작해야 하나).
+ *
+ * 🔴 **iOS 는 한 번 거부되면 앱 안에서 프롬프트를 다시 못 띄운다.** 사용자는 설정으로
+ *    가서 고치고 돌아오는데, 그때 앱이 «스스로» 다시 시작하지 않으면 화면은 그대로다 —
+ *    고쳤는데도 아무 일이 없으니 「역시 안 되네」로 끝난다.
+ *
+ * 🔑 **첫 보고(prev === null)에는 재시작하지 않는다.** 그때는 이미 enable()/resume() 이
+ *    감시를 시작한 뒤라, 여기서 또 restart 하면 불필요하게 끊었다 잇는다.
+ */
+export function shouldRestartTracking(prev, next) {
+    if (!next || BLOCKED.includes(next)) return false;
+
+    return prev !== null && prev !== undefined && BLOCKED.includes(prev);
+}

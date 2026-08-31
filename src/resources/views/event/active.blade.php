@@ -206,7 +206,17 @@
                 },
 
                 applyPermission(permission) {
+                    const prev = this.osPermission;
                     this.osPermission = permission;
+
+                    // 🔑 **설정에서 고치고 돌아온 순간 스스로 다시 시작한다.**
+                    //    iOS 는 거부된 뒤 프롬프트를 다시 못 띄우므로 사용자는 설정으로
+                    //    갔다 온다. 그때 재시작이 없으면 화면이 그대로여서 「역시 안 되네」로
+                    //    끝난다 — 고친 보람이 사라진다.
+                    if (this.sharing && window.__gps119Bridge?.shouldRestartTracking?.(prev, permission)) {
+                        this.sharer.restart();
+                    }
+
                     this.permissionStep = window.__gps119Bridge?.decidePermissionStep?.({
                         native: window.__gps119Bridge?.isNativeApp,
                         permission,
