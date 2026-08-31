@@ -65,6 +65,49 @@ enum TrackingState: string
         };
     }
 
+    /**
+     * 관제 지도가 «표시»에 쓰는 색. 배지 톤과 별개다 —
+     * 관제 SPA 는 x-ui 토큰이 아니라 raw Tailwind 위에서 돌고 마커에도 같은 색을 쓴다.
+     */
+    public function markerColor(): string
+    {
+        return match ($this) {
+            self::TRACKING => '#16A34A',        // green-600
+            self::STALE => '#EA580C',           // orange-600 — 우선순위 「사고」와 같은 톤
+            self::FOREGROUND_ONLY => '#D97706', // amber-600
+            self::BLOCKED => '#DC2626',         // red-600
+            self::OFF => '#9CA3AF',             // gray-400 — 정상이므로 «조용한» 색
+            self::UNKNOWN => '#6B7280',         // gray-500
+        };
+    }
+
+    /**
+     * 관제 SPA 로 주입할 전량 (control/index.blade.php → data-tracking-meta).
+     *
+     * 🔑 **JS 가 라벨·색 사본을 갖지 않게 한다.** N0 의 0-8 이 정확히 그 실패였다 —
+     *    역할 색·라벨이 두 벌로 있다가 어긋났고, 「PHP 가 단일 출처」라는 주석과 달리
+     *    실질 출처는 JS 였다. EventRole::mapMeta() 와 같은 방식이다.
+     *
+     * `attention` 은 needsAttention() 그대로다. **「무엇이 경보인가」의 판단까지 서버가
+     * 갖는다** — 화면이 다시 정하면 두 벌이 된다.
+     *
+     * @return array<string, array{label: string, color: string, attention: bool}>
+     */
+    public static function mapMeta(): array
+    {
+        $meta = [];
+
+        foreach (self::cases() as $state) {
+            $meta[$state->value] = [
+                'label' => $state->label(),
+                'color' => $state->markerColor(),
+                'attention' => $state->needsAttention(),
+            ];
+        }
+
+        return $meta;
+    }
+
     public function badgeTone(): string
     {
         return match ($this) {

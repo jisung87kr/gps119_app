@@ -129,3 +129,54 @@ export const ICON_PATHS = {
     // 신고핀 기본 글리프(경고 느낌표) — RequestType::markerIcon() 도입 전 임시
     alert: 'M12 9v3.75M12 16.5h.01M10.3 4.3l-7.4 12.8A1.5 1.5 0 004.2 19.5h15.6a1.5 1.5 0 001.3-2.4L13.7 4.3a1.5 1.5 0 00-2.6 0z',
 };
+
+// ── 위치 추적 상태 (M-5 / ADR-0008) ──────────────────────────────
+//
+// 🔑 역할 메타와 «같은 이유»로 서버가 준다. 라벨·색·「경보인가」 판단을 JS 가 또 갖지
+//    않는다 — 0-8 이 그 실패였다. 축이 여섯이라 손으로 맞추면 더 빨리 어긋난다.
+
+export const TRACKING_META = {};
+
+/**
+ * 🔴 주입이 없을 때의 «모름». 초록(정상)으로 떨어뜨리지 않는다 —
+ *    「모른다」를 「문제 없음」으로 칠하면 M-5 를 통째로 잃는다.
+ */
+const UNKNOWN_TRACKING = { label: '알 수 없음', color: '#6B7280', attention: false };
+
+/**
+ * @param {Object} injected - { state: { label, color, attention } } (TrackingState::mapMeta())
+ * @returns {boolean} 채웠으면 true
+ */
+export function initTrackingMeta(injected) {
+    if (!injected || typeof injected !== 'object') {
+        console.error('[control] data-tracking-meta 주입 실패 — 위치 추적 상태를 표시할 수 없습니다.');
+        return false;
+    }
+
+    Object.keys(TRACKING_META).forEach((k) => delete TRACKING_META[k]);
+    Object.entries(injected).forEach(([state, meta]) => {
+        TRACKING_META[state] = {
+            label: meta.label,
+            color: meta.color,
+            attention: Boolean(meta.attention),
+        };
+    });
+
+    return true;
+}
+
+export function trackingMeta(state) {
+    return TRACKING_META[state] || UNKNOWN_TRACKING;
+}
+
+/**
+ * 지금 «조치가 필요한» 사람 수.
+ *
+ * 🔑 판단 기준은 서버가 준 attention 이다. 화면이 상태 이름을 나열해 세면
+ *    상태가 늘어날 때 여기만 안 고쳐져서 조용히 빠진다.
+ */
+export function attentionCount(rows) {
+    if (!Array.isArray(rows)) return 0;
+
+    return rows.filter((r) => trackingMeta(r?.tracking_state).attention).length;
+}

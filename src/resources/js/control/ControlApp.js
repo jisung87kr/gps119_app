@@ -6,6 +6,7 @@ import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
     dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta, presenceState,
+    trackingMeta, attentionCount,
 } from './roleMeta';
 import { isNativeApp, hasNativeCapability, NativeCapability } from '../native/bridge';
 
@@ -101,6 +102,17 @@ export default {
     },
 
     computed: {
+        /**
+         * 🔴 지금 «위치가 전혀 안 오는» 사람 수.
+         *
+         * 공유를 켜뒀는데 OS 권한이 막힌 사람들이다. 본인은 보이는 줄 알고, 관제는
+         * M-5 이전이라면 그냥 「오프라인」으로 봤다 — 그 구분이 M-5 다.
+         *
+         * 🔑 세는 기준은 서버가 준 attention 이다. 화면이 상태 이름을 나열해 세면
+         *    상태가 늘어날 때 여기만 안 고쳐져 조용히 빠진다.
+         */
+        trackingAlertCount() { return attentionCount(this.roster); },
+
         hasProject() {
             return this.selectedProjectId != null;
         },
@@ -204,6 +216,10 @@ export default {
     methods: {
         roleLabel(role) { return roleMeta(role).label; },
         roleColor(role) { return roleMeta(role).color; },
+
+        // 위치 추적 상태 (M-5). 라벨·색·「경보인가」는 전부 서버가 준 값이다.
+        trackingLabel(state) { return trackingMeta(state).label; },
+        trackingColor(state) { return trackingMeta(state).color; },
         priorityLabel(p) { return priorityMeta(p).label; },
         priorityColor(p) { return priorityMeta(p).color; },
         dispatchLabel(s) { return dispatchStatusMeta(s).label; },
@@ -1060,11 +1076,27 @@ export default {
 
     <!-- 참가자 역할 배정(controller/admin) -->
     <div v-if="roster.length" class="p-3 border-t border-gray-100">
-      <h2 class="text-sm font-bold text-gray-700 mb-2">참가자 역할 배정</h2>
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-bold text-gray-700">참가자 역할 배정</h2>
+        <!-- 🔴 M-5 — 「켜뒀는데 위치가 안 오는」 사람 수. 예전에는 그냥 오프라인으로 보였다. -->
+        <span v-if="trackingAlertCount" class="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">
+          위치 권한 없음 {{ trackingAlertCount }}명
+        </span>
+      </div>
       <div class="space-y-1.5 max-h-56 overflow-y-auto">
         <div v-for="r in roster" :key="'a-'+r.user_id" class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: roleColor(r.role) }"></span>
           <span class="text-sm text-gray-700 flex-1 truncate" :title="r.name">{{ r.name }}</span>
+          <!--
+            위치 추적 상태 (M-5). 🔑 «전부» 표시한다 — unknown 을 감추면
+            「문제 없음」으로 읽히고, 그게 M-5 를 다시 잃는 길이다.
+            색·라벨은 서버가 준 값이라 여기에 사본이 없다.
+          -->
+          <span class="flex-shrink-0 text-[11px] font-semibold leading-none"
+                :style="{ color: trackingColor(r.tracking_state) }"
+                :title="'위치 추적: ' + trackingLabel(r.tracking_state)">
+            ● {{ trackingLabel(r.tracking_state) }}
+          </span>
           <select :value="r.role" @change="assignParticipantRole(r.user_id, $event.target.value)"
                   :disabled="assigningUserId === r.user_id"
                   class="text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer max-w-[110px]">
@@ -1373,6 +1405,11 @@ export default {
             <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: roleColor(role) }"></span>{{ roleLabel(role) }}
           </span>
           <span class="text-sm text-gray-500"><b class="text-green-600">{{ roleOnline(role) }}</b> / {{ roleTotal(role) }}</span>
+        </div>
+        <!-- 🔴 모바일은 개인별 명단이 없다(역할 집계만). 그래도 «이 경보»는 보여야 한다 —
+             위치가 안 오는 사람이 있다는 사실은 집계 뒤에 숨으면 안 된다. -->
+        <div v-if="trackingAlertCount" class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-600">
+          위치 권한이 없는 참가자 {{ trackingAlertCount }}명 — 위치가 전혀 오지 않습니다
         </div>
         <p class="pt-3 text-xs text-gray-400">역할 배정은 관리자 &gt; 행사 &gt; 참가자 관리에서 합니다.</p>
       </div>
