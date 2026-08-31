@@ -324,6 +324,27 @@ describe('취득 위임 (N3 / 02 §3-3)', () => {
         expect(watchPosition).toHaveBeenCalledTimes(1);
     });
 
+    it('🔑 restart 는 공유 상태를 건드리지 않고 옵션을 트래커에 넘긴다', async () => {
+        // disable()+enable() 로 하면 sharing 이 잠깐 «꺼짐»으로 서버에 기록되고,
+        // 관제는 그 순간 이 사람을 「공유 꺼짐」으로 본다. 구조 앱에서 버튼 한 번에
+        // 위치가 끊기면 안 된다.
+        stubEnv();
+        const tracker = fakeTracker();
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        const patchCalls = globalThis.window.axios.patch.mock.calls.length;
+
+        await sharer.restart({ requestPermissions: true });
+
+        expect(tracker.stop).toHaveBeenCalled();
+        expect(tracker.start).toHaveBeenLastCalledWith(
+            expect.any(Function), expect.any(Function), { requestPermissions: true },
+        );
+        expect(globalThis.window.axios.patch.mock.calls.length).toBe(patchCalls);
+        expect(sharer.state.sharing).toBe(true);
+    });
+
     it('disable 은 트래커를 멈춘다', async () => {
         stubEnv();
         const tracker = fakeTracker();
