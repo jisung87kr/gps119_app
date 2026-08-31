@@ -235,6 +235,10 @@ class FcmSenderTest extends TestCase
     public function test_tag_가_없으면_해당_블록을_보내지_않는다(): void
     {
         // 빈 tag 를 보내면 FCM 이 400 을 준다 — 없으면 «키 자체가 없어야» 한다.
+        //
+        // ⚠️ apns 는 더 이상 «통째로» 없지 않다. sound/interruption-level 이 tag 와
+        //    무관하게 항상 실리기 때문이다(아래 테스트). 여기서 고정하려는 것은
+        //    «collapse-id 를 빈 값으로 보내지 않는다»이므로 그 키만 본다.
         Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
 
         $this->sender()->send($this->device(), $this->message());
@@ -243,7 +247,53 @@ class FcmSenderTest extends TestCase
             $message = $request->data()['message'];
 
             $this->assertArrayNotHasKey('android', $message);
-            $this->assertArrayNotHasKey('apns', $message);
+            $this->assertArrayNotHasKey('headers', $message['apns']);
+
+            return true;
+        });
+    }
+
+    public function test_🔑_i_os_알림은_소리와_time_sensitive_를_달고_나간다(): void
+    {
+        // 실기기 QA(2026-08-31): 알림은 «오는데» 잠금화면에서 화면이 켜지지 않고,
+        // 손으로 깨워야 보였다. 소리도 안 났다.
+        //
+        // 안드로이드는 채널(IMPORTANCE_HIGH)이 heads-up 을 보장하지만 iOS 에서
+        // 그 역할을 하는 건 이 페이로드다. 둘 다 비어 있어 iOS 만 반쪽이었다.
+        // 구조 지령이 «조용히» 도착하면 대원이 배정을 놓친다 — 뱃지와 달리
+        // 이건 편의가 아니라 도달 자체의 문제다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), $this->message());
+
+        Http::assertSent(function ($request) {
+            $aps = $request->data()['message']['apns']['payload']['aps'];
+
+            $this->assertSame('default', $aps['sound']);
+            $this->assertSame('time-sensitive', $aps['interruption-level']);
+
+            return true;
+        });
+    }
+
+    public function test_tag_와_소리가_같은_apns_키를_두고_다투지_않는다(): void
+    {
+        // tag 블록이 `$payload['apns'] = [...]` 로 «통째 대입»이던 시절엔 순서만
+        // 바뀌어도 sound 가 조용히 사라졌다. 셋(collapse-id·sound·badge)이 같은
+        // apns 키를 공유하므로 «함께 살아남는지»를 고정한다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), (new PushMessage(
+            '새 구조요청', '사고', '/control?request=7', [], 'request-7',
+        ))->withBadge(2));
+
+        Http::assertSent(function ($request) {
+            $apns = $request->data()['message']['apns'];
+
+            $this->assertSame('request-7', $apns['headers']['apns-collapse-id']);
+            $this->assertSame('default', $apns['payload']['aps']['sound']);
+            $this->assertSame('time-sensitive', $apns['payload']['aps']['interruption-level']);
+            $this->assertSame(2, $apns['payload']['aps']['badge']);
 
             return true;
         });
