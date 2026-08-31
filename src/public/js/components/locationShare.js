@@ -51,6 +51,51 @@ function waitForAxios() {
     });
 }
 
+/**
+ * 기본 트래커 — 브라우저 `navigator.geolocation`.
+ *
+ * ⚠️ **앱이 백그라운드로 가면 멈춘다.** 그게 N3 가 네이티브 플러그인을 붙이는 이유다.
+ *    여기서는 그 사실을 `supportsBackground: false` 로 «말한다» — 부르는 쪽이
+ *    「화면을 닫으면 끊긴다」를 사용자에게 설명할 수 있어야 하기 때문이다.
+ */
+function webTracker(env = globalThis) {
+    let watchId = null;
+
+    return {
+        kind: 'web',
+        supportsBackground: false,
+        get supported() { return Boolean(env.navigator && 'geolocation' in env.navigator); },
+
+        start(onFix, onError) {
+            if (watchId != null) return;
+            watchId = env.navigator.geolocation.watchPosition(onFix, onError, GEO_OPTIONS);
+        },
+
+        stop() {
+            if (watchId != null) {
+                env.navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+        },
+
+        // 브라우저는 「항상 허용」을 줄 수 없다 — 탭이 죽으면 끝난다.
+        // 그래서 최선이 when_in_use 이고, 그건 «사실»이다(M-5 의 foreground_only).
+        async readPermission() {
+            if (!this.supported) return 'services_off';
+
+            try {
+                const st = await env.navigator.permissions?.query?.({ name: 'geolocation' });
+                if (st?.state === 'granted') return 'when_in_use';
+                if (st?.state === 'denied') return 'denied';
+
+                return 'not_determined';
+            } catch {
+                return null;
+            }
+        },
+    };
+}
+
 export function createLocationSharer(config = {}) {
     const projectId = config.projectId;
     const onChange = typeof config.onChange === 'function' ? config.onChange : () => {};
@@ -65,7 +110,12 @@ export function createLocationSharer(config = {}) {
         error: null,
     };
 
-    let watchId = null;
+    // 위치 «취득»은 트래커가 한다. 이 파일은 «언제 보내는가»만 갖는다 (02 §3-3).
+    //
+    // 🔑 **주입받는다.** 앱에서는 번들이 네이티브 트래커를 window 로 건네고(app.js),
+    //    웹이거나 그 앱이 백그라운드 위치를 모르면 null 이라 아래 웹 구현으로 떨어진다.
+    //    이 파일은 Capacitor 를 영영 모른다 — 셸을 바꿔도 여기는 안 바뀐다.
+    const tracker = config.tracker || webTracker();
     let lastSent = null;   // {lat,lng,t}
     let buffer = [];       // 실패 payload 보관
     let backoffUntil = 0;  // 429 백오프 만료 시각(ms epoch). 0 이면 백오프 아님
@@ -189,15 +239,11 @@ export function createLocationSharer(config = {}) {
     }
 
     function startWatch() {
-        if (watchId != null) return;
-        watchId = navigator.geolocation.watchPosition(handlePosition, handleError, GEO_OPTIONS);
+        tracker.start(handlePosition, handleError);
     }
 
     function stopWatch() {
-        if (watchId != null) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-        }
+        tracker.stop();
     }
 
     return {
@@ -205,7 +251,7 @@ export function createLocationSharer(config = {}) {
 
         // 공유 시작: sharing on(PATCH) + watch 시작
         async enable() {
-            if (!('geolocation' in navigator)) {
+            if (!tracker.supported) {
                 state.permission = 'unsupported';
                 state.error = '이 기기는 위치 기능을 지원하지 않습니다.';
                 emit();
@@ -221,7 +267,7 @@ export function createLocationSharer(config = {}) {
         // enable() 과 달리 PATCH 를 보내지 않는다 — 셸이 매 페이지마다 공유를 다시
         // 켜버리면, 사용자가 끈 공유가 화면을 옮기는 것만으로 되살아난다.
         resume() {
-            if (!('geolocation' in navigator)) {
+            if (!tracker.supported) {
                 state.permission = 'unsupported';
                 emit();
                 return;
