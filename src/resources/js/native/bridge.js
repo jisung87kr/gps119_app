@@ -104,6 +104,14 @@ export const NativeCapability = {
  * 넣을 게 없으면 ①(명시 선언)만으로 판정된다.
  */
 const PLUGIN_FOR = {
+    // M-4 로 고른 @capacitor-community/background-geolocation 이 노출하는 이름.
+    //
+    // 🔑 **셸이 목록을 안 고쳐도 여기서 «실측»된다.** 플러그인이 실제로 들어간 빌드에서만
+    //    참이므로, 앱이 먼저 나가고 웹이 나중에 나가도(또는 그 반대여도) 어긋나지 않는다.
+    //    ADR-0008 의 되돌릴 조건으로 플러그인을 갈아끼우면 바꿀 곳은 이 문자열과
+    //    locationTracker.js 뿐이다.
+    [NativeCapability.BACKGROUND_LOCATION]: 'BackgroundGeolocation',
+
     // ⚠️ '@capacitor/push-notifications' 가 아니라 FirebaseMessaging 이다.
     //    전자는 iOS 에서 «APNs 토큰»을 준다 — 그걸 FCM 에 보내면 INVALID_ARGUMENT 가
     //    오고, 서버는 그걸 「죽은 기기」로 읽어 **살아 있는 아이폰을 폐기**한다.

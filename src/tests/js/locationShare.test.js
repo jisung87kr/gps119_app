@@ -280,3 +280,69 @@ describe('공유 토글', () => {
         expect(h.sharer.state.sharing).toBe(false);
     });
 });
+
+describe('취득 위임 (N3 / 02 §3-3)', () => {
+    /** 주입되는 트래커의 최소 계약만 흉내낸다. */
+    function fakeTracker(over = {}) {
+        return {
+            kind: 'native',
+            supportsBackground: true,
+            supported: true,
+            start: vi.fn(),
+            stop: vi.fn(),
+            ...over,
+        };
+    }
+
+    /** enable() 이 PATCH 를 부르므로 axios 스텁이 있어야 한다(없으면 3초 폴링에 걸린다). */
+    function stubEnv() {
+        globalThis.window = { axios: { post: vi.fn().mockResolvedValue({}), patch: vi.fn().mockResolvedValue({}) } };
+        const watchPosition = vi.fn(() => 1);
+        globalThis.navigator = { geolocation: { watchPosition, clearWatch: vi.fn() } };
+
+        return { watchPosition };
+    }
+
+    it('🔑 트래커를 주면 navigator.geolocation 을 쓰지 않는다', async () => {
+        // 이 파일은 «언제 보내는가»만 갖는다. 취득 경로가 둘로 갈리면
+        // 셸을 바꿀 때마다 전송 로직이 흔들린다.
+        const { watchPosition } = stubEnv();
+        const tracker = fakeTracker();
+
+        await createLocationSharer({ projectId: 1, tracker }).enable();
+
+        expect(tracker.start).toHaveBeenCalledTimes(1);
+        expect(watchPosition).not.toHaveBeenCalled();
+    });
+
+    it('트래커를 안 주면 기존 웹 경로를 그대로 쓴다', async () => {
+        // 하위호환. 앱이 아니거나 구버전 셸이면 여기로 떨어져야 한다.
+        const { watchPosition } = stubEnv();
+
+        await createLocationSharer({ projectId: 1 }).enable();
+
+        expect(watchPosition).toHaveBeenCalledTimes(1);
+    });
+
+    it('disable 은 트래커를 멈춘다', async () => {
+        stubEnv();
+        const tracker = fakeTracker();
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+        await sharer.disable();
+
+        expect(tracker.stop).toHaveBeenCalled();
+    });
+
+    it('트래커가 지원 불가라고 하면 공유를 시작하지 않는다', async () => {
+        stubEnv();
+        const tracker = fakeTracker({ supported: false });
+        const sharer = createLocationSharer({ projectId: 1, tracker });
+
+        await sharer.enable();
+
+        expect(tracker.start).not.toHaveBeenCalled();
+        expect(sharer.state.permission).toBe('unsupported');
+    });
+});

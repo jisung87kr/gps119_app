@@ -110,19 +110,56 @@ Xcode 16+ 에서 앞엣것은 92KB 껍데기라 우리 `AppDelegate` 조차 안 
 여전히 멈춰 있으면 그때 유료로 간다. 그 판단을 「불편해서」가 아니라 **「OS 가 요구하는데
 업스트림이 안 따라온다」** 로 한다.
 
-### 3-3. 브리지 설계
+### 3-3. 브리지 설계 — ✅ 구현됨 (2026-08-31)
 
-웹 코드가 Capacitor 를 직접 알지 않게 어댑터를 하나 둔다.
+웹 코드가 Capacitor 를 직접 알지 않게 어댑터를 둔다. `locationShare.js` 는
+**전송 정책(적응형 주기·버퍼·429 백오프)만 담당**하고 위치 «취득»은 위임한다.
+이렇게 나눠야 셸을 바꿔도 전송 로직이 안 흔들린다.
 
 ```
-resources/js/native/bridge.js
-  ├─ isNativeApp()          → window.Capacitor 존재 여부
-  ├─ startLocationTracking(opts, onFix)
-  │     앱: 네이티브 플러그인 · 웹: 기존 watchPosition
-  └─ stopLocationTracking()
+resources/js/native/bridge.js           «그 앱이 이 기능을 아는가» 판정
+  ├─ isNativeApp() · nativePlatform()
+  └─ hasNativeCapability(BACKGROUND_LOCATION)
+
+resources/js/native/locationTracker.js  «어떻게 얻는가» — 네이티브 어댑터
+  ├─ createNativeLocationTracker(env) → 트래커 | null
+  └─ toLocationPermission(raw)        → M-5 값으로 접기 (경계 매핑)
+
+resources/js/app.js                     window.__gps119Bridge.locationTracker
+public/js/components/locationShare.js   config.tracker 주입, 없으면 웹 경로
 ```
 
-`locationShare.js` 는 **전송 정책(적응형 주기·버퍼·429 백오프)만 담당**하고 위치 «취득»은 브리지에 위임한다. 이렇게 나눠야 셸을 바꿔도 전송 로직이 안 흔들린다.
+⚠️ **애초 설계는 `startLocationTracking()` 을 `bridge.js` «안»에 두는 것이었으나
+파일을 나눴다.** `bridge.js` 는 「그 앱이 이 기능을 아는가」를 판정하는 곳이고, 거기에
+플러그인 세부(`addWatcher` 옵션·payload 변환)를 섞으면 **협상 로직이 묻힌다.**
+갈아끼울 때 봐야 할 곳도 흐려진다.
+
+🔑 **웹 트래커는 브리지 쪽에 «없다».** `createNativeLocationTracker()` 는 네이티브가
+가능할 때만 트래커를 주고 아니면 `null` 이다 — 웹 구현은 `locationShare.js` 안에 이미
+있으므로 여기에 또 만들면 **0-8(같은 로직 두 벌 → 드리프트)이 반복된다.**
+
+🔴 **`null` 을 주는 조건이 그 함수의 절반이다.** 웹이거나 · 플러그인이 없거나(구버전
+셸) · 기능은 있다는데 `Capacitor.Plugins` 에 없으면 `null`. 여기서 잘못 트래커를 주면
+**구버전 앱이 없는 플러그인을 부르다 깨진다.** 「앱이면 네이티브」가 아니라 「그 앱이
+그 기능을 아는가」다.
+
+📌 **`window` 를 거치는 이유.** `public/js/components/*` 는 브라우저에 그대로 서빙되는
+모듈이고 Vite 는 번들에서 `public/` 의 JS import 를 막는다(`vitest.config.js` 주석 참조).
+`import` 로 이을 수 없어서 **한 지점에서만** `window` 로 건네고, 받는 쪽은 «주입»으로
+취급한다. 그래서 `locationShare.js` 는 Capacitor 를 영영 모른다.
+
+📌 플러그인 payload 는 **W3C `GeolocationPosition` «모양»으로 바꿔** 넘긴다. 그게 이미
+안쪽 계약이라 웹 경로는 무변환이고 적응은 네이티브에서만 일어난다. 권한 오류도
+`err.code === err.PERMISSION_DENIED` 계약에 맞춰 접는다 — 안 그러면 권한 거부가
+「알 수 없는 오류」로 표시된다.
+
+🔑 **이 구조가 M-4 를 되돌릴 수 있게 하는 실체다.** [ADR-0008](../../adr/0008-location-permission-as-separate-axis.md)
+와 §3-2 에 적은 되돌릴 조건이 실제로 오면, 갈아끼울 곳은 `locationTracker.js` 와
+`bridge.js` 의 플러그인 이름 문자열 **둘뿐**이다.
+
+⚠️ **네이티브 경로는 실기기 미검증이다.** 셸에 플러그인이 아직 없어 판정이 항상 false 이고
+**지금은 언제나 웹 경로로 돈다.** 테스트(Vitest 22건)는 가짜 Capacitor 로 «계약»만
+고정한 것이다 — 플러그인 배선은 셸 저장소 몫이고 N3 에 남는다.
 
 ## 4. 권한 — 3단계로 나눠 요청한다
 

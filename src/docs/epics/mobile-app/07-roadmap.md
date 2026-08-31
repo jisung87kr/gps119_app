@@ -268,7 +268,7 @@ Android 실기기 logcat + 서버 로그가 오늘 고친 것 셋을 그대로 �
 ### N3 — 네이티브 기능
 
 - 푸시 SDK 연동 + 토큰 등록 + **딥링크 착지**(`?request=` 규약 재사용)
-- 백그라운드 위치 플러그인 + 포그라운드 서비스(Android) / `UIBackgroundModes`(iOS)
+- 백그라운드 위치 플러그인 + 포그라운드 서비스(Android) / `UIBackgroundModes`(iOS)<br>  🟡 **웹 쪽 브리지는 끝났다**([02 §3-3](02-location-accuracy.md)) — 취득이 트래커로 분리돼 주입된다. 남은 건 **셸에 플러그인을 붙이는 것**이고, 그때까지는 판정이 false 라 웹 경로로 돈다
 - 권한 3단계 UX + **「공유 켬 + OS 권한 없음」 상태 표현** — 🟡 **서버는 끝났다**([ADR-0008](../../adr/0008-location-permission-as-separate-axis.md)). 남은 건 **앱의 권한 보고 배선**(`PATCH /events/{id}/location-permission`)과 **관제 배지**
 - ~~정확도(accuracy) 저장 및 관제 노출~~ → **N0 에서 완료.** 여기서는 «백그라운드 픽스의 정확도가 포그라운드보다 나쁜지» 실측만
 - **스로틀·백오프 값 재실측** (N0 의 `30/분` 은 웹 기준 추정치)
