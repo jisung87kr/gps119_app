@@ -73,6 +73,30 @@ class Project extends Model
     }
 
     /**
+     * 🔴 replicate() 는 «유니크 컬럼까지» 그대로 복사해 온다.
+     *
+     * slug 는 복제하는 쪽에서 비워 주고 있었지만 join_code 는 아무도 비우지 않아서,
+     * 행사 복제가 projects_join_code_unique 위반으로 500 이 났다. 한쪽만 비워서 생긴
+     * 문제이므로, «비우는 책임»을 부르는 쪽이 아니라 모델에 둔다 — creating 훅이 둘 다
+     * 「비어 있을 때만」 발급하니, 여기서 비우면 어느 경로로 복제하든 새로 발급된다.
+     *
+     * is_default 도 같이 끈다. 복제본이 두 번째 「상시 운영」이 되면 defaultEvent() 의
+     * firstOrCreate(['is_default' => true]) 가 어느 쪽을 집는지 알 수 없어지고, 일반
+     * 신고가 어느 행사로 귀속되는지도 같이 흔들린다(ADR-0005). 지우지도 못한다 —
+     * deleting 훅이 is_default 를 막는다. 유니크 제약이 없는 자리라 조용히 어긋난다.
+     */
+    public function replicate(?array $except = null)
+    {
+        $clone = parent::replicate($except);
+
+        $clone->slug = null;
+        $clone->join_code = null;
+        $clone->is_default = false;
+
+        return $clone;
+    }
+
+    /**
      * ADR-0005: "상시 운영" 기본 행사. 행사 미지정 신고의 귀속처(항상 활성).
      * 없으면 생성한다(멱등). created_by 는 admin 우선, 없으면 아무 유저.
      */
