@@ -40,6 +40,48 @@
                 </button>
             </div>
 
+            {{--
+                2단계 — 「항상 허용」을 요구하기 «전에» 왜 필요한지 우리 화면으로 설명한다.
+                🔑 OS 다이얼로그는 이유를 못 담는다. 곧바로 띄우면 거절률이 급등하고,
+                   iOS 는 «한 번 거부하면 앱 안에서 다시 못 묻는다».
+            --}}
+            <div v-if="permissionStep === 'explain_always'"
+                 class="mt-5 rounded-2xl border border-warning-500/30 bg-warning-50 p-4">
+                <p class="text-sm font-bold text-warning-600">화면을 끄면 위치가 끊깁니다</p>
+                <p class="mt-1 text-sm leading-relaxed text-ink-600">
+                    지금은 앱을 보고 있을 때만 위치가 전달됩니다.
+                    주머니에 넣거나 다른 앱을 쓰면 상황실에서 내 위치가 멈춥니다.
+                    <strong class="font-bold text-ink-950">「항상 허용」</strong>으로 바꾸면
+                    화면이 꺼져 있어도 전달됩니다.
+                </p>
+                <button type="button" v-on:click="requestAlways"
+                        class="mt-3 w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white">
+                    「항상 허용」으로 바꾸기
+                </button>
+            </div>
+
+            {{--
+                3단계 — 거부됐거나 기기 위치가 꺼진 상태. 기능 제한을 알리고 설정으로 보낸다.
+                🔴 공유를 켜기 «전»에도 뜬다. 켜고 나서야 막힌 걸 알면 그때는 이미 현장이다.
+            --}}
+            <div v-if="permissionStep === 'guide_settings'"
+                 class="mt-5 rounded-2xl border border-danger-200 bg-danger-50 p-4">
+                <p class="text-sm font-bold text-danger-700">
+                    @{{ osPermission === 'services_off' ? '기기의 위치 서비스가 꺼져 있습니다' : '위치 권한이 거부되어 있습니다' }}
+                </p>
+                <p class="mt-1 text-sm leading-relaxed text-ink-600">
+                    지금 상태로는 <strong class="font-bold text-ink-950">위치가 상황실에 전혀 전달되지 않습니다.</strong>
+                    사고가 났을 때 마지막 위치를 알 수 없습니다.
+                </p>
+                <button type="button" v-on:click="openSettings"
+                        class="mt-3 w-full rounded-xl bg-danger-600 px-4 py-2.5 text-sm font-bold text-white">
+                    설정 열기
+                </button>
+                <p v-if="settingsOpenFailed" class="mt-2 text-xs text-ink-500">
+                    설정을 열지 못했습니다. 기기 설정 → GPS119 → 위치 에서 직접 허용해 주세요.
+                </p>
+            </div>
+
             {{-- 상태 --}}
             <div class="mt-5 rounded-2xl p-4" :class="sharing ? 'bg-brand-50' : 'bg-ink-50'">
                 <div class="flex items-center gap-2">
@@ -127,6 +169,10 @@
                     lastAccuracy: null,
                     bufferedCount: 0,
                     error: null,
+                    // 위치 권한 3단계 (02 §4). 판정은 번들의 순수 함수가 한다.
+                    osPermission: null,
+                    permissionStep: 'none',
+                    settingsOpenFailed: false,
                 };
             },
             computed: {
@@ -142,6 +188,40 @@
                 },
             },
             methods: {
+                // 권한을 읽어 서버에 보고하고(M-5) 화면 단계를 갱신한다.
+                async syncPermission() {
+                    const bridge = window.__gps119Bridge;
+                    if (!bridge?.reportLocationPermission) return;
+
+                    this.applyPermission(await bridge.reportLocationPermission(this.projectId));
+                },
+
+                applyPermission(permission) {
+                    this.osPermission = permission;
+                    this.permissionStep = window.__gps119Bridge?.decidePermissionStep?.({
+                        native: window.__gps119Bridge?.isNativeApp,
+                        permission,
+                        sharing: this.sharing,
+                    }) ?? 'none';
+                },
+
+                // 2단계 — 설명을 읽은 뒤 「항상 허용」 OS 프롬프트로 간다.
+                //
+                // 🔑 프롬프트를 직접 못 띄운다. 이 플러그인은 addWatcher 안에서만
+                //    권한을 요청하므로(requestPermissions), 추적을 «다시 시작»하는 것이
+                //    곧 요청이다. 그래서 껐다 켠다.
+                async requestAlways() {
+                    await this.sharer.disable();
+                    await this.sharer.enable();
+                    await this.syncPermission();
+                },
+
+                // 3단계 — 설정 앱으로 보낸다.
+                async openSettings() {
+                    const ok = await window.__gps119Bridge?.openLocationSettings?.();
+                    this.settingsOpenFailed = !ok;
+                },
+
                 applyState(s) {
                     this.sharing = s.sharing;
                     this.permission = s.permission;
@@ -167,11 +247,23 @@
                 });
                 // 브라우저 QA용 전역 노출(셀렉터/제어 가능)
                 window.__locationShare = this.sharer;
-                // 입장 후 자동 시작(권한 프롬프트 → watchPosition)
+                // 입장 후 자동 시작 — 이게 «1단계»다(사용 중에만 허용).
                 this.sharer.enable();
+
+                // 2·3단계는 여기서 갈린다. 🔴 공유를 켜기 «전»에도 읽는다 —
+                // 「켜고 나서야 막힌 걸 아는」 순서면 대원은 이미 현장에 있다.
+                this.syncPermission();
+
+                // iOS 는 「항상 허용」을 나중에 다시 물어보고, 사용자가 「사용 중」으로
+                // 되돌리면 배경 추적이 «조용히» 끊긴다. 복귀할 때마다 다시 읽는다.
+                this.stopWatchingPermission = window.__gps119Bridge?.watchPermissionChanges?.(
+                    this.projectId,
+                    (p) => this.applyPermission(p),
+                ) ?? (() => {});
             },
             beforeUnmount() {
                 if (this.sharer) this.sharer.destroy();
+                this.stopWatchingPermission?.();
             },
         }).mount('#eventActiveApp');
     </script>
