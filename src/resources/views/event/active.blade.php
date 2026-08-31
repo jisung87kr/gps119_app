@@ -123,14 +123,7 @@
     </div>
 
     <script type="module">
-        {{--
-            🔴 **캐시 버스팅이 필요하다.** 이 파일은 Vite 번들이 아니라 public/ 에서
-               «원본 그대로» 서빙되므로 해시가 안 붙는다. 그래서 파일을 고쳐도 웹뷰가
-               옛 사본을 계속 쓴다 — 실기기에서 3시간 전 사본을 물고 있어 새로 추가한
-               메서드가 없었고, 버튼을 눌러도 «아무 일도 안 일어났다»(2026-08-31).
-               증상이 「버튼이 안 눌린다」 하나뿐이라 UI 문제로 오진하기 쉽다.
-        --}}
-        import { createLocationSharer } from '/js/components/locationShare.js?v={{ @filemtime(public_path('js/components/locationShare.js')) ?: time() }}';
+        import { createLocationSharer } from '/js/components/locationShare.js';
 
         const { createApp } = Vue;
 
