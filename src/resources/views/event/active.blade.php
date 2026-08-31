@@ -84,7 +84,7 @@
             {{-- 🔑 상태가 이미 권한 문제를 말하고 있으면 오류줄을 겹쳐 띄우지 않는다.
                  「위치 공유 중」 옆에 빨간 거부 문구가 같이 뜨던 것이 이 화면의 결함이었다.
                  남는 것은 타임아웃 같은 «일시적» 오류뿐이다. --}}
-            <p v-if="error && shareStatus.tone !== 'danger'"
+            <p v-if="sharing && error && shareStatus.tone !== 'danger'"
                class="mt-3 text-sm font-bold text-danger-600">@{{ error }}</p>
         </x-ui.card>
 
@@ -179,6 +179,7 @@
                         permissionStep: this.permissionStep,
                         osPermission: this.osPermission,
                         webPermission: this.permission,
+                        native: Boolean(window.__gps119Bridge?.isNativeApp),
                     }) ?? { label: this.sharing ? '위치 공유 중' : '공유 중지됨', hint: null, action: null, tone: this.sharing ? 'ok' : 'muted' };
 
                     return { ...s, ...TONE[s.tone] };

@@ -134,6 +134,7 @@ export function shareStatus({
     permissionStep = 'none',
     osPermission = null,
     webPermission = null,
+    native = false,
 } = {}) {
     if (!sharing) {
         // 끈 사람에게 붉은 경고를 띄우면 진짜 이상이 묻힌다.
@@ -170,9 +171,13 @@ export function shareStatus({
     if (webPermission === 'denied') {
         return {
             label: '위치 권한이 없습니다',
-            hint: '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다. 주소창의 위치 아이콘에서 허용으로 바꿔 주세요.',
+            // 🔴 **고치는 곳이 웹과 앱이 다르다.** 앱에서 「주소창」을 안내하면
+            //    사용자는 있지도 않은 UI 를 찾는다 — 웹뷰에는 브라우저 UI 가 없다.
+            hint: native
+                ? '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다. 설정 → GPS119 → 위치 에서 허용해 주세요.'
+                : '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다. 주소창의 위치 아이콘에서 허용으로 바꿔 주세요.',
             // 🔑 웹에는 설정을 열 방법이 없다. 누를 수 없는 버튼을 두지 않는다.
-            action: null,
+            action: native ? 'settings' : null,
             tone: 'danger',
         };
     }

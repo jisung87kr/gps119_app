@@ -85,6 +85,23 @@ describe('shareStatus — 상태가 «진실»을 말한다', () => {
         expect(s.action).toBeNull();
     });
 
+    it('🔴 앱에서는 「주소창」을 안내하지 않는다 — 웹뷰엔 그런 UI 가 없다', () => {
+        // 앱에서 「브라우저 설정에서 허용해 주세요」가 떴다(2026-08-31 실기기).
+        // 사용자는 있지도 않은 주소창을 찾게 된다.
+        const app = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'denied', native: true });
+        const web = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'denied', native: false });
+
+        expect(app.hint).not.toContain('주소창');
+        expect(app.hint).toContain('설정');
+        expect(web.hint).toContain('주소창');
+    });
+
+    it('앱에서는 설정을 열 수 있으므로 조치를 준다', () => {
+        const app = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'denied', native: true });
+
+        expect(app.action).toBe('settings');
+    });
+
     it('🔑 네이티브 판정이 웹 신호보다 «먼저»다', () => {
         // 앱에서도 webPermission 은 채워진다. 순서가 뒤집히면 앱에서 「설정 열기」
         // 조치를 못 주게 되고, 그러면 3단계 UX 가 사라진다.

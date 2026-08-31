@@ -262,7 +262,7 @@ export function createLocationSharer(config = {}) {
 
     function handleError(err) {
         if (err && err.code === err.PERMISSION_DENIED) state.permission = 'denied';
-        state.error = geoErrorMessage(err);
+        state.error = geoErrorMessage(err, tracker.kind === 'native');
         emit();
     }
 
@@ -335,6 +335,10 @@ export function createLocationSharer(config = {}) {
         async disable() {
             state.sharing = false;
             lastSent = null;
+            // 🔑 **껐으면 이전 오류도 지운다.** 안 지우면 「공유 중지됨」 아래에
+            //    「위치 권한이 거부되었습니다」가 계속 남아, 끈 사람에게 고칠 것도 없는
+            //    경고를 보여준다(2026-08-31 실기기).
+            state.error = null;
             stopWatch();
             emit();
             await patchSharing(false);
@@ -365,10 +369,22 @@ export function createLocationSharer(config = {}) {
     };
 }
 
-function geoErrorMessage(err) {
+/**
+ * 오류 문구.
+ *
+ * 🔴 **웹과 앱은 «고치는 곳»이 다르다.** 앱에서 「브라우저 설정에서 허용해 주세요」라고
+ *    하면 사용자는 있지도 않은 주소창을 찾는다 — 앱 웹뷰에는 브라우저 UI 가 없다.
+ *    실제로 앱에서 그 문구가 떴다(2026-08-31).
+ *
+ * @param {boolean} isNative 앱(웹뷰) 안인가
+ */
+function geoErrorMessage(err, isNative = false) {
     if (!err) return '위치 오류';
     switch (err.code) {
-        case err.PERMISSION_DENIED: return '위치 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.';
+        case err.PERMISSION_DENIED:
+            return isNative
+                ? '위치 권한이 거부되었습니다. 설정 → GPS119 → 위치 에서 허용해 주세요.'
+                : '위치 권한이 거부되었습니다. 주소창의 위치 아이콘에서 허용해 주세요.';
         case err.POSITION_UNAVAILABLE: return '위치 정보를 사용할 수 없습니다.';
         case err.TIMEOUT: return '위치 확인 시간이 초과되었습니다(재시도).';
         default: return '위치 오류가 발생했습니다.';
