@@ -99,7 +99,10 @@
         <div class="relative border-t border-slate-100 p-3">
             <div x-show="user" x-cloak @click.away="user = false" x-transition
                  class="absolute left-3 right-3 bottom-[68px] bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                {{-- 🔴 앱(웹뷰)에는 주소창이 없다. 관리자가 자기 «참가자» 화면으로 갈 길은
+                     이 메뉴뿐이고, 여기가 막히면 앱에서 위치공유·활동 화면을 볼 수 없다. --}}
                 <a href="{{ route('dashboard') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">사용자 페이지</a>
+                <a href="{{ route('events.join') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">행사 참가</a>
                 <a href="{{ route('profile.show') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">프로필</a>
                 <form method="POST" action="{{ route('logout') }}">@csrf
                     <button type="submit" class="block w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">로그아웃</button>

@@ -24,8 +24,25 @@
             <x-ui.stat label="완료" :value="$stats['completed']" />
         </div>
 
-        {{-- 참가 중인 행사 — 운영 인력이 자기 행사(활동/지령) 화면으로 가는 통로 --}}
-        @if ($myEvents->isNotEmpty())
+        {{--
+            참가 중인 행사 — 운영 인력이 자기 행사(활동/지령) 화면으로 가는 통로.
+
+            🔴 **참가한 행사가 없으면 이 절이 통째로 사라졌다.** 그러면 앱에서는
+               행사에 참가할 방법이 «전혀» 없다 — 앱 셸에는 주소창이 없고, QR 은
+               폰 기본 카메라가 읽어 Safari 로 열리기 때문이다(Universal Links 미설정).
+               실제로 실기기 테스트가 여기서 막혔다(2026-08-31).
+        --}}
+        @if ($myEvents->isEmpty())
+            <x-ui.section title="내 행사">
+                <x-ui.card>
+                    <p class="text-sm leading-relaxed text-ink-600">
+                        아직 참가 중인 행사가 없습니다.
+                        주최측이 안내한 <strong class="font-bold text-ink-950">6자리 입장 코드</strong>로 참가할 수 있습니다.
+                    </p>
+                    <x-ui.button :href="route('events.join')" class="mt-4">행사 참가하기</x-ui.button>
+                </x-ui.card>
+            </x-ui.section>
+        @else
             <x-ui.section title="내 행사" :meta="$myEvents->count().'개'">
                 <x-ui.list>
                     @foreach ($myEvents as $participant)
@@ -51,6 +68,14 @@
                         </x-ui.list-item>
                     @endforeach
                 </x-ui.list>
+
+                {{-- 이미 참가 중이어도 «다른» 행사에 들어갈 길은 있어야 한다.
+                     한 사람이 두 행사를 오가는 운용이 실제로 있다(last_entered_at 이 그 근거다). --}}
+                <div class="mt-3 px-1">
+                    <a href="{{ route('events.join') }}" class="text-sm font-bold text-brand-600 underline underline-offset-2">
+                        다른 행사 참가하기
+                    </a>
+                </div>
             </x-ui.section>
         @endif
 
