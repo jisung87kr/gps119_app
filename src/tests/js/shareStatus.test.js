@@ -45,11 +45,55 @@ describe('shareStatus — 상태가 «진실»을 말한다', () => {
         expect(s.action).toBeNull();
     });
 
-    it('웹(step=none)에서는 그냥 공유 중이다 — 브라우저는 그게 정상이다', () => {
-        const s = shareStatus({ sharing: true, permissionStep: 'none' });
+    it('웹에서 권한이 «허용»이면 그냥 공유 중이다 — 브라우저는 그게 정상이다', () => {
+        const s = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'granted' });
 
         expect(s.tone).toBe('ok');
         expect(s.action).toBeNull();
+    });
+
+    it('🔴 웹에서 권한이 거부됐는데 «공유 중»이라고 말하지 않는다', () => {
+        // PC 실측(2026-08-31): 초록 「위치 공유 중」과 빨간 「권한이 거부되었습니다」가
+        // 같은 카드에 함께 떴다. decidePermissionStep 이 웹에서 늘 'none' 이라
+        // 상태가 웹의 권한 신호를 아예 안 보고 있었다.
+        const s = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'denied' });
+
+        expect(s.tone).toBe('danger');
+        expect(s.label).not.toContain('공유 중');
+    });
+
+    it('🔑 웹에서는 «설정 열기» 조치를 주지 않는다 — 열 방법이 없다', () => {
+        // 누를 수 없는 버튼을 두면 사용자는 눌러보고 아무 일도 없는 것을 겪는다.
+        const s = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'denied' });
+
+        expect(s.action).toBeNull();
+        expect(s.hint).toContain('주소창');
+    });
+
+    it('권한을 아직 못 받았으면 «공유 중»이 아니라 «기다리는 중»이다', () => {
+        // 한 건도 못 보낸 상태에서 「공유 중」이라고 말하면 그것도 거짓이다.
+        const s = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'prompt' });
+
+        expect(s.tone).toBe('warning');
+        expect(s.label).toContain('기다리는');
+    });
+
+    it('위치를 지원하지 않는 기기도 구분한다', () => {
+        const s = shareStatus({ sharing: true, permissionStep: 'none', webPermission: 'unsupported' });
+
+        expect(s.tone).toBe('danger');
+        expect(s.action).toBeNull();
+    });
+
+    it('🔑 네이티브 판정이 웹 신호보다 «먼저»다', () => {
+        // 앱에서도 webPermission 은 채워진다. 순서가 뒤집히면 앱에서 「설정 열기」
+        // 조치를 못 주게 되고, 그러면 3단계 UX 가 사라진다.
+        const s = shareStatus({
+            sharing: true, permissionStep: 'guide_settings',
+            osPermission: 'denied', webPermission: 'denied',
+        });
+
+        expect(s.action).toBe('settings');
     });
 
     it('🔑 조치 버튼은 «필요할 때만» 나온다', () => {

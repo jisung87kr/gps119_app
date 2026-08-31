@@ -129,7 +129,12 @@ export function watchPermissionChanges(projectId, onChange, env = globalThis) {
  *
  * @returns {{label: string, hint: string|null, action: 'settings'|'always'|null, tone: string}}
  */
-export function shareStatus({ sharing = false, permissionStep = 'none', osPermission = null } = {}) {
+export function shareStatus({
+    sharing = false,
+    permissionStep = 'none',
+    osPermission = null,
+    webPermission = null,
+} = {}) {
     if (!sharing) {
         // 끈 사람에게 붉은 경고를 띄우면 진짜 이상이 묻힌다.
         return { label: '공유 중지됨', hint: null, action: null, tone: 'muted' };
@@ -148,6 +153,40 @@ export function shareStatus({ sharing = false, permissionStep = 'none', osPermis
         };
     }
 
+    // 🔴 **웹의 권한 신호도 봐야 한다.** decidePermissionStep 은 웹에서 항상 'none' 이다
+    //    (브라우저엔 「항상 허용」이라는 개념이 없으니 의도한 동작이다). 그것만 보면
+    //    브라우저가 위치를 «거부»했는데도 「위치 공유 중」이라고 말하게 된다 —
+    //    실제로 PC 에서 초록 불과 빨간 오류가 함께 떴다(2026-08-31).
+    //    앱에서도 이 값은 채워지므로, 위 네이티브 분기 «뒤»에 둬서 순서를 지킨다.
+    if (webPermission === 'unsupported') {
+        return {
+            label: '이 기기에서는 위치를 쓸 수 없습니다',
+            hint: '브라우저나 기기가 위치 기능을 지원하지 않습니다.',
+            action: null,
+            tone: 'danger',
+        };
+    }
+
+    if (webPermission === 'denied') {
+        return {
+            label: '위치 권한이 없습니다',
+            hint: '지금 상태로는 상황실에 위치가 전혀 전달되지 않습니다. 주소창의 위치 아이콘에서 허용으로 바꿔 주세요.',
+            // 🔑 웹에는 설정을 열 방법이 없다. 누를 수 없는 버튼을 두지 않는다.
+            action: null,
+            tone: 'danger',
+        };
+    }
+
+    if (webPermission === 'prompt') {
+        // 아직 한 건도 못 보낸 상태다. 「공유 중」이라고 말하면 그것도 거짓이다.
+        return {
+            label: '위치 권한을 기다리는 중',
+            hint: '위치 사용을 물어보면 허용해 주세요.',
+            action: null,
+            tone: 'warning',
+        };
+    }
+
     if (permissionStep === 'explain_always') {
         return {
             label: '앱 열려 있을 때만 전달됩니다',
@@ -157,6 +196,5 @@ export function shareStatus({ sharing = false, permissionStep = 'none', osPermis
         };
     }
 
-    // 웹(step=none)도 여기다 — 브라우저는 탭이 열려 있는 동안 정상 동작이다.
     return { label: '위치 공유 중', hint: null, action: null, tone: 'ok' };
 }
