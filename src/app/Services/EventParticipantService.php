@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\EventRole;
+use App\Enums\LocationPermission;
 use App\Enums\ParticipantStatus;
 use App\Models\EventParticipant;
 use App\Models\EventRoster;
@@ -120,6 +121,36 @@ class EventParticipantService
     }
 
     /**
+     * 앱이 보고한 OS 위치 권한 상태를 기록한다 (M-5, ADR-0008).
+     *
+     * ⚠️ **ping 에 실어 보낼 수 없어서 별도 진입점이 필요하다.** 권한이 끊기면 ping 도
+     *    끊기므로, 정작 알아야 할 순간에 아무것도 안 온다. 앱은 포그라운드 복귀·공유
+     *    토글·OS 권한 변경 콜백에서 «공유가 꺼져 있어도» 보고한다.
+     *
+     * 🔑 **`sharing_location` 을 건드리지 않는다.** 의도와 능력은 다른 축이고,
+     *    권한이 없다고 사용자의 «켬»을 서버가 꺼버리면 권한을 되돌렸을 때 왜 안 되는지
+     *    아무도 모른다. 되돌아오면 그대로 다시 흐르는 편이 맞다.
+     *
+     * 멱등하다. 같은 값을 여러 번 보내도 시각만 갱신된다 — 그 시각이 「언제 본
+     * 상태인가」라서 갱신되는 게 맞다.
+     */
+    public function setLocationPermission(
+        Project $project,
+        User $user,
+        LocationPermission $permission,
+    ): EventParticipant {
+        $participant = EventParticipant::where('project_id', $project->id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $participant->location_permission = $permission;
+        $participant->location_permission_at = now();
+        $participant->save();
+
+        return $participant;
+    }
+
+    /**
      * 관제 초기 로드/폴백용 roster (SPEC-04b/06b).
      *
      * active 참가 전원의 최신 위치 캐시 + 역할 + online 여부를 1쿼리로 반환.
@@ -146,6 +177,10 @@ class EventParticipantService
             'last_accuracy' => $p->last_accuracy,
             'last_seen_at' => $p->last_seen_at?->toISOString(),
             'online' => $p->isOnline($onlineThresholdSeconds),
+            // M-5 — 「공유 켬 + 권한 없음」을 관제가 구분할 수 있게 한다.
+            // 세 축의 조합은 모델이 «한 번만» 한다(0-8 의 교훈). 화면은 이 값으로 분기한다.
+            'sharing_location' => $p->sharing_location,
+            'tracking_state' => $p->trackingState($onlineThresholdSeconds)->value,
         ])->all();
     }
 }

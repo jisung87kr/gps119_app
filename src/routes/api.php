@@ -52,6 +52,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/events/{id}/sharing', [LocationApiController::class, 'sharing'])
         ->middleware('event.member')->name('api.events.sharing');
 
+    // OS 위치 권한 보고 (M-5, ADR-0008).
+    // ⚠️ /location(ping)과 «합치면 안 된다» — 권한이 끊기면 ping 도 끊겨서, 정작
+    //    알아야 할 순간에 아무것도 안 온다. 공유가 꺼져 있어도 받는다.
+    //    호출 빈도는 낮다(포그라운드 복귀·토글·권한 변경 콜백)이므로 ping 만큼
+    //    느슨한 스로틀이 필요 없다.
+    Route::patch('/events/{id}/location-permission', [LocationApiController::class, 'locationPermission'])
+        ->middleware(['event.member', 'throttle:20,1'])->name('api.events.location-permission');
+
     // 지령(출동) (실시간 관제 — BE-3.3 / SPEC-06b)
     // 배정: 해당 신고 행사의 controller (event.role 은 {requestId}→신고→행사 해석)
     Route::post('/requests/{requestId}/dispatch', [DispatchApiController::class, 'store'])
