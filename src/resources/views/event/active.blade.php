@@ -61,7 +61,7 @@
                 <p v-if="shareStatus.hint" class="mt-1.5 text-sm leading-relaxed text-ink-600">
                     @{{ shareStatus.hint }}
                     <button v-if="shareStatus.action" type="button"
-                            v-on:click="shareStatus.action === 'settings' ? openSettings() : requestAlways()"
+                            v-on:click="shareStatus.action === 'settings' ? openSettings() : openDisclosure()"
                             class="font-bold text-brand-600 underline underline-offset-2">
                         @{{ shareStatus.action === 'settings' ? '설정 열기' : '항상 허용으로 바꾸기' }}
                     </button>
@@ -120,6 +120,44 @@
             @endif
             <x-ui.button :href="route('dashboard')" variant="ghost">홈으로</x-ui.button>
         </div>
+
+        {{--
+            백그라운드 위치 사전 고지 (Play 정책 / docs/store/background-location-video.md).
+
+            🔴 **바깥을 눌러서 닫히지 않는다.** 「다음」이나 「나중에」를 눌러야 한다 —
+               사용자가 «지나칠 수 있는» 고지는 고지로 인정되지 않는다.
+            🔑 문구는 두 가지를 반드시 말해야 한다: 앱을 «쓰지 않는 동안에도» 수집한다는
+               사실과, 그것이 «무엇에 쓰이는지». 하나라도 빠지면 반려 사유다.
+        --}}
+        <div v-if="disclosureOpen"
+             class="fixed inset-0 z-[120] flex items-end justify-center bg-ink-950/40 px-0 sm:items-center sm:px-5"
+             role="dialog" aria-modal="true" aria-labelledby="bgLocTitle">
+            <div class="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 sm:max-w-md sm:rounded-3xl">
+                <span class="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                    <x-ui.icon name="pin" class="h-6 w-6" />
+                </span>
+
+                <h2 id="bgLocTitle" class="mt-4 break-keep text-lg font-extrabold leading-snug text-ink-950">
+                    화면을 꺼도 위치를 보내려면 「항상 허용」이 필요합니다
+                </h2>
+
+                <p class="mt-3 break-keep text-sm leading-relaxed text-ink-600">
+                    허용하면 GPS119 는 <strong class="font-bold text-ink-950">앱을 보고 있지 않을 때나
+                    화면이 꺼져 있는 동안에도</strong> 위치를 수집해 상황실 지도에 표시합니다.
+                    사고가 났을 때 구조대가 정확한 지점으로 가기 위해서입니다.
+                </p>
+
+                <p class="mt-3 break-keep text-sm leading-relaxed text-ink-600">
+                    수집은 <strong class="font-bold text-ink-950">행사에 참가 중이고, 위치 공유를 켜 둔
+                    동안에만</strong> 이루어집니다. 공유를 끄면 즉시 멈춥니다.
+                </p>
+
+                <div class="mt-6 space-y-2.5">
+                    <x-ui.button vue-click="confirmDisclosure">다음</x-ui.button>
+                    <x-ui.button variant="secondary" vue-click="disclosureOpen = false">나중에</x-ui.button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -156,6 +194,8 @@
                     osPermission: null,
                     permissionStep: 'none',
                     settingsOpenFailed: false,
+                    // 백그라운드 수집 사전 고지(Play 정책). 권한 요청 «앞»에 선다.
+                    disclosureOpen: false,
                     // 승격을 시도했는데 권한이 그대로였다 = iOS 가 프롬프트를 안 띄웠다.
                     alwaysPromptUnavailable: false,
                     requesting: false,
@@ -225,6 +265,24 @@
                         permission,
                         sharing: this.sharing,
                     }) ?? 'none';
+                },
+
+                // 🔴 **Play 정책: 사전 고지(prominent disclosure).**
+                //    백그라운드 위치를 «요청하기 전에», OS 프롬프트가 아니라 우리 화면으로
+                //    「앱을 쓰지 않는 동안에도 수집한다」와 그 «용도»를 말해야 한다.
+                //    OS 대화상자는 이 고지를 대신하지 못한다 — 심사에서 그것만으로는
+                //    반려된다. 시연 영상의 필수 컷이기도 하다
+                //    (docs/store/background-location-video.md 컷 3).
+                //
+                // 🔑 토스트·스낵바로 띄우면 «사용자가 놓칠 수 있는» 고지라 정책 위반이다.
+                //    사용자가 「다음」을 누르기 전에는 권한 요청으로 넘어가지 않는다.
+                openDisclosure() {
+                    this.disclosureOpen = true;
+                },
+
+                async confirmDisclosure() {
+                    this.disclosureOpen = false;
+                    await this.requestAlways();
                 },
 
                 // 2단계 — 설명을 읽은 뒤 「항상 허용」 OS 프롬프트로 간다.
