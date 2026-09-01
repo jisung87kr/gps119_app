@@ -18,11 +18,13 @@
 
             {{-- 바깥 겹은 overflow 없음(위치 버튼이 시트 위로 떠야 함), 스크롤은 안쪽 --}}
             <div id="bottom-sheet"
-                 class="absolute inset-x-0 bottom-0 z-20 transition-transform duration-300 ease-out"
-                 {{-- 접힘 노출 높이 = 핸들 행(h-11=44px) + border-t(1px) + 안전영역.
-                     🔴 안전영역을 빼먹으면 안드로이드 3버튼 내비바가 손잡이를
-                        통째로 덮는다 — 45px 는 내비바보다 얇다(실기기 2026-09-01). --}}
-                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem_-_var(--safe-bottom))]'">
+                 class="absolute inset-x-0 bottom-[var(--safe-bottom)] z-20 transition-transform duration-300 ease-out"
+                 {{-- 접힘 노출 높이 = 핸들 행(h-11=44px) + border-t(1px).
+                     🔴 안전영역은 여기가 아니라 시트 «위치»(bottom)로 준다.
+                        노출 높이에 더하면 시트가 올라오는 게 아니라 «더 많이 보여서»
+                        핸들 아래 내용까지 드러나고, 그게 다시 내비바에 걸린다
+                        (실기기에서 그렇게 나왔다, 2026-09-01). --}}
+                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
 
                 <location-button :loading="loading" v-on:get-location="getMyLocation"></location-button>
 
@@ -115,7 +117,7 @@
                                        title="내 현재 위치" tone="brand"></location-info>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3 px-5 pb-[calc(1.25rem+var(--safe-bottom))] pt-4">
+                    <div class="grid grid-cols-2 gap-3 px-5 pb-5 pt-4">
                         <x-ui.button variant="secondary" vue-click="showRequestLocation">
                             <x-ui.icon name="pin" class="h-5 w-5 text-danger-600" />
                             요청지 보기

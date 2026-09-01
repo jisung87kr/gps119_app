@@ -55,10 +55,10 @@
             top 이 음수인 버튼을 잘라먹는다)
         --}}
         <div id="bottom-sheet"
-             class="absolute inset-x-0 bottom-0 z-20 transition-transform duration-300 ease-out"
+             class="absolute inset-x-0 bottom-[var(--safe-bottom)] z-20 transition-transform duration-300 ease-out"
              {{-- 접힘 높이 = 그랩 핸들 행(h-11=44px) + 시트 border-t(1px) = 45px.
                   이 값이 어긋나면 아래 내용 한 줄이 반쯤 걸쳐 잘린다 --}}
-             :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem_-_var(--safe-bottom))]'">
+             :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
 
             {{-- 현재 위치 재조회 — 시트를 따라 움직인다 --}}
             <location-button :loading="loading" v-on:get-location="getLocation"></location-button>
@@ -131,7 +131,7 @@
                 </div>
 
                 {{-- 상황 버튼 2x2 — 2단계 구분은 RequestType::actionTone() 이 결정 --}}
-                <div class="grid grid-cols-2 gap-2.5 px-5 pb-[calc(1.5rem+var(--safe-bottom))] pt-1">
+                <div class="grid grid-cols-2 gap-2.5 px-5 pb-6 pt-1">
                     @foreach (RequestType::cases() as $type)
                         <x-ui.action-button
                             :tone="$type->actionTone()"
