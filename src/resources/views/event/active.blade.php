@@ -87,6 +87,29 @@
                 </p>
             </div>
 
+            {{--
+                배터리 최적화 경고 (M-26).
+
+                🔴 **이게 없으면 화면을 끄는 순간 위치 전송이 «완전히» 멈춘다**
+                   (실측 0건 → 예외 등록 후 9건). 그런데 앱은 멀쩡히 돌고 알림도 떠
+                   있어서 **사용자도 관제도 끊긴 줄 모른다** — M-5 가 막으려던
+                   «거짓 안심»과 같은 종류라 반드시 말해야 한다.
+
+                🔑 판정은 번들의 순수 함수가 한다(Vitest). 안드로이드가 아니거나,
+                   공유가 꺼져 있거나, 이미 제외돼 있거나, «모르면» 뜨지 않는다.
+            --}}
+            <div v-if="batteryWarn" class="mt-3 rounded-2xl bg-warning-50 p-4">
+                <p class="text-sm font-bold text-warning-700">@{{ batteryText.title }}</p>
+                <p class="mt-1.5 break-keep text-sm leading-relaxed text-ink-600">@{{ batteryText.body }}</p>
+                <button type="button" v-on:click="openBatterySettings"
+                        class="mt-2.5 text-sm font-bold text-brand-600 underline underline-offset-2">
+                    @{{ batteryText.action }}
+                </button>
+                <p v-if="batterySettingsFailed" class="mt-1.5 text-xs text-ink-500">
+                    설정을 열지 못했습니다. 설정 앱에서 배터리 › 사용량 관리 › 절전 제외에 GPS119 를 추가해 주세요.
+                </p>
+            </div>
+
             {{-- 🔑 상태가 이미 권한 문제를 말하고 있으면 오류줄을 겹쳐 띄우지 않는다.
                  「위치 공유 중」 옆에 빨간 거부 문구가 같이 뜨던 것이 이 화면의 결함이었다.
                  남는 것은 타임아웃 같은 «일시적» 오류뿐이다. --}}
@@ -249,6 +272,10 @@
                     consentChecked: [],
                     consentSubmitting: false,
                     consentError: null,
+                    // 배터리 최적화 (M-26). 안드로이드에서만 값이 찬다.
+                    batteryWarn: false,
+                    batteryText: null,
+                    batterySettingsFailed: false,
                     // 승격을 시도했는데 권한이 그대로였다 = iOS 가 프롬프트를 안 띄웠다.
                     alwaysPromptUnavailable: false,
                     requesting: false,
@@ -320,6 +347,22 @@
                     }) ?? 'none';
                 },
 
+                // 배터리 최적화 (M-26).
+                //
+                // 🔑 **포그라운드로 돌아올 때마다 다시 읽는다.** 사용자가 설정에서
+                //    고치고 돌아오는 흐름이라, 한 번만 읽으면 고쳐도 경고가 남는다 —
+                //    권한 3단계에서 같은 실수를 한 적이 있다.
+                async syncBattery() {
+                    const res = await window.__gps119Bridge?.checkBatteryOptimization?.(this.sharing);
+                    this.batteryWarn = Boolean(res?.warn);
+                    this.batteryText = window.__gps119Bridge?.BATTERY_WARNING ?? null;
+                },
+
+                async openBatterySettings() {
+                    const opened = await window.__gps119Bridge?.openBatteryOptimizationSettings?.();
+                    this.batterySettingsFailed = opened === false;
+                },
+
                 // 🔴 **Play 정책: 사전 고지(prominent disclosure).**
                 //    백그라운드 위치를 «요청하기 전에», OS 프롬프트가 아니라 우리 화면으로
                 //    「앱을 쓰지 않는 동안에도 수집한다」와 그 «용도»를 말해야 한다.
@@ -386,6 +429,9 @@
 
                     // 🔑 서버가 «막았다»는 사실만 받아온다. 무엇에 동의해야 하는지는
                     //    서버가 준 목록을 그대로 쓴다 — 화면에서 다시 만들면 어긋난다.
+                    // 공유를 켜고 끌 때 배터리 경고 조건이 바뀐다(끄면 안 띄운다).
+                    if (this.batteryWarn !== false || s.sharing) this.syncBattery();
+
                     this.consentItems = s.consentRequired ?? [];
                     if (this.consentItems.length === 0) {
                         this.consentChecked = [];
@@ -453,10 +499,22 @@
                     this.projectId,
                     (p) => this.applyPermission(p),
                 ) ?? (() => {});
+
+                // 배터리 최적화 (M-26).
+                //
+                // 🔑 **복귀할 때마다 다시 읽는다.** 사용자가 설정에서 고치고 돌아오는
+                //    흐름이라, 한 번만 읽으면 «고쳤는데도 경고가 남는» 화면이 된다.
+                //    권한 3단계에서 같은 실수를 했다(02 §4).
+                this.syncBattery();
+                this._onVisible = () => {
+                    if (!document.hidden) this.syncBattery();
+                };
+                document.addEventListener('visibilitychange', this._onVisible);
             },
             beforeUnmount() {
                 if (this.sharer) this.sharer.destroy();
                 this.stopWatchingPermission?.();
+                if (this._onVisible) document.removeEventListener('visibilitychange', this._onVisible);
             },
         }).mount('#eventActiveApp');
     </script>

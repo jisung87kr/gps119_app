@@ -1,5 +1,10 @@
 import './bootstrap';
 import { initErrorReporting } from './errorReport';
+import {
+    BATTERY_WARNING,
+    checkBatteryOptimization,
+    openBatteryOptimizationSettings,
+} from './native/batteryOptimization';
 import { isNativeApp, nativeInfo, nativePlatform } from './native/bridge';
 import { initPwa } from './pwa';
 import { initPushToggles } from './push-toggle';
@@ -59,4 +64,10 @@ window.__gps119Bridge = {
     watchPermissionChanges,
     shareStatus,
     shouldRestartTracking,
+
+    // 배터리 최적화 (M-26). 안드로이드는 이게 없으면 화면을 끄는 순간
+    // 위치 전송이 «완전히» 멈추는데, 앱은 멀쩡해 보인다.
+    checkBatteryOptimization,
+    openBatteryOptimizationSettings,
+    BATTERY_WARNING,
 };
