@@ -222,7 +222,10 @@ public/js/components/locationShare.js   config.tracker 주입, 없으면 웹 경
 
 ⚠️ **지금 통과한 것은 adb 로 넣은 «기기 설정»이다**(`dumpsys deviceidle whitelist +pkg`).
    코드가 아니므로 **사용자 기기에는 적용되지 않는다.** 앱이 직접 예외를 요청하는
-   경로가 필요하다(`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) → M-26.
+   경로가 필요했다 → **M-26 으로 해소(2026-09-01)**. 앱이 `Gps119BatteryOptimization` 으로 상태를 읽고,
+   제외돼 있지 않으면 활동 화면에 안내 카드를 띄운다. 실기기에서 뜨는 쪽·사라지는 쪽 모두 확인했다.
+   🔑 시스템 «다이얼로그»가 아니라 설정 «목록»을 연다 — 전자는 Play 가 허용 용도를 요구하고 위반 시
+   앱이 내려간다. 후자는 사용자가 직접 고르는 방식이라 **권한 선언 자체가 필요 없다.**
 
 📌 앱 대기 버킷은 `10`(ACTIVE)이었다 — standby bucket 은 원인이 아니었다.
 
