@@ -3,10 +3,30 @@
 // 모든 함수는 kakao.maps.* 네임스페이스를 사용하며, SDK 로드 완료 후에만 호출되어야 한다.
 
 // 기본 지오로케이션 옵션 (양쪽 화면 동일)
+//
+// 🔴 **실기기에서만 나는 실패가 있었다.** 예전 값은 `timeout: 5000, maximumAge: 0` 이었는데,
+//    안드로이드 실기기에서 「사용자 위치 정보를 가져오는 요청이 시간 초과되었습니다」가
+//    떴다(2026-09-01, Galaxy A36 / Android 16). 콜드 GPS 픽스는 10~30초가 걸리고
+//    실내면 더 걸린다. 데스크톱 브라우저는 Wi-Fi 측위라 즉시 떠서 **개발 중에는 절대
+//    안 걸린다** — 그래서 이 값이 오래 살아남았다.
+//
+// 🔑 `maximumAge` 를 0 으로 두지 않는다. 구조요청에서 30초 전 좌표는 «없는 것»보다
+//    압도적으로 낫다. 0 은 캐시를 거부해서 매번 콜드 픽스를 강요한다.
 export const GEO_OPTIONS = {
     enableHighAccuracy: true,
-    timeout: 5000,
-    maximumAge: 0
+    timeout: 15000,
+    maximumAge: 30000
+};
+
+// 고정밀이 실패했을 때의 2차 시도. 기지국·Wi-Fi 측위라 거의 즉시 오고 정확도만 낮다.
+//
+// 🔑 **정확도가 낮은 좌표가 「좌표 없음」보다 낫다.** 구조요청 화면은 주소를 보여주고
+//    사용자가 «지도에서 보정»할 수 있다 — 대략이라도 있으면 고칠 수 있지만,
+//    없으면 사용자는 주소를 직접 검색해야 한다.
+export const GEO_FALLBACK_OPTIONS = {
+    enableHighAccuracy: false,
+    timeout: 10000,
+    maximumAge: 120000
 };
 
 /**
@@ -54,13 +74,31 @@ export function reverseGeocode(long, lat) {
  * 미지원 브라우저 alert / loading 플래그는 호출자가 처리한다(화면별 동작 차이 보존).
  * @returns {Promise<GeolocationPosition>}
  */
-export function getCurrentPositionOnce(options = GEO_OPTIONS) {
+export function getCurrentPositionOnce(options = GEO_OPTIONS, env = globalThis) {
     return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
+        const geo = env.navigator?.geolocation;
+        if (!geo) {
             reject(new Error('UNSUPPORTED'));
             return;
         }
-        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+
+        geo.getCurrentPosition(resolve, (error) => {
+            // 🔑 **시간 초과만 다시 시도한다.** 거부(PERMISSION_DENIED)를 다시 물으면
+            //    프롬프트가 두 번 뜨거나 조용히 또 거부되고, 사용자는 이유를 모른 채
+            //    기다리기만 한다. 「고칠 수 있는 실패」와 「고칠 수 없는 실패」는 다르다.
+            if (error?.code !== error?.TIMEOUT) {
+                reject(error);
+                return;
+            }
+
+            // 이미 저정밀로 부른 것이 또 시간 초과면 더 해볼 게 없다.
+            if (options.enableHighAccuracy === false) {
+                reject(error);
+                return;
+            }
+
+            geo.getCurrentPosition(resolve, reject, GEO_FALLBACK_OPTIONS);
+        }, options);
     });
 }
 
