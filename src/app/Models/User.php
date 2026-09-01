@@ -60,6 +60,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function consents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserConsent::class);
+    }
+
     public function requests(): HasMany
     {
         return $this->hasMany(Request::class);

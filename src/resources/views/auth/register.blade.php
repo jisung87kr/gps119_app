@@ -22,6 +22,35 @@
                             :error="$errors->has('password_confirmation')" />
             </x-ui.field>
 
+            {{--
+                🔴 **위치기반서비스 약관은 개인정보처리방침과 «분리»해서 받는다.**
+                   위치정보법은 개인위치정보 수집에 별도 동의를 요구한다 — 한 체크박스로
+                   묶으면 동의를 받은 것으로 보지 않는다.
+                🔑 링크는 «새 탭»으로 연다. 폼을 떠나면 입력이 날아가서, 사용자는
+                   결국 안 읽고 체크한다.
+            --}}
+            <fieldset class="!mt-6 space-y-3 rounded-2xl border border-ink-200 p-4">
+                <legend class="px-1 text-sm font-bold text-ink-900">약관 동의</legend>
+
+                @foreach (\App\Enums\ConsentType::required() as $consent)
+                    <label class="flex items-start gap-3 text-sm leading-relaxed text-ink-600">
+                        <input type="checkbox" name="consents[]" value="{{ $consent->value }}" required
+                               @checked(in_array($consent->value, old('consents', []), true))
+                               class="mt-0.5 h-5 w-5 shrink-0 rounded border-ink-300 text-brand-600 focus:ring-brand-200">
+                        <span>
+                            <span class="font-bold text-ink-900">[필수]</span>
+                            <a href="{{ route($consent->routeName()) }}" target="_blank" rel="noopener"
+                               class="font-bold text-brand-600 underline underline-offset-2">{{ $consent->label() }}</a>에
+                            동의합니다.
+                        </span>
+                    </label>
+                @endforeach
+
+                @error('consents')
+                    <p class="text-sm font-bold text-danger-600">{{ $message }}</p>
+                @enderror
+            </fieldset>
+
             <x-ui.button type="submit" size="xl" class="!mt-6">회원가입</x-ui.button>
         </form>
 

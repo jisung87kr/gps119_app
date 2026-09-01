@@ -176,6 +176,8 @@ class RoleBasedLandingTest extends TestCase
             'phone' => '010-9999-0001',
             'password' => 'password123',
             'password_confirmation' => 'password123',
+            // 필수 약관 동의가 없으면 가입 자체가 막힌다 (ConsentTest 참조).
+            'consents' => ['privacy', 'location_terms'],
         ])->assertRedirect(route('request.create'));
 
         $this->assertAuthenticated();

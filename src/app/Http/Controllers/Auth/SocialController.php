@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ConsentService;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -66,6 +67,13 @@ class SocialController extends Controller
 
             // Login the user
             Auth::login($user);
+
+            // 🔴 **소셜 가입은 우리 회원가입 폼을 거치지 않는다.** 체크박스를 보여줄
+            //    자리가 없으므로 로그인 직후 동의 화면으로 보낸다. 이걸 빼면
+            //    소셜 가입자만 «동의 없이» 위치가 수집된다.
+            if (app(ConsentService::class)->missingRequired($user)) {
+                return redirect()->route('consent.show');
+            }
 
             return redirect()->route('request.create');
 

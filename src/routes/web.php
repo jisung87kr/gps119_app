@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\ConsentController;
 use App\Http\Controllers\Auth\SocialController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -373,5 +374,12 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Social login routes
+// 필수 약관 동의 — 소셜 가입처럼 회원가입 폼을 «거치지 않은» 경로를 받는다.
+Route::middleware('auth')->group(function () {
+    Route::get('/consent', [ConsentController::class, 'show'])->name('consent.show');
+    Route::post('/consent', [ConsentController::class, 'store'])->name('consent.store');
+    Route::post('/consent/decline', [ConsentController::class, 'decline'])->name('consent.decline');
+});
+
 Route::get('/login/{driver}', [SocialController::class, 'redirect'])->name('login.social');
 Route::get('/auth/{driver}/callback', [SocialController::class, 'callback']);
