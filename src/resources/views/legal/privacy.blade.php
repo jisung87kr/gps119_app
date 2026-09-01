@@ -60,7 +60,9 @@
                         <tr class="border-b border-ink-100">
                             <td class="py-2 pr-3 font-bold text-ink-900">실시간 위치</td>
                             <td class="py-2 pr-3">위도·경도, 위치 정확도, 이동 방향, 이동 속도, 측정 시각</td>
-                            <td class="py-2">이용자가 <strong class="text-ink-900">위치 공유를 켠 동안</strong></td>
+                            <td class="py-2">이용자가 <strong class="text-ink-900">위치 공유를 켠 동안</strong>
+                                (앱에서 「항상 허용」을 선택한 경우
+                                <strong class="text-ink-900">화면이 꺼져 있거나 앱을 보고 있지 않을 때에도</strong> 수집)</td>
                         </tr>
                         <tr class="border-b border-ink-100">
                             <td class="py-2 pr-3 font-bold text-ink-900">알림</td>
@@ -79,6 +81,32 @@
                 위치 공유는 이용자가 직접 켜고 끌 수 있으며, <strong class="text-ink-900">꺼 두면 위치가 기록되지 않습니다.</strong>
                 다만 구조요청을 보내는 시점의 위치는 요청 자체의 핵심 정보이므로 함께 저장됩니다.
             </p>
+
+            {{--
+                🔴 **백그라운드 수집 고지.** Play·App Store 는 앱 화면의 사전 고지와
+                   «개인정보처리방침»이 서로 맞는지 대조한다. 앱에서는 고지하는데 방침에
+                   없으면 어긋난 상태로 제출된다.
+                   앱 화면 문구는 event/active.blade.php 의 고지 모달에 있다 —
+                   둘을 «같이» 고친다.
+            --}}
+            <div class="rounded-2xl bg-ink-50 p-4 text-sm leading-relaxed text-ink-600">
+                <p class="font-bold text-ink-900">앱에서의 백그라운드 위치 수집</p>
+                <p class="mt-1.5">
+                    모바일 앱에서 위치 권한을 <strong class="text-ink-900">「항상 허용」</strong>으로 설정하면,
+                    <strong class="text-ink-900">앱을 보고 있지 않을 때나 화면이 꺼져 있는 동안에도</strong>
+                    위치가 수집되어 상황실 지도에 표시됩니다. 사고가 발생했을 때 구조대가 정확한 지점으로
+                    이동하기 위해 필요한 기능입니다.
+                </p>
+                <p class="mt-2">
+                    수집은 <strong class="text-ink-900">행사에 참여 중이고, 위치 공유를 켜 둔 동안에만</strong>
+                    이루어집니다. 위치 공유를 끄면 즉시 중단되며, 권한을 「앱 사용 중에만 허용」으로
+                    바꾸거나 회수하면 백그라운드 수집은 중단됩니다.
+                </p>
+                <p class="mt-2">
+                    수집이 진행되는 동안 Android 기기에는 상시 알림이 표시되어, 이용자가 언제든
+                    수집 여부를 확인할 수 있습니다.
+                </p>
+            </div>
         </section>
 
         <section class="space-y-2">

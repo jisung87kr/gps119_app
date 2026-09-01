@@ -70,6 +70,25 @@ class BackgroundLocationDisclosureTest extends TestCase
         $this->assertStringContainsString('공유를 끄면 즉시 멈춥니다', $modal);
     }
 
+    public function test_🔴_개인정보처리방침도_백그라운드_수집을_말한다(): void
+    {
+        // 🔴 심사자는 «앱 화면의 고지»와 «방침»을 대조한다. 앱에서는 고지하는데
+        //    방침에 없으면 어긋난 상태로 제출된다 — 이것도 화면상 증상이 없다.
+        $privacy = file_get_contents(resource_path('views/legal/privacy.blade.php'));
+
+        $this->assertStringContainsString('화면이 꺼져 있는 동안에도', $privacy);
+        $this->assertStringContainsString('앱을 보고 있지 않을 때', $privacy);
+        // 언제 멈추는지도 함께 말해야 한다.
+        $this->assertStringContainsString('위치 공유를 끄면 즉시 중단', $privacy);
+    }
+
+    public function test_위치기반서비스_약관도_같이_말한다(): void
+    {
+        $terms = file_get_contents(resource_path('views/legal/location-terms.blade.php'));
+
+        $this->assertStringContainsString('화면이 꺼져 있는 동안에도', $terms);
+    }
+
     /** 고지 모달의 마크업만 잘라낸다. 파일 전체를 검사하면 다른 모달과 섞인다. */
     private function disclosureModal(string $view): string
     {

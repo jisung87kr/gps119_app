@@ -40,7 +40,10 @@
             <p>회사는 아래의 위치기반서비스를 제공합니다.</p>
             <ul class="list-disc space-y-1 pl-5">
                 <li><strong class="text-ink-900">구조요청 위치 전송</strong> — 이용자가 구조를 요청할 때의 위치를 구조대원·관제요원에게 전달</li>
-                <li><strong class="text-ink-900">실시간 위치 공유</strong> — 행사 참여 중 이용자가 공유를 켠 동안 위치를 관제 화면에 표시</li>
+                <li><strong class="text-ink-900">실시간 위치 공유</strong> — 행사 참여 중 이용자가 공유를 켠 동안 위치를 관제 화면에 표시.
+                    모바일 앱에서 위치 권한을 「항상 허용」으로 설정한 경우
+                    <strong class="text-ink-900">앱을 보고 있지 않거나 화면이 꺼져 있는 동안에도</strong> 위치가 수집됩니다
+                    (사고 지점을 특정하기 위한 것이며, 공유를 끄면 즉시 중단됩니다)</li>
                 <li><strong class="text-ink-900">출동 안내</strong> — 배정된 구조대원에게 요청 위치까지의 경로 제공</li>
                 <li><strong class="text-ink-900">행사 기록</strong> — 행사 종료 후 요청·출동·이동 기록의 정리</li>
             </ul>
