@@ -124,7 +124,7 @@ function webTracker(env = globalThis) {
     };
 }
 
-export function createLocationSharer(config = {}) {
+export function createLocationSharer(config = {}, env = globalThis) {
     const projectId = config.projectId;
     const onChange = typeof config.onChange === 'function' ? config.onChange : () => {};
 
@@ -140,10 +140,19 @@ export function createLocationSharer(config = {}) {
 
     // 위치 «취득»은 트래커가 한다. 이 파일은 «언제 보내는가»만 갖는다 (02 §3-3).
     //
-    // 🔑 **주입받는다.** 앱에서는 번들이 네이티브 트래커를 window 로 건네고(app.js),
-    //    웹이거나 그 앱이 백그라운드 위치를 모르면 null 이라 아래 웹 구현으로 떨어진다.
-    //    이 파일은 Capacitor 를 영영 모른다 — 셸을 바꿔도 여기는 안 바뀐다.
-    const tracker = config.tracker || webTracker();
+    // 🔑 **주입받되, 기본값이 «네이티브 우선»이다.** 앱에서는 번들이 네이티브 트래커를
+    //    window 로 건네고(app.js), 웹이거나 그 앱이 백그라운드 위치를 모르면 null 이라
+    //    웹 구현으로 떨어진다. 이 파일은 Capacitor 를 영영 모른다 —
+    //    `__gps119Bridge` 는 주입 지점의 이름일 뿐이다.
+    //
+    // 🔴 **기본값을 여기 둔 이유.** 예전에는 호출부가 `tracker:` 를 «직접» 넘겨야 했고,
+    //    세 곳 중 활동 화면 하나만 넘기고 있었다. 그래서 지령·출동 화면과 셸 전송기는
+    //    「항상 허용」 권한이 있어도 웹 watchPosition 으로 돌았고, **화면을 끄는 순간
+    //    위치가 끊겼다** — 실서버에서 출동 수락 후 5분 만에 멈춘 것이 그것이다
+    //    (2026-09-01). 배선을 호출부마다 반복하면 다음에 또 빠뜨린다.
+    const tracker = config.tracker
+        || env.__gps119Bridge?.locationTracker
+        || webTracker(env);
     let lastSent = null;   // {lat,lng,t}
     let buffer = [];       // 실패 payload 보관
     let backoffUntil = 0;  // 429 백오프 만료 시각(ms epoch). 0 이면 백오프 아님

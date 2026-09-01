@@ -315,6 +315,42 @@ describe('취득 위임 (N3 / 02 §3-3)', () => {
         expect(watchPosition).not.toHaveBeenCalled();
     });
 
+    it('🔴 호출부가 «안 넘겨도» 앱에서는 네이티브 트래커로 돈다', async () => {
+        // 예전에는 호출부가 tracker: 를 직접 넘겨야 했고, 세 곳 중 활동 화면 하나만
+        // 넘기고 있었다. 그래서 지령·출동 화면과 셸 전송기는 「항상 허용」 권한이
+        // 있어도 웹 watchPosition 으로 돌았고 «화면을 끄는 순간 위치가 끊겼다».
+        // 실서버에서 출동 수락 후 5분 만에 멈춘 것이 그것이다(2026-09-01).
+        const { watchPosition } = stubEnv();
+        const native = fakeTracker();
+        const env = { ...globalThis, __gps119Bridge: { locationTracker: native } };
+
+        await createLocationSharer({ projectId: 1 }, env).enable();
+
+        expect(native.start).toHaveBeenCalledTimes(1);
+        expect(watchPosition).not.toHaveBeenCalled();
+    });
+
+    it('셸이 트래커를 안 주면(웹·구버전) 웹 경로로 떨어진다', async () => {
+        const { watchPosition } = stubEnv();
+        const env = { ...globalThis, __gps119Bridge: { locationTracker: null } };
+
+        await createLocationSharer({ projectId: 1 }, env).enable();
+
+        expect(watchPosition).toHaveBeenCalledTimes(1);
+    });
+
+    it('명시적으로 넘긴 트래커가 «전역보다» 우선한다', async () => {
+        stubEnv();
+        const explicit = fakeTracker();
+        const global_ = fakeTracker();
+        const env = { ...globalThis, __gps119Bridge: { locationTracker: global_ } };
+
+        await createLocationSharer({ projectId: 1, tracker: explicit }, env).enable();
+
+        expect(explicit.start).toHaveBeenCalled();
+        expect(global_.start).not.toHaveBeenCalled();
+    });
+
     it('트래커를 안 주면 기존 웹 경로를 그대로 쓴다', async () => {
         // 하위호환. 앱이 아니거나 구버전 셸이면 여기로 떨어져야 한다.
         const { watchPosition } = stubEnv();

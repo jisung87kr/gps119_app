@@ -281,11 +281,10 @@
                 this.sharer = createLocationSharer({
                     projectId: this.projectId,
                     onChange: (s) => this.applyState(s),
-                    // 위치 «취득»을 셸에 위임한다 (N3 / 02 §3-3).
-                    // 앱이고 그 앱이 백그라운드 위치를 «아는» 경우에만 값이 있다.
-                    // 없으면(웹·구버전 셸) undefined 라 기존 watchPosition 경로로 떨어진다 —
-                    // 「앱이면 네이티브」가 아니라 「그 앱이 그 기능을 아는가」로 판정한다.
-                    tracker: window.__gps119Bridge?.locationTracker,
+                    // 🔑 tracker 를 «넘기지 않는다». createLocationSharer 가 앱이면
+                    //    네이티브 트래커를, 아니면 웹 경로를 알아서 고른다.
+                    //    호출부마다 배선하면 한 곳을 빠뜨리고, 그 화면만 화면을 끄는
+                    //    순간 위치가 끊긴다 — 실제로 그렇게 됐다(2026-09-01).
                 });
                 // 브라우저 QA용 전역 노출(셀렉터/제어 가능)
                 window.__locationShare = this.sharer;
