@@ -3,6 +3,7 @@
 // + 지령 배정 패널 + 출동현황 보드(FE-3.3).
 
 import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool';
+import { TrackLayer } from './trackLayer';
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
     dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta, presenceState,
@@ -51,6 +52,13 @@ export default {
             roster: [],            // roster 원본(활성 참가자) — 역할 배정 패널용
             assigningUserId: null, // 역할 배정 진행중 표시
             hideOffline: false,
+            // 이동 궤적 (M-25). 기본은 «꺼짐» — 관제의 기본 질문은 「지금 어디」이고,
+            // 선이 항상 깔려 있으면 현재 위치를 읽기 어려워진다.
+            showTracks: false,
+            trackMinutes: 60,
+            tracks: [],
+            loadingTracks: false,
+            trackError: null,
 
             requests: [],          // 라이브 신고(최신 우선)
             expandedRequestId: null,
@@ -254,6 +262,7 @@ export default {
                     this.isMobile ? CLUSTER_PROFILE.mobile : CLUSTER_PROFILE.desktop
                 );
                 this.requestPins = new RequestPinLayer(this.map);
+                this.trackLayer = new TrackLayer(this.map);
                 this._applyFilterToPool();
             } else {
                 this.pool = null;
@@ -869,6 +878,65 @@ export default {
             this.roleOrder.forEach((r) => { this.roleFilter[r] = false; });
             this._applyFilterToPool();
         },
+        // ── 이동 궤적 (M-25) ───────────────────────────────────
+        //
+        // 🔑 **켤 때만 부른다.** 관제는 12초마다 roster 를 폴링하는데 궤적까지 같이
+        //    끌면 매번 수천 점이 오간다. 궤적은 「지금 어디」와 달리 «초 단위로
+        //    달라지지 않는» 정보라 그럴 이유가 없다.
+        async toggleTracks() {
+            this.showTracks = !this.showTracks;
+
+            if (!this.showTracks) {
+                if (this.trackLayer) this.trackLayer.setVisible(false);
+
+                return;
+            }
+
+            await this.fetchTracks();
+            if (this.trackLayer) this.trackLayer.setVisible(true);
+        },
+
+        async setTrackMinutes(minutes) {
+            this.trackMinutes = Number(minutes);
+            if (this.showTracks) await this.fetchTracks();
+        },
+
+        async fetchTracks() {
+            if (!this.hasProject || !this.trackLayer) return;
+
+            this.loadingTracks = true;
+            this.trackError = null;
+            try {
+                const res = await window.axios.get(
+                    `/api/events/${this.selectedProjectId}/tracks`,
+                    {
+                        params: { minutes: this.trackMinutes },
+                        headers: { Accept: 'application/json' },
+                    }
+                );
+                this.tracks = res.data.data?.tracks || [];
+
+                // 🔑 색은 그 사람의 «역할»을 따른다. 마커와 다른 색이면 관제사가
+                //    선과 핀을 이어 보지 못한다.
+                const roleByUser = new Map(this.roster.map((r) => [r.user_id, r.role]));
+                this.trackLayer.render(this.tracks, (userId) => roleByUser.get(userId));
+                this.trackLayer.setVisible(this.showTracks);
+            } catch (e) {
+                console.error('[control] 궤적 조회 실패', e);
+                this.trackError = '궤적을 불러오지 못했습니다.';
+            } finally {
+                this.loadingTracks = false;
+            }
+        },
+
+        /** 지금 화면에 그려진 궤적의 «원본» 점 수. 「일부만 보고 있다」를 말하기 위해. */
+        trackPointsShown() {
+            return this.tracks.reduce((sum, t) => sum + t.points.length, 0);
+        },
+        trackPointsTotal() {
+            return this.tracks.reduce((sum, t) => sum + (t.count ?? t.points.length), 0);
+        },
+
         toggleHideOffline() {
             this.hideOffline = !this.hideOffline;
             if (this.pool) this.pool.setHideOffline(this.hideOffline);
@@ -1058,6 +1126,40 @@ export default {
         <span class="text-xs text-gray-400" :title="roleOnline(role) + '/' + roleTotal(role)">({{ roleOnline(role) }})</span>
       </label>
     </div>
+    <!-- 이동 궤적 (M-25) -->
+    <div class="p-3 border-t border-gray-100">
+      <div class="flex items-center justify-between">
+        <label class="text-sm font-bold text-gray-700 flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" :checked="showTracks" @change="toggleTracks"
+                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+          이동 궤적
+        </label>
+        <select :value="trackMinutes" @change="setTrackMinutes($event.target.value)"
+                :disabled="!showTracks"
+                class="text-xs border-gray-300 rounded py-0.5 pl-1.5 pr-6 disabled:bg-gray-50 disabled:text-gray-400">
+          <option :value="30">최근 30분</option>
+          <option :value="60">최근 1시간</option>
+          <option :value="180">최근 3시간</option>
+          <option :value="720">최근 12시간</option>
+        </select>
+      </div>
+      <p v-if="loadingTracks" class="mt-1 text-xs text-gray-400">불러오는 중…</p>
+      <p v-else-if="trackError" class="mt-1 text-xs text-red-600 font-bold">{{ trackError }}</p>
+      <!--
+        🔑 «몇 점을 보고 있는지» 말한다. 서버가 사람당 500점으로 솎으므로,
+           말하지 않으면 관제사는 지금 보는 선을 원본이라고 믿는다.
+      -->
+      <p v-else-if="showTracks" class="mt-1 text-xs text-gray-400">
+        <template v-if="tracks.length">
+          {{ tracks.length }}명 · {{ trackPointsShown() }}점
+          <span v-if="trackPointsTotal() > trackPointsShown()">
+            (원본 {{ trackPointsTotal() }}점을 솎아 표시)
+          </span>
+        </template>
+        <template v-else>이 시간 범위에 기록된 이동이 없습니다.</template>
+      </p>
+    </div>
+
     <div class="p-3">
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-sm font-bold text-gray-700">인력 현황</h2>

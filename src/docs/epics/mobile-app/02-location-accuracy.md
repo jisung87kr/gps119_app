@@ -175,7 +175,10 @@ public/js/components/locationShare.js   config.tracker 주입, 없으면 웹 경
 **지금은 언제나 웹 경로로 돈다.** 테스트(Vitest 22건)는 가짜 Capacitor 로 «계약»만
 고정한 것이다 — 플러그인 배선은 셸 저장소 몫이고 N3 에 남는다.
 
-### 📌 3-4. 관제는 «현재 위치»만 그린다 — 궤적은 없다 (M-25)
+### ✅ 3-4. 관제 지도의 이동 궤적 (M-25 — 2026-09-01 해소)
+
+> 아래는 «해소 전» 기록이다. 지금은 좌측 패널의 「이동 궤적」 체크박스로 켜면 폴리라인이 그려진다.
+> 구현은 `TrackService`(조회) · `TrackSimplifier`(솎기, 순수) · `control/trackLayer.js`(그리기).
 
 지도는 `.participant.location` 이 올 때마다 그 사람 **마커를 옮긴다.** 지나온 자리는
 남지 않는다. `kakao.maps.Polyline` 을 쓰는 코드가 **한 줄도 없고**, 위치 «이력»을 지도로

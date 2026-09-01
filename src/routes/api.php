@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\EventApiController;
 use App\Http\Controllers\Api\EventReportController;
 use App\Http\Controllers\Api\LocationApiController;
 use App\Http\Controllers\Api\RequestApiController;
+use App\Http\Controllers\Api\TrackApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -103,6 +104,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 기록 다운로드 (BE-4.1) — controller/admin, 스트리밍 CSV
     Route::middleware('event.role:controller')->group(function () {
+        // 이동 궤적 (M-25). 관제만 본다 — 참가자끼리 지나온 자리를 공유하지 않는다.
+        Route::get('/events/{id}/tracks', [TrackApiController::class, 'index'])->name('api.events.tracks');
+
         Route::get('/events/{id}/report/requests.csv', [EventReportController::class, 'requests'])->name('api.events.report.requests');
         Route::get('/events/{id}/report/dispatches.csv', [EventReportController::class, 'dispatches'])->name('api.events.report.dispatches');
         Route::get('/events/{id}/report/tracks.csv', [EventReportController::class, 'tracks'])->name('api.events.report.tracks');
