@@ -1,5 +1,6 @@
 import './bootstrap';
-import { isNativeApp } from './native/bridge';
+import { initErrorReporting } from './errorReport';
+import { isNativeApp, nativeInfo, nativePlatform } from './native/bridge';
 import { initPwa } from './pwa';
 import { initPushToggles } from './push-toggle';
 import { initNativePushRouting } from './push-native';
@@ -12,6 +13,18 @@ import {
     shouldRestartTracking,
     watchPermissionChanges,
 } from './native/locationPermission';
+
+// 웹뷰 JS 에러 수집 (M-16) — **가장 먼저 붙인다.**
+//
+// 🔴 앱은 원격 URL 을 띄우므로 콘솔을 볼 방법이 없다. 이게 없으면 실기기에서 난
+//    에러는 «증상»으로만 남고, 낮에 그랬듯 화면에 진단 문자열을 그려서 쫓게 된다.
+// ⚠️ 이 줄보다 먼저 난 에러는 못 잡는다(레이아웃 인라인 모듈 등). 전부는 아니다.
+initErrorReporting({
+    context: () => ({
+        platform: nativePlatform(),
+        appVersion: nativeInfo().version,
+    }),
+});
 
 // PWA: 서비스워커 등록 + 설치 온보딩 (참가자 셸)
 initPwa();

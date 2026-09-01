@@ -73,6 +73,20 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // 웹뷰·브라우저에서 올라온 JS 에러 (M-16).
+        //
+        // 🔑 laravel.log 와 «섞지 않는다». 클라이언트발 잡음이 서버 로그를 덮으면
+        //    정작 서버 장애를 못 찾는다.
+        // 🔑 replace_placeholders 는 false 다. 클라이언트 메시지에 들어 있는 `{...}` 를
+        //    Monolog 가 치환하려 들면 원문이 망가진다.
+        'client' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/client.log'),
+            'level' => 'debug',
+            'days' => env('LOG_CLIENT_DAYS', 14),
+            'replace_placeholders' => false,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

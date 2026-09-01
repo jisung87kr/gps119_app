@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ClientErrorController;
 use App\Http\Controllers\Api\DeviceTokenApiController;
 use App\Http\Controllers\Api\DispatchApiController;
 use App\Http\Controllers\Api\EventApiController;
@@ -12,6 +13,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// 웹뷰 JS 에러 수집 (M-16).
+//
+// 🔑 **auth 밖에 둔다.** 로그인 «전» 화면에서 난 에러도 받아야 한다 — 거기서 깨지면
+//    사용자는 들어오지도 못하는데, 정작 그 화면이 가장 안 보이는 곳이다.
+// 🔴 throttle 은 «분당» 이다(아래 위치 API 주석 참조). 폭주의 1차 방어는 클라이언트
+//    게이트(errorReport.js)이고, 여기는 마지막 방어선이다.
+Route::post('/client-errors', [ClientErrorController::class, 'store'])
+    ->middleware('throttle:20,1')->name('api.client-errors.store');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/requests', [RequestApiController::class, 'index'])->name('api.requests.index');
