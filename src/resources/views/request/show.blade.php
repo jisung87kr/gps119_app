@@ -19,8 +19,10 @@
             {{-- 바깥 겹은 overflow 없음(위치 버튼이 시트 위로 떠야 함), 스크롤은 안쪽 --}}
             <div id="bottom-sheet"
                  class="absolute inset-x-0 bottom-0 z-20 transition-transform duration-300 ease-out"
-                 {{-- 접힘 높이 = 핸들 행(h-11=44px) + border-t(1px) --}}
-                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
+                 {{-- 접힘 노출 높이 = 핸들 행(h-11=44px) + border-t(1px) + 안전영역.
+                     🔴 안전영역을 빼먹으면 안드로이드 3버튼 내비바가 손잡이를
+                        통째로 덮는다 — 45px 는 내비바보다 얇다(실기기 2026-09-01). --}}
+                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem_-_var(--safe-bottom))]'">
 
                 <location-button :loading="loading" v-on:get-location="getMyLocation"></location-button>
 

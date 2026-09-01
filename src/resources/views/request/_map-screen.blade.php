@@ -58,7 +58,7 @@
              class="absolute inset-x-0 bottom-0 z-20 transition-transform duration-300 ease-out"
              {{-- 접힘 높이 = 그랩 핸들 행(h-11=44px) + 시트 border-t(1px) = 45px.
                   이 값이 어긋나면 아래 내용 한 줄이 반쯤 걸쳐 잘린다 --}}
-             :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
+             :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem_-_var(--safe-bottom))]'">
 
             {{-- 현재 위치 재조회 — 시트를 따라 움직인다 --}}
             <location-button :loading="loading" v-on:get-location="getLocation"></location-button>
