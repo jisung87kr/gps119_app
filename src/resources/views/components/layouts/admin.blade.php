@@ -11,7 +11,9 @@
     </script>
     <meta charset="utf-8">
     {{--
-        viewport-fit=cover — 이게 없으면 env(safe-area-inset-*) 가 «전부 0» 이 된다.
+        viewport-fit=cover 가 없으면 안전영역 값이 전부 0 이다.
+        🔑 화면 코드는 env() 를 직접 쓰지 않고 app.css 의 --safe-top/--safe-bottom 을 쓴다 —
+           안드로이드 웹뷰는 env 를 안 채워주고 Capacitor 가 CSS 변수로 준다(app.css 주석).
         브라우저에서는 상태바가 페이지 영역이 아니라 티가 안 났지만, 웹뷰·홈화면 PWA 는
         화면 최상단부터 시작해서 헤더가 상태바/다이나믹 아일랜드 밑으로 들어간다.
         cover 를 켜면 edge-to-edge 가 되므로 «상단 크롬마다» env() 패딩이 짝으로 필요하다.
@@ -54,7 +56,7 @@
     <aside x-cloak
            class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white border-r border-slate-200 transition-transform duration-200 lg:translate-x-0"
            :class="nav ? 'translate-x-0' : '-translate-x-full'"
-           style="padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom)">
+           style="padding-top: var(--safe-top); padding-bottom: var(--safe-bottom)">
         <!-- brand -->
         <div class="flex items-center gap-2.5 h-16 px-5 border-b border-slate-100">
             <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2.5">
@@ -123,7 +125,7 @@
     <div class="lg:pl-64">
         <!-- mobile top bar -->
         <div class="lg:hidden sticky top-0 z-30 flex items-center gap-3 min-h-14 px-4 bg-white border-b border-slate-200"
-             style="padding-top: env(safe-area-inset-top)">
+             style="padding-top: var(--safe-top)">
             <button @click="nav = true" class="p-1 -ml-1 text-slate-600" aria-label="메뉴 열기">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>

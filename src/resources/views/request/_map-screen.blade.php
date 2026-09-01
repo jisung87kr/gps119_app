@@ -131,7 +131,7 @@
                 </div>
 
                 {{-- 상황 버튼 2x2 — 2단계 구분은 RequestType::actionTone() 이 결정 --}}
-                <div class="grid grid-cols-2 gap-2.5 px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1">
+                <div class="grid grid-cols-2 gap-2.5 px-5 pb-[calc(1.5rem+var(--safe-bottom))] pt-1">
                     @foreach (RequestType::cases() as $type)
                         <x-ui.action-button
                             :tone="$type->actionTone()"

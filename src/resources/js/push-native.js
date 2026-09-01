@@ -322,7 +322,7 @@ export function showForegroundBanner({ title, body, url }, env = globalThis) {
     box.style.cssText = [
         'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:2147483647',
         // iOS 노치·다이내믹 아일랜드 아래로 내린다. 안드로이드에서는 0 이라 영향이 없다.
-        'margin:calc(8px + env(safe-area-inset-top)) 8px 8px',
+        'margin:calc(8px + var(--safe-top)) 8px 8px',
         'padding:14px 16px', 'border-radius:16px',
         'background:#0E6E7C', 'color:#fff',
         'font-family:Pretendard,ui-sans-serif,system-ui,-apple-system,sans-serif',

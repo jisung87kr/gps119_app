@@ -62,7 +62,7 @@
 @endphp
 
 <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-white"
-     style="padding-bottom: env(safe-area-inset-bottom)">
+     style="padding-bottom: var(--safe-bottom)">
     <div class="mx-auto flex max-w-2xl">
         @foreach ($tabs as $tab)
             <a href="{{ $tab['url'] }}"

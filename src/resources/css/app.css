@@ -15,6 +15,32 @@
  * 아니고 Tailwind 기본 slate/blue 팔레트 + Geist 폰트를 계속 쓴다. 그래서 기본
  * 팔레트와 --font-sans 를 덮어쓰지 않고 신규 토큰만 추가한다.
  */
+/*
+ * 안전영역(노치·상태바·내비게이션바) — **iOS 와 안드로이드의 규약이 다르다.**
+ *
+ * 🔴 안드로이드 웹뷰는 `env(safe-area-inset-*)` 를 채워주지 않는다. iOS 의 WKWebView 는
+ *    시스템이 알아서 넣지만 안드로이드는 아니고, Capacitor 가 대신 «CSS 변수»
+ *    `--safe-area-inset-*` 를 documentElement 에 주입한다(내장 SystemBars 플러그인).
+ *    그래서 env 만 쓰면 안드로이드에서 전부 0 이 되고, Android 15+ 는 edge-to-edge 가
+ *    강제라 하단 콘텐츠가 내비게이션바에 그대로 가린다 —
+ *    실제로 「내 신고 상태」 바텀시트를 끝까지 내리면 손잡이가 덮였다
+ *    (Galaxy A36 / Android 16, 2026-09-01).
+ *
+ * 🔑 **둘 중 «큰 값»을 쓴다.** 한쪽만 채워지는 것이 정상이라 max 로 고르면 양쪽에서
+ *    맞고, 둘 다 채워져도 같은 값이라 두 배가 되지 않는다.
+ *    (Capacitor 는 웹뷰 부모에 패딩을 «주는» 분기에서는 변수를 0 으로 주입한다 —
+ *     그때도 max 는 0 이라 이중 여백이 생기지 않는다.)
+ *
+ * 🔑 화면 코드는 env 를 직접 쓰지 않고 이 변수만 쓴다. 직접 쓰면 그 화면만 조용히
+ *    안드로이드에서 어긋난다.
+ */
+:root {
+    --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+    --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+    --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+    --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+}
+
 @theme {
     /*
      * 사용자 화면 폰트 — Pretendard (한글 최적화). layouts/app.blade.php 의 body 에

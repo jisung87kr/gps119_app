@@ -1047,12 +1047,12 @@ export default {
   이걸 더하지 않으면 행사 선택 드롭다운이 상태바·다이나믹 아일랜드 밑으로 들어간다.
   브라우저에서는 env() 가 0 이라 기존과 동일하다.
 -->
-<div class="h-[100dvh] w-full grid grid-rows-[calc(56px+env(safe-area-inset-top))_1fr] bg-gray-100 text-gray-900"
+<div class="h-[100dvh] w-full grid grid-rows-[calc(56px+var(--safe-top))_1fr] bg-gray-100 text-gray-900"
      :style="gridStyle">
 
   <!-- HEADER -->
   <header class="col-span-2 row-start-1 h-full bg-white border-b border-gray-200 flex items-center justify-between px-3 lg:px-4 gap-2"
-          style="padding-top: env(safe-area-inset-top)">
+          style="padding-top: var(--safe-top)">
     <div class="flex items-center gap-2 lg:gap-3 min-w-0">
       <a v-if="backUrl" :href="backUrl" class="flex items-center gap-1 pl-1 pr-2 py-1.5 rounded-md hover:bg-gray-100 text-gray-500 text-sm font-medium" title="대시보드로 돌아가기">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -1383,7 +1383,7 @@ export default {
   <div v-if="isMobile && hasProject"
        class="fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-gray-200 bg-white shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.18)] transition-[height] duration-200 ease-out"
        :class="sheetHeightClass"
-       style="padding-bottom: env(safe-area-inset-bottom)">
+       style="padding-bottom: var(--safe-bottom)">
 
     <!-- 핸들 + 요약 바 (peek 에서 보이는 전부) -->
     <button type="button" @click="cycleSheet"
@@ -1528,7 +1528,7 @@ export default {
            상단 safe-area 를 더하지 않으면 제목이 다이나믹 아일랜드에 가린다(아이폰 실측
            2026-08-09). 하단은 이미 처리돼 있었는데(아래 pb-[calc(...)]) 상단만 빠져 있었다.
            딥링크로 들어오면 이 패널이 «자동으로» 열리므로 앱에서 가장 먼저 보이는 화면이다. -->
-      <div class="flex flex-none items-center justify-between border-b border-gray-200 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+      <div class="flex flex-none items-center justify-between border-b border-gray-200 px-4 pb-3 pt-[calc(0.75rem+var(--safe-top))]">
         <h3 class="text-base font-bold text-gray-900">
           {{ assign.mode === 'support' ? '보조 인원 추가' : '지령 배정' }} — 신고 #{{ assign.request && assign.request.request_id }}
         </h3>
@@ -1581,7 +1581,7 @@ export default {
         </label>
       </div>
       <!-- 메모 + 발령 -->
-      <div class="flex-none border-t border-gray-200 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div class="flex-none border-t border-gray-200 px-4 py-3 pb-[calc(0.75rem+var(--safe-bottom))]">
         <template v-if="!assign.confirming">
           <input v-model="assign.note" type="text" placeholder="메모(선택)"
                  class="mb-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">

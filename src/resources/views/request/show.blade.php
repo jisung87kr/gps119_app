@@ -113,7 +113,7 @@
                                        title="내 현재 위치" tone="brand"></location-info>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3 px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4">
+                    <div class="grid grid-cols-2 gap-3 px-5 pb-[calc(1.25rem+var(--safe-bottom))] pt-4">
                         <x-ui.button variant="secondary" vue-click="showRequestLocation">
                             <x-ui.icon name="pin" class="h-5 w-5 text-danger-600" />
                             요청지 보기
