@@ -591,3 +591,72 @@ describe('약관 동의 게이트', () => {
         expect(h.sharer.state.sharing).toBe(true);
     });
 });
+
+/**
+ * 초기 상태 — 「모른다」를 「불가능하다」로 말하지 않는다.
+ *
+ * 🔴 초기값이 'unsupported' 여서, 화면이 열리자마자 「위치를 쓸 수 없는 브라우저입니다」
+ *    라는 붉은 단정이 떴다가 첫 좌표가 오면 사라졌다(실기기 약 10초, 2026-09-01).
+ *    확인 중인 것을 «불가능»이라 말하면 사용자는 멀쩡한 기기를 의심하고, 진짜 오류가
+ *    났을 때도 「또 저러다 사라지겠지」로 읽는다.
+ */
+describe('권한 초기 상태', () => {
+    it('🔴 아무것도 하기 전에는 «모름»이다', () => {
+        const h = harness();
+
+        expect(h.sharer.state.permission).toBeNull();
+    });
+
+    it('🔴 켜자마자 현재 권한을 한 번 읽는다 — 첫 좌표를 기다리지 않는다', async () => {
+        const h = harness();
+        globalThis.navigator.permissions = {
+            query: () => Promise.resolve({ state: 'granted', addEventListener() {} }),
+        };
+
+        await h.sharer.enable();
+        await h.tick();
+
+        expect(h.sharer.state.permission).toBe('granted');
+        expect(h.post).not.toHaveBeenCalled();   // 좌표는 아직 하나도 안 왔다
+    });
+
+    it('resume() 도 마찬가지로 읽는다', async () => {
+        const h = harness();
+        globalThis.navigator.permissions = {
+            query: () => Promise.resolve({ state: 'prompt', addEventListener() {} }),
+        };
+
+        h.sharer.resume();
+        await h.tick();
+
+        expect(h.sharer.state.permission).toBe('prompt');
+    });
+
+    it('🔴 늦게 온 초기 읽기가 최신 상태를 되돌리지 않는다', async () => {
+        // 되돌리면 화면이 「공유 중」에서 「확인 중」으로 거꾸로 간다.
+        let resolveQuery;
+        const h = harness();
+        globalThis.navigator.permissions = {
+            query: () => new Promise((r) => { resolveQuery = () => r({ state: 'prompt', addEventListener() {} }); }),
+        };
+
+        await h.sharer.enable();
+        h.feed(0);                       // 첫 좌표 → granted
+        await h.tick();
+        expect(h.sharer.state.permission).toBe('granted');
+
+        resolveQuery();
+        await h.tick();
+
+        expect(h.sharer.state.permission).toBe('granted');
+    });
+
+    it('Permissions API 가 없어도 깨지지 않는다', async () => {
+        const h = harness();
+
+        await h.sharer.enable();
+        await h.tick();
+
+        expect(h.sharer.state.sharing).toBe(true);
+    });
+});

@@ -146,3 +146,46 @@ describe('shouldRestartTracking — 설정에서 고치고 돌아왔을 때', ()
         expect(shouldRestartTracking('when_in_use', 'always')).toBe(false);
     });
 });
+
+/**
+ * 「모른다」와 「불가능하다」는 다르다 (2026-09-01 실기기).
+ */
+describe('아직 모르는 상태', () => {
+    it('🔴 확인 전에는 붉은 단정을 하지 않는다', () => {
+        const s = shareStatus({ sharing: true, webPermission: null, native: true });
+
+        expect(s.tone).not.toBe('danger');
+        expect(s.label).toBe('위치 확인 중');
+    });
+
+    it('🔴 아직 모르는데 「공유 중」이라고도 하지 않는다', () => {
+        // 한 건도 못 보낸 상태에서 초록 불을 켜는 것이 M-5 가 막으려던 «거짓 안심»이다.
+        const s = shareStatus({ sharing: true, webPermission: null, native: true });
+
+        expect(s.label).not.toBe('위치 공유 중');
+    });
+
+    it('꺼져 있으면 모름보다 «꺼짐»이 먼저다', () => {
+        const s = shareStatus({ sharing: false, webPermission: null });
+
+        expect(s.label).toBe('위치 공유 꺼짐');
+    });
+});
+
+describe('위치를 쓸 수 없을 때 — 앱과 웹의 안내가 다르다', () => {
+    it('🔴 앱에서 「다른 브라우저」를 안내하지 않는다', () => {
+        // 앱에는 브라우저가 없다. 있지도 않은 해결책을 주면 사용자는 할 수 있는 게 없다.
+        const s = shareStatus({ sharing: true, webPermission: 'unsupported', native: true });
+
+        expect(s.label).not.toContain('브라우저');
+        expect(s.hint).not.toContain('브라우저');
+        expect(s.action).toBe('settings');
+    });
+
+    it('웹에서는 브라우저를 바꾸라고 안내한다', () => {
+        const s = shareStatus({ sharing: true, webPermission: 'unsupported', native: false });
+
+        expect(s.label).toContain('브라우저');
+        expect(s.action).toBeNull();
+    });
+});

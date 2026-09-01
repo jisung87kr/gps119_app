@@ -161,9 +161,14 @@ export function shareStatus({
     //    앱에서도 이 값은 채워지므로, 위 네이티브 분기 «뒤»에 둬서 순서를 지킨다.
     if (webPermission === 'unsupported') {
         return {
-            label: '위치를 쓸 수 없는 브라우저입니다',
-            hint: '다른 브라우저에서 열어 주세요.',
-            action: null,
+            // 🔑 앱에는 «브라우저»가 없다. 앱에서 「다른 브라우저에서 열어 주세요」는
+            //    있지도 않은 해결책이라, 사용자는 할 수 있는 게 없어진다.
+            //    (같은 실수를 'denied' 분기의 「주소창」 안내에서 한 번 했다.)
+            label: native ? '이 기기에서는 위치를 쓸 수 없습니다' : '위치를 쓸 수 없는 브라우저입니다',
+            hint: native
+                ? '기기의 위치 서비스를 켠 뒤 앱을 다시 열어 주세요.'
+                : '다른 브라우저에서 열어 주세요.',
+            action: native ? 'settings' : null,
             tone: 'danger',
         };
     }
@@ -199,6 +204,21 @@ export function shareStatus({
             action: 'always',
             tone: 'warning',
         };
+    }
+
+    // 🔴 **아직 모르면 «모른다»고 말한다.** 초기값이 'unsupported' 이던 시절, 화면이
+    //    열리자마자 「위치를 쓸 수 없는 브라우저입니다」라는 붉은 단정이 떴다가 첫 판정이
+    //    오면 사라졌다(실기기에서 약 10초, 2026-09-01).
+    //
+    // 🔑 **자리가 중요하다.** 네이티브 판정(permissionStep)보다 «뒤»에 있어야 한다 —
+    //    앱에서는 webPermission 이 비어 있는 채로 permissionStep 만 채워지는 경우가
+    //    정상이라, 앞에 두면 「항상 허용으로 바꾸기」 안내를 통째로 가린다.
+    //    (같은 순서 문제를 'denied' 분기에서 한 번 겪었다 — 이 파일 위쪽 주석 참조.)
+    //
+    // 🔑 그렇다고 「공유 중」이라고 하지도 않는다. 한 건도 못 보낸 상태에서 초록 불을
+    //    켜는 것이 M-5 가 막으려던 «거짓 안심»이다.
+    if (webPermission == null) {
+        return { label: '위치 확인 중', hint: null, action: null, tone: 'muted' };
     }
 
     return { label: '위치 공유 중', hint: null, action: null, tone: 'ok' };

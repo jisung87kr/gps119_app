@@ -106,6 +106,25 @@ function webTracker(env = globalThis) {
             return () => status?.removeEventListener?.('change', onChange);
         },
 
+        /**
+         * 브라우저가 «지금» 아는 권한 상태. 'granted'|'denied'|'prompt'|null
+         *
+         * 🔑 onPermissionChange 는 «바뀔 때»만 부른다 — 현재 값은 한 번도 주지 않는다.
+         *    그래서 화면은 첫 좌표가 올 때까지(콜드 픽스면 10초 이상) 아무것도 모른 채
+         *    있었다. 이건 그 «처음 한 번»을 채운다.
+         */
+        async readWebPermission() {
+            if (!this.supported) return 'unsupported';
+
+            try {
+                const st = await env.navigator.permissions?.query?.({ name: 'geolocation' });
+
+                return st?.state ?? null;
+            } catch {
+                return null;
+            }
+        },
+
         // 브라우저는 「항상 허용」을 줄 수 없다 — 탭이 죽으면 끝난다.
         // 그래서 최선이 when_in_use 이고, 그건 «사실»이다(M-5 의 foreground_only).
         async readPermission() {
@@ -134,7 +153,12 @@ export function createLocationSharer(config = {}, env = globalThis) {
         //    화면은 이 값을 보고 동의 UI 를 띄운다 — 「전송 실패」로만 말하면
         //    사용자는 고칠 방법을 모른다.
         consentRequired: null,
-        permission: 'unsupported', // unsupported | prompt | granted | denied
+        // 🔴 **초기값은 «모름»(null)이다.** 예전 초기값이 'unsupported' 여서, 아직
+        //    아무것도 확인하기 «전»에 화면이 「위치를 쓸 수 없는 브라우저입니다」라는
+        //    붉은 단정을 띄웠다 — 실기기에서 10초쯤 떠 있다 사라졌다(2026-09-01).
+        //    「모른다」를 「불가능하다」로 말하면 사용자는 멀쩡한 기기를 의심한다.
+        //    (decidePermissionStep 이 permission===null 을 그냥 두는 것과 같은 이유다.)
+        permission: null, // null(모름) | unsupported | prompt | granted | denied
         sentCount: 0,
         lastSentAt: null,
         lastAccuracy: null,
@@ -331,6 +355,26 @@ export function createLocationSharer(config = {}, env = globalThis) {
      * 🔑 사용자는 주소창에서 고친 뒤 «화면이 저절로 살아나기»를 기대한다.
      *    새로고침을 요구하면 대부분 그냥 「안 되는구나」로 끝난다.
      */
+    /**
+     * 권한의 «현재» 값을 한 번 읽어 초기 공백을 메운다.
+     *
+     * 🔑 **첫 좌표가 이미 판정을 바꿔놨으면 덮지 않는다.** 늦게 도착한 초기 읽기가
+     *    최신 상태를 되돌리면, 화면이 「공유 중」에서 「확인 중」으로 거꾸로 간다.
+     * 🔑 네이티브 트래커에는 이 메서드가 없다 — 그쪽은 화면이 osPermission 을 따로
+     *    읽는다(M-5). 없으면 조용히 아무것도 하지 않는다.
+     */
+    function primePermission() {
+        if (typeof tracker.readWebPermission !== 'function') return;
+
+        tracker.readWebPermission()
+            .then((next) => {
+                if (!next || state.permission != null) return;
+                state.permission = next;
+                emit();
+            })
+            .catch(() => {});
+    }
+
     function watchPermission() {
         if (stopPermissionWatch || typeof tracker.onPermissionChange !== 'function') return;
 
@@ -383,6 +427,7 @@ export function createLocationSharer(config = {}, env = globalThis) {
             }
 
             startWatch(opts);
+            primePermission();
             watchPermission();
         },
 
@@ -398,6 +443,7 @@ export function createLocationSharer(config = {}, env = globalThis) {
             state.sharing = true;
             emit();
             startWatch();
+            primePermission();
         },
 
         // 공유 중지: watch 중지 + sharing off(PATCH)
