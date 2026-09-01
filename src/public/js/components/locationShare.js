@@ -130,6 +130,10 @@ export function createLocationSharer(config = {}, env = globalThis) {
 
     const state = {
         sharing: false,
+        // 🔴 동의가 없어 «수집이 막힌» 상태. null 이면 정상.
+        //    화면은 이 값을 보고 동의 UI 를 띄운다 — 「전송 실패」로만 말하면
+        //    사용자는 고칠 방법을 모른다.
+        consentRequired: null,
         permission: 'unsupported', // unsupported | prompt | granted | denied
         sentCount: 0,
         lastSentAt: null,
@@ -159,15 +163,28 @@ export function createLocationSharer(config = {}, env = globalThis) {
 
     function emit() { onChange({ ...state }); }
 
+    /**
+     * @returns {{consentRequired: Array}|null} 동의가 필요하면 그 항목들, 아니면 null
+     */
     async function patchSharing(on) {
         const axios = await waitForAxios();
-        if (!axios) return;
+        if (!axios) return null;
         try {
             await axios.patch(`/api/events/${projectId}/sharing`, { sharing_location: on },
                 { headers: { Accept: 'application/json' } });
+
+            return null;
         } catch (e) {
+            // 🔴 **동의 거절만은 삼키지 않는다.** 나머지 실패는 다음 ping 이 캐시를
+            //    갱신해 주지만, 동의는 사용자가 행동해야만 풀린다 — 그대로 진행하면
+            //    watch 만 돌면서 ping 이 전부 막히고 화면은 「공유 중」이라 말한다.
+            const items = consentRequiredItems(e);
+            if (items) return { consentRequired: items };
+
             // 토글 실패해도 로컬 watch 상태는 사용자의 의도대로 진행(다음 ping에서 백엔드가 캐시 갱신)
             console.warn('[locationShare] sharing 토글 실패', e);
+
+            return null;
         }
     }
 
@@ -181,6 +198,24 @@ export function createLocationSharer(config = {}, env = globalThis) {
     // 429(Too Many Requests) 여부. axios 는 e.response.status, fetch 폴백은 e.status.
     function isThrottled(e) {
         return (e && (e.response?.status === 429 || e.status === 429)) || false;
+    }
+
+    /**
+     * 서버가 「약관 동의가 필요하다」고 했는가 (409).
+     *
+     * 🔑 429 와 «다르게» 다뤄야 한다. 429 는 기다리면 풀리지만 이건 사용자가
+     *    행동해야 풀린다 — 기다리며 재시도하면 영원히 안 된다.
+     *
+     * @returns {Array|null} 동의해야 할 항목들. 해당 없으면 null.
+     */
+    function consentRequiredItems(e) {
+        const res = e?.response ?? e;
+        if (res?.status !== 409) return null;
+
+        const errors = res.data?.errors ?? res.errors;
+        if (errors?.code !== 'consent_required') return null;
+
+        return Array.isArray(errors.items) ? errors.items : [];
     }
 
     // 적응형: 보낼지 판단
@@ -256,6 +291,19 @@ export function createLocationSharer(config = {}, env = globalThis) {
             state.lastAccuracy = payload.accuracy;
             state.error = null;
         } catch (e) {
+            // 🔴 동의가 없으면 재시도해도 영원히 막힌다. 버퍼에 쌓지 않고 멈춘다 —
+            //    쌓아두면 나중에 «동의 전 위치»가 한꺼번에 올라간다.
+            const items = consentRequiredItems(e);
+            if (items) {
+                state.consentRequired = items;
+                state.error = null;
+                stopWatch();
+                state.sharing = false;
+                emit();
+
+                return;
+            }
+
             // 조용히 재시도: 버퍼에 보관 후 다음 tick
             pushBuffer(payload);
             if (isThrottled(e)) {
@@ -320,8 +368,20 @@ export function createLocationSharer(config = {}, env = globalThis) {
                 return;
             }
             state.sharing = true;
+            state.consentRequired = null;
             emit();
-            await patchSharing(true);
+
+            const blocked = await patchSharing(true);
+            if (blocked) {
+                // 켜지 않는다. 여기서 watch 를 시작하면 위치를 «수집»하게 되고,
+                // 그건 정확히 동의 없이 하면 안 되는 일이다.
+                state.sharing = false;
+                state.consentRequired = blocked.consentRequired;
+                emit();
+
+                return;
+            }
+
             startWatch(opts);
             watchPermission();
         },

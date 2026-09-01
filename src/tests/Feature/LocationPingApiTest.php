@@ -37,7 +37,7 @@ class LocationPingApiTest extends TestCase
         Queue::fake();
 
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         $participant = EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id,
             'sharing_location' => true,
@@ -65,7 +65,7 @@ class LocationPingApiTest extends TestCase
     public function test_out_of_range_coordinates_422(): void
     {
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id, 'sharing_location' => true,
         ]);
@@ -82,7 +82,7 @@ class LocationPingApiTest extends TestCase
     public function test_future_recorded_at_422(): void
     {
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id, 'sharing_location' => true,
         ]);
@@ -101,7 +101,7 @@ class LocationPingApiTest extends TestCase
         Queue::fake();
 
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         $participant = EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id,
             'sharing_location' => false,
@@ -175,7 +175,7 @@ class LocationPingApiTest extends TestCase
     public function test_sharing_toggle(): void
     {
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         $participant = EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id, 'sharing_location' => false,
         ]);
@@ -200,7 +200,7 @@ class LocationPingApiTest extends TestCase
         Queue::fake();
 
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         $participant = EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id,
             'sharing_location' => true, 'role' => EventRole::PARAMEDIC,
@@ -243,7 +243,7 @@ class LocationPingApiTest extends TestCase
         Queue::fake();
 
         $project = $this->project();
-        $user = User::factory()->create();
+        $user = User::factory()->consented()->create();
         EventParticipant::factory()->create([
             'project_id' => $project->id, 'user_id' => $user->id,
             'sharing_location' => true,

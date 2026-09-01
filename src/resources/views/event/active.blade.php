@@ -129,6 +129,53 @@
             🔑 문구는 두 가지를 반드시 말해야 한다: 앱을 «쓰지 않는 동안에도» 수집한다는
                사실과, 그것이 «무엇에 쓰이는지». 하나라도 빠지면 반려 사유다.
         --}}
+        {{--
+            약관 동의 (위치정보법). 🔴 **공유를 켜는 «그 자리»에서 받는다.**
+            동의 페이지로 내보내면 사용자는 행사 화면을 잃고, 돌아왔을 때 무엇을
+            하려던 참이었는지 다시 찾아야 한다. 동의가 끝나면 원래 하려던
+            「공유 켜기」를 이어서 실행한다.
+
+            🔑 항목·문구는 «서버가 준 것»을 그대로 쓴다. 화면에서 목록을 다시 만들면
+               약관이 늘거나 바뀔 때 한쪽만 고쳐진다.
+        --}}
+        <div v-if="consentItems.length"
+             class="fixed inset-0 z-[130] flex items-end justify-center bg-ink-950/40 px-0 sm:items-center sm:px-5"
+             role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+            <div class="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 sm:max-w-md sm:rounded-3xl">
+                <h2 id="consentTitle" class="break-keep text-lg font-extrabold leading-snug text-ink-950">
+                    위치를 공유하려면 약관 동의가 필요합니다
+                </h2>
+                <p class="mt-2 break-keep text-sm leading-relaxed text-ink-600">
+                    상황실에 위치를 전달하려면 아래 항목에 동의해 주세요.
+                </p>
+
+                <div class="mt-4 space-y-3 rounded-2xl border border-ink-200 p-4">
+                    <label v-for="item in consentItems" :key="item.type"
+                           class="flex items-start gap-3 text-sm leading-relaxed text-ink-600">
+                        <input type="checkbox" :value="item.type" v-model="consentChecked"
+                               class="mt-0.5 h-5 w-5 shrink-0 rounded border-ink-300 text-brand-600 focus:ring-brand-200">
+                        <span>
+                            <span class="font-bold text-ink-900">[필수]</span>
+                            <a :href="item.url" target="_blank" rel="noopener"
+                               class="font-bold text-brand-600 underline underline-offset-2">@{{ item.label }}</a>에
+                            동의합니다.
+                        </span>
+                    </label>
+                </div>
+
+                <p v-if="consentError" class="mt-3 text-sm font-bold text-danger-600">@{{ consentError }}</p>
+
+                <div class="mt-6 space-y-2.5">
+                    <button type="button" v-on:click="agreeConsent" :disabled="consentSubmitting"
+                            class="inline-flex w-full items-center justify-center rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-sm transition-colors active:bg-brand-700 disabled:cursor-not-allowed disabled:bg-ink-100 disabled:text-ink-400">
+                        @{{ consentSubmitting ? '저장 중…' : '동의하고 공유 시작' }}
+                    </button>
+                    {{-- 🔑 나가는 길을 반드시 둔다. 동의는 «강요»가 아니라 선택이어야 한다. --}}
+                    <x-ui.button variant="secondary" vue-click="consentItems = []">나중에</x-ui.button>
+                </div>
+            </div>
+        </div>
+
         <div v-if="disclosureOpen"
              class="fixed inset-0 z-[120] flex items-end justify-center bg-ink-950/40 px-0 sm:items-center sm:px-5"
              role="dialog" aria-modal="true" aria-labelledby="bgLocTitle">
@@ -196,6 +243,12 @@
                     settingsOpenFailed: false,
                     // 백그라운드 수집 사전 고지(Play 정책). 권한 요청 «앞»에 선다.
                     disclosureOpen: false,
+                    // 🔴 서버가 「약관 동의가 필요하다」고 한 항목들(위치정보법).
+                    //    가입 폼 도입 «전»에 만들어진 계정이 여기 걸린다.
+                    consentItems: [],
+                    consentChecked: [],
+                    consentSubmitting: false,
+                    consentError: null,
                     // 승격을 시도했는데 권한이 그대로였다 = iOS 가 프롬프트를 안 띄웠다.
                     alwaysPromptUnavailable: false,
                     requesting: false,
@@ -330,6 +383,41 @@
                     this.lastAccuracy = s.lastAccuracy;
                     this.bufferedCount = s.bufferedCount;
                     this.error = s.error;
+
+                    // 🔑 서버가 «막았다»는 사실만 받아온다. 무엇에 동의해야 하는지는
+                    //    서버가 준 목록을 그대로 쓴다 — 화면에서 다시 만들면 어긋난다.
+                    this.consentItems = s.consentRequired ?? [];
+                    if (this.consentItems.length === 0) {
+                        this.consentChecked = [];
+                        this.consentError = null;
+                    }
+                },
+
+                // 동의를 남기고 «원래 하려던 일»을 이어서 한다.
+                async agreeConsent() {
+                    if (this.consentSubmitting) return;
+
+                    if (this.consentChecked.length !== this.consentItems.length) {
+                        this.consentError = '필수 약관에 모두 동의해야 합니다.';
+
+                        return;
+                    }
+
+                    this.consentSubmitting = true;
+                    this.consentError = null;
+                    try {
+                        await window.axios.post('/api/consents',
+                            { consents: this.consentChecked },
+                            { headers: { Accept: 'application/json' } });
+
+                        // 🔑 동의만 받고 끝내지 않는다. 사용자가 누른 것은 「공유 켜기」였다.
+                        this.consentItems = [];
+                        await this.sharer.enable();
+                    } catch (e) {
+                        this.consentError = '동의를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+                    } finally {
+                        this.consentSubmitting = false;
+                    }
                 },
                 toggle() {
                     this.sharer.toggle();

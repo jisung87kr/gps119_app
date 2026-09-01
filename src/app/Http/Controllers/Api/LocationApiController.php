@@ -6,6 +6,7 @@ use App\Enums\LocationPermission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreLocationPingRequest;
 use App\Models\Project;
+use App\Services\ConsentService;
 use App\Services\EventParticipantService;
 use App\Services\LocationService;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,30 @@ class LocationApiController extends Controller
     public function __construct(
         private LocationService $locationService,
         private EventParticipantService $participantService,
+        private ConsentService $consents,
     ) {}
+
+    /**
+     * 「동의가 필요하다」를 «클라이언트가 고칠 수 있는 모양»으로 돌려준다.
+     *
+     * 🔑 그냥 403 을 던지면 화면은 「위치 전송 실패」만 말하게 되고, 사용자는
+     *    고칠 방법을 모른다. 무엇에 동의해야 하는지와 그 문서 주소까지 같이 준다.
+     *
+     * 409 를 쓴다 — 권한(403)이 아니라 «선행 조건이 안 갖춰진» 상태다.
+     *
+     * @param  \App\Enums\ConsentType[]  $missing
+     */
+    private function consentRequired(array $missing): JsonResponse
+    {
+        return response()->error('약관 동의가 필요합니다.', 409, [
+            'code' => 'consent_required',
+            'items' => array_map(fn ($type) => [
+                'type' => $type->value,
+                'label' => $type->label(),
+                'url' => route($type->routeName()),
+            ], $missing),
+        ]);
+    }
 
     /**
      * POST /api/events/{id}/location  (event.member)
@@ -33,6 +57,13 @@ class LocationApiController extends Controller
     public function store(StoreLocationPingRequest $request, int $id): JsonResponse
     {
         $project = Project::findOrFail($id);
+
+        // 🔴 **동의가 없으면 수집하지 않는다.** 가입 시 동의는 신규 가입자에게만
+        //    걸리므로, 기존 사용자는 이 지점에서 막지 않으면 영영 동의 없이 수집된다.
+        //    막는 곳이 «수집 시점»이라 법 취지와도 맞다.
+        if ($missing = $this->consents->missingRequired(Auth::user())) {
+            return $this->consentRequired($missing);
+        }
 
         try {
             $this->locationService->record($project, Auth::user(), $request->validated());
@@ -63,6 +94,12 @@ class LocationApiController extends Controller
         $validated = $request->validate([
             'sharing_location' => ['required', 'boolean'],
         ]);
+
+        // 🔑 **끄는 것은 언제나 허용한다.** 동의가 없다고 «끄지도 못하게» 하면
+        //    사용자가 수집을 멈출 방법이 사라진다 — 정확히 반대 방향이다.
+        if ($validated['sharing_location'] && ($missing = $this->consents->missingRequired(Auth::user()))) {
+            return $this->consentRequired($missing);
+        }
 
         $project = Project::findOrFail($id);
         $participant = $this->participantService->setSharing(

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ClientErrorController;
+use App\Http\Controllers\Api\ConsentApiController;
 use App\Http\Controllers\Api\DeviceTokenApiController;
 use App\Http\Controllers\Api\DispatchApiController;
 use App\Http\Controllers\Api\EventApiController;
@@ -31,6 +32,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/requests/{id}', [RequestApiController::class, 'destroy'])->name('api.requests.destroy');
     // 푸시 수신 통로 등록/해제 (mobile-app N1).
     // 🔴 토큰은 «본문»으로만 받는다 — path 에 넣으면 액세스·프록시·에러 로그에 자격증명이 남는다.
+    // 약관 동의 — 위치 공유를 켜는 «그 자리»에서 받는다(화면 이동 없이).
+    Route::get('/consents', [ConsentApiController::class, 'index'])->name('api.consents.index');
+    Route::post('/consents', [ConsentApiController::class, 'store'])
+        ->middleware('throttle:10,1')->name('api.consents.store');
+
     Route::post('/devices', [DeviceTokenApiController::class, 'store'])->name('api.devices.store');
     Route::delete('/devices/current', [DeviceTokenApiController::class, 'destroyCurrent'])->name('api.devices.destroy');
 

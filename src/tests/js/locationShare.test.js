@@ -488,3 +488,106 @@ describe('취득 위임 (N3 / 02 §3-3)', () => {
         expect(sharer.state.permission).toBe('unsupported');
     });
 });
+
+/**
+ * 동의 게이트 (위치정보법).
+ *
+ * 🔴 서버가 409 로 「동의가 필요하다」고 하면 **수집을 시작하지도, 계속하지도 않는다.**
+ *    이 경로가 틀리면 화면은 「공유 중」이라 말하면서 실제로는 아무것도 못 보내거나,
+ *    더 나쁘게는 동의 없이 모은 좌표를 나중에 한꺼번에 올린다.
+ */
+describe('약관 동의 게이트', () => {
+    const consentError = {
+        response: {
+            status: 409,
+            data: {
+                errors: {
+                    code: 'consent_required',
+                    items: [
+                        { type: 'privacy', label: '개인정보처리방침', url: 'https://x/privacy' },
+                        { type: 'location_terms', label: '위치기반서비스 이용약관', url: 'https://x/terms' },
+                    ],
+                },
+            },
+        },
+    };
+
+    it('🔴 동의가 없으면 공유가 켜지지 않는다', async () => {
+        const h = harness();
+        h.patch.mockRejectedValueOnce(consentError);
+
+        await h.sharer.enable();
+
+        expect(h.sharer.state.sharing).toBe(false);
+        expect(h.sharer.state.consentRequired).toHaveLength(2);
+    });
+
+    it('🔴 동의가 없으면 watch 를 시작하지 않는다 — 수집 자체가 안 된다', async () => {
+        const h = harness();
+        h.patch.mockRejectedValueOnce(consentError);
+
+        await h.sharer.enable();
+
+        expect(h.isWatching()).toBe(false);
+        expect(h.post).not.toHaveBeenCalled();
+    });
+
+    it('화면이 고칠 수 있게 항목을 그대로 넘긴다', async () => {
+        const h = harness();
+        h.patch.mockRejectedValueOnce(consentError);
+
+        await h.sharer.enable();
+
+        expect(h.sharer.state.consentRequired.map((i) => i.type))
+            .toEqual(['privacy', 'location_terms']);
+        expect(h.sharer.state.consentRequired[0].url).toBe('https://x/privacy');
+    });
+
+    it('🔴 ping 이 409 면 즉시 멈춘다 — 버퍼에 쌓지 않는다', async () => {
+        // 쌓아두면 동의를 받은 «뒤»에 동의 전 좌표가 한꺼번에 올라간다.
+        const h = harness();
+        await h.sharer.enable();
+
+        h.post.mockRejectedValueOnce(consentError);
+        h.feed(0);
+        await h.tick();
+
+        expect(h.sharer.state.sharing).toBe(false);
+        expect(h.sharer.state.bufferedCount ?? 0).toBe(0);
+        expect(h.sharer.state.consentRequired).toHaveLength(2);
+    });
+
+    it('🔑 409 라도 consent_required 가 아니면 평소대로 다룬다', async () => {
+        const h = harness();
+        h.patch.mockRejectedValueOnce({ response: { status: 409, data: {} } });
+
+        await h.sharer.enable();
+
+        expect(h.sharer.state.sharing).toBe(true);
+        expect(h.sharer.state.consentRequired).toBeNull();
+    });
+
+    it('🔑 429 는 동의와 «다르게» 다뤄진다 — 기다리면 풀린다', async () => {
+        const h = harness();
+        await h.sharer.enable();
+
+        h.post.mockRejectedValueOnce(makeError(429));
+        h.feed(0);
+        await h.tick();
+
+        expect(h.sharer.state.sharing).toBe(true);
+        expect(h.sharer.state.consentRequired).toBeNull();
+    });
+
+    it('다시 켜면 이전 동의 표시는 지워진다', async () => {
+        const h = harness();
+        h.patch.mockRejectedValueOnce(consentError);
+        await h.sharer.enable();
+        expect(h.sharer.state.consentRequired).toHaveLength(2);
+
+        await h.sharer.enable();
+
+        expect(h.sharer.state.consentRequired).toBeNull();
+        expect(h.sharer.state.sharing).toBe(true);
+    });
+});
