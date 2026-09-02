@@ -64,6 +64,45 @@ class SafeAreaInsetTest extends TestCase
             .implode("\n", $offenders));
     }
 
+    /**
+     * 🔴 **화면 «바닥에 붙는» 것은 안전영역을 반드시 고려해야 한다.**
+     *
+     * 안 하면 안드로이드 내비게이션바·iOS 홈 인디케이터가 그 위를 덮는다.
+     * 실제로 바텀시트 손잡이가 통째로 가려졌고(안드로이드), 반대로 시트를 통째로
+     * 띄웠더니 iOS 에서 아래가 비었다(2026-09-02). 요소마다 «기억해서» 챙기는 대신
+     * 빠뜨리면 여기서 걸리게 한다.
+     *
+     * 🔑 판정은 느슨하다 — 같은 요소나 그 근처(±6줄)에서 --safe-bottom 을 쓰기만 하면
+     *    통과한다. 여백으로 줄지 위치로 줄지는 화면이 정할 일이다.
+     */
+    public function test_🔴_바닥에_붙는_요소는_안전영역을_고려한다(): void
+    {
+        $offenders = [];
+
+        foreach ($this->sources() as $path) {
+            $lines = preg_split('/\R/', file_get_contents($path));
+
+            foreach ($lines as $i => $line) {
+                // fixed/absolute 로 «바닥»에 붙는 것만 본다. inset-0(전면 덮개)은 제외.
+                if (! preg_match('/(fixed|absolute)[^"\']*bottom-0/', $line)) {
+                    continue;
+                }
+                if (str_contains($line, 'inset-0')) {
+                    continue;
+                }
+
+                $near = implode("\n", array_slice($lines, max(0, $i - 6), 13));
+                if (! str_contains($near, '--safe-bottom')) {
+                    $offenders[] = basename($path).':'.($i + 1);
+                }
+            }
+        }
+
+        $this->assertSame([], $offenders,
+            "화면 바닥에 붙는데 안전영역을 고려하지 않았다 — 시스템 바가 덮는다:\n"
+            .implode("\n", $offenders));
+    }
+
     public function test_변수_정의가_한_곳에_있다(): void
     {
         $css = file_get_contents(resource_path('css/app.css'));

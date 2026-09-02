@@ -55,17 +55,18 @@
             top 이 음수인 버튼을 잘라먹는다)
         --}}
         <div id="bottom-sheet"
-             class="absolute inset-x-0 bottom-[var(--safe-bottom)] z-20 transition-transform duration-300 ease-out"
+             class="absolute inset-x-0 z-20 transition-transform duration-300 ease-out"
              {{-- 접힘 높이 = 그랩 핸들 행(h-11=44px) + 시트 border-t(1px) = 45px.
                   이 값이 어긋나면 아래 내용 한 줄이 반쯤 걸쳐 잘린다 --}}
-             :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
+             :class="sheetExpanded ? 'bottom-0 translate-y-0'
+                              : 'bottom-[var(--safe-bottom)] translate-y-[calc(100%_-_2.8125rem)]'">
 
             {{-- 현재 위치 재조회 — 시트를 따라 움직인다 --}}
             <location-button :loading="loading" v-on:get-location="getLocation"></location-button>
 
             {{-- 높이 단위는 컨테이너(h-[100dvh])와 맞춰 dvh 로. vh 로 두면 모바일
                  주소창이 보일 때 70vh 가 실제 가용 높이를 넘어선다 --}}
-            <div class="max-h-[70dvh] overflow-y-auto rounded-t-3xl border-t border-ink-200 bg-white shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)]">
+            <div class="max-h-[70dvh] overflow-y-auto rounded-t-3xl border-t border-ink-200 bg-white pb-[var(--safe-bottom)] shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)]">
                 {{-- 그랩 핸들 (탭하면 시트 접기/펼치기) --}}
                 <div class="flex h-11 cursor-pointer items-center justify-center" v-on:click="toggleSheet"
                      role="button" aria-label="패널 펼치기/접기">

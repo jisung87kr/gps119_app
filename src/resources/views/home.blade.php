@@ -32,7 +32,7 @@
             <map-container ref="mapContainer"></map-container>
         </div>
 
-        <div class="bg-white fixed left-0 bottom-0 right-0 p-5 z-[99] bottom-sheet border-t border-gray-100">
+        <div class="bg-white fixed left-0 bottom-0 right-0 p-5 pb-[calc(1.25rem+var(--safe-bottom))] z-[99] bottom-sheet border-t border-gray-100">
             <div class="bottom-sheet-handle"></div>
             
             <location-button :loading="loading" @get-location="getLocation"></location-button>

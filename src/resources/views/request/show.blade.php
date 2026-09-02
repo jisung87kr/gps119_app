@@ -18,17 +18,18 @@
 
             {{-- 바깥 겹은 overflow 없음(위치 버튼이 시트 위로 떠야 함), 스크롤은 안쪽 --}}
             <div id="bottom-sheet"
-                 class="absolute inset-x-0 bottom-[var(--safe-bottom)] z-20 transition-transform duration-300 ease-out"
+                 class="absolute inset-x-0 z-20 transition-transform duration-300 ease-out"
                  {{-- 접힘 노출 높이 = 핸들 행(h-11=44px) + border-t(1px).
                      🔴 안전영역은 여기가 아니라 시트 «위치»(bottom)로 준다.
                         노출 높이에 더하면 시트가 올라오는 게 아니라 «더 많이 보여서»
                         핸들 아래 내용까지 드러나고, 그게 다시 내비바에 걸린다
                         (실기기에서 그렇게 나왔다, 2026-09-01). --}}
-                 :class="sheetExpanded ? 'translate-y-0' : 'translate-y-[calc(100%_-_2.8125rem)]'">
+                 :class="sheetExpanded ? 'bottom-0 translate-y-0'
+                              : 'bottom-[var(--safe-bottom)] translate-y-[calc(100%_-_2.8125rem)]'">
 
                 <location-button :loading="loading" v-on:get-location="getMyLocation"></location-button>
 
-                <div class="max-h-[70dvh] overflow-y-auto rounded-t-3xl border-t border-ink-200 bg-white shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)]">
+                <div class="max-h-[70dvh] overflow-y-auto rounded-t-3xl border-t border-ink-200 bg-white pb-[var(--safe-bottom)] shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.15)]">
                     <div class="flex h-11 cursor-pointer items-center justify-center" v-on:click="toggleSheet"
                          role="button" aria-label="패널 펼치기/접기">
                         <span class="h-1.5 w-12 rounded-full bg-ink-200"></span>
