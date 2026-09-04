@@ -24,7 +24,7 @@
         }
     </style>
 
-    <div id="app" class="w-full h-screen relative flex flex-col" style="padding-bottom: 340px">
+    <div id="app" v-cloak class="w-full h-screen relative flex flex-col" style="padding-bottom: 340px">
         <map-loader @scripts-loaded="initMap"></map-loader>
         <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
         

@@ -38,10 +38,21 @@ function fakeDocument() {
     return { createElement: make, getElementById: () => null, body: make() };
 }
 
+/** localStorage 흉내 — 「켜 뒀다」 기록은 페이지를 넘어 살아야 하므로 env 에 붙인다. */
+function fakeStorage() {
+    const m = new Map();
+
+    return {
+        getItem: (k) => (m.has(k) ? m.get(k) : null),
+        setItem: (k, v) => { m.set(k, String(v)); },
+        removeItem: (k) => { m.delete(k); },
+    };
+}
+
 /** Capacitor 셸이 주입한 전역을 흉내낸다. */
 function nativeEnv({
     receive = 'granted', token = 'fcm-tok-1', fail = false, platform = 'android',
-    localNotifications = true, scheduleFails = false, badge = true,
+    localNotifications = true, scheduleFails = false, badge = true, storage = true,
 } = {}) {
     const listeners = {};
     const local = localNotifications ? {
@@ -72,7 +83,8 @@ function nativeEnv({
     if (local) plugins.LocalNotifications = local;
     if (badgePlugin) plugins.Badge = badgePlugin;
 
-    return {
+    const env = {
+        localStorage: storage ? fakeStorage() : null,
         Capacitor: {
             isNativePlatform: () => true,
             getPlatform: () => platform,
@@ -87,6 +99,13 @@ function nativeEnv({
         __badge: badgePlugin,
         __listeners: listeners,
     };
+
+    if (!storage) {
+        // 프라이빗 모드처럼 «접근 자체가» 던지는 환경.
+        Object.defineProperty(env, 'localStorage', { get() { throw new Error('SecurityError'); } });
+    }
+
+    return env;
 }
 
 beforeEach(() => __resetNativePushState());
@@ -198,6 +217,68 @@ describe('앱 푸시 — 상태와 끄기', () => {
 
         expect(await disableNativePush(env)).toEqual({ ok: false, reason: 'server-error' });
         expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    /**
+     * 🔴 실제 사고: 프로필에서 켠 뒤 다른 화면을 다녀오면 「알림 꺼짐」으로 읽혔다.
+     *    모듈 변수(lastToken)는 페이지마다 사라진다 — 앱 셸은 원격 URL 이라
+     *    화면 이동이 곧 새 번들 인스턴스다. __resetNativePushState 가 그 이동이다.
+     */
+    it('🔴 페이지를 옮겨도 «켜짐»이 유지된다 — 모듈 상태는 페이지마다 사라진다', async () => {
+        const env = nativeEnv();
+        await enableNativePush(env);
+
+        __resetNativePushState();
+        expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    it('새 페이지에서 끄면 토큰을 «다시 받아» 서버에 알린다', async () => {
+        const env = nativeEnv();
+        await enableNativePush(env);
+        __resetNativePushState();
+        env.axios.delete.mockClear();
+
+        expect(await disableNativePush(env)).toEqual({ ok: true });
+        expect(env.axios.delete).toHaveBeenCalledWith('/api/devices/current', {
+            data: { token: 'fcm-tok-1' },
+        });
+        expect(await nativePushStatus(env)).toBe('default');
+    });
+
+    it('새 페이지에서 토큰을 못 받으면 «꺼짐»으로 치지 않는다 — 서버는 계속 보낸다', async () => {
+        const env = nativeEnv();
+        await enableNativePush(env);
+        __resetNativePushState();
+        env.__plugin.getToken = vi.fn(async () => { throw new Error('no-network'); });
+
+        expect(await disableNativePush(env)).toEqual({ ok: false, reason: 'server-error' });
+        expect(env.axios.delete).not.toHaveBeenCalled();
+        expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    it('켜짐 기록이 있어도 OS 권한이 사라지면 켜짐이 아니다 — 권한이 먼저다', async () => {
+        const env = nativeEnv();
+        await enableNativePush(env);
+        __resetNativePushState();
+        env.__plugin.checkPermissions = vi.fn(async () => ({ receive: 'prompt' }));
+
+        expect(await nativePushStatus(env)).toBe('default');
+    });
+
+    it('켠 기록이 없으면 새 페이지의 끄기는 아무것도 하지 않는다', async () => {
+        const env = nativeEnv();
+
+        expect(await disableNativePush(env)).toEqual({ ok: true });
+        expect(env.axios.delete).not.toHaveBeenCalled();
+    });
+
+    it('저장소가 막혀 있어도(프라이빗 모드) 같은 페이지 안에서는 종전처럼 동작한다', async () => {
+        const env = nativeEnv({ storage: false });
+
+        expect(await enableNativePush(env)).toEqual({ ok: true });
+        expect(await nativePushStatus(env)).toBe('subscribed');
+        expect(await disableNativePush(env)).toEqual({ ok: true });
+        expect(await nativePushStatus(env)).toBe('default');
     });
 });
 

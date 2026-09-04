@@ -9,7 +9,7 @@
     {{-- 서버에서 전달된 프리필 코드(QR 딥링크 진입 시) --}}
     @php($prefillCode = $prefillCode ?? '')
 
-    <div id="eventJoinApp" class="space-y-6" data-prefill="{{ $prefillCode }}">
+    <div id="eventJoinApp" v-cloak class="space-y-6" data-prefill="{{ $prefillCode }}">
 
         {{-- 1단계: 코드 입력 --}}
         <div v-if="step === 'input'" class="space-y-6">

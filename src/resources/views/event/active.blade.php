@@ -6,7 +6,7 @@
     <!-- Vue 3 (페이지별 마운트 — 기존 request/create·event/join 패턴 계승) -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
-    <div id="eventActiveApp"
+    <div id="eventActiveApp" v-cloak
          class="space-y-6"
          data-project-id="{{ $project->id }}"
          data-role="{{ $role }}"

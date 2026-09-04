@@ -39,7 +39,7 @@
 @endphp
 
 {{-- 다른 사용자 화면과 같은 폭(max-w-2xl 중앙 정렬) — 레퍼런스 tmp/dispatch.html 동일 --}}
-<div id="app" class="mx-auto flex h-[100dvh] max-w-2xl flex-col overflow-hidden bg-ink-50">
+<div id="app" v-cloak class="mx-auto flex h-[100dvh] max-w-2xl flex-col overflow-hidden bg-ink-50">
     <map-loader v-on:scripts-loaded="initMap"></map-loader>
     <intro-screen :show="showIntro" title="응급상황 위치공유 서비스"></intro-screen>
 

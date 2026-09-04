@@ -4,6 +4,7 @@
 
 import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool';
 import { TrackLayer } from './trackLayer';
+import { filterRoster } from './rosterSearch';
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
     dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta, presenceState,
@@ -51,6 +52,7 @@ export default {
             roleCounts: {},        // role -> {online,total}
             roster: [],            // roster 원본(활성 참가자) — 역할 배정 패널용
             assigningUserId: null, // 역할 배정 진행중 표시
+            rosterQuery: '',       // 역할 배정 패널 검색어 — 100명 넘는 행사에서 사람을 찾는 유일한 길
             hideOffline: false,
             // 이동 궤적 (M-25). 기본은 «꺼짐» — 관제의 기본 질문은 「지금 어디」이고,
             // 선이 항상 깔려 있으면 현재 위치를 읽기 어려워진다.
@@ -110,6 +112,11 @@ export default {
     },
 
     computed: {
+        /** 역할 배정 패널에 보이는 명단 — 검색어로 좁힌 것. 판정은 rosterSearch.js(순수). */
+        filteredRoster() {
+            return filterRoster(this.roster, this.rosterQuery, this.roleLabel);
+        },
+
         /**
          * 🔴 지금 «위치가 전혀 안 오는» 사람 수.
          *
@@ -1185,8 +1192,20 @@ export default {
           위치 권한 없음 {{ trackingAlertCount }}명
         </span>
       </div>
+      <!-- 검색 — 100명이 넘는 행사에서 셀렉트를 스크롤해 사람을 찾을 수는 없다. 이름·역할 라벨로 좁힌다. -->
+      <div class="relative mb-2">
+        <input v-model="rosterQuery" type="search" placeholder="이름·역할로 검색" autocomplete="off"
+               aria-label="참가자 검색"
+               class="w-full text-sm border border-gray-300 rounded px-2.5 py-1.5 pr-16 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 tabular-nums pointer-events-none">
+          {{ filteredRoster.length }} / {{ roster.length }}
+        </span>
+      </div>
       <div class="space-y-1.5 max-h-56 overflow-y-auto">
-        <div v-for="r in roster" :key="'a-'+r.user_id" class="flex items-center gap-2">
+        <p v-if="!filteredRoster.length" class="py-3 text-center text-xs text-gray-400">
+          「{{ rosterQuery }}」에 맞는 사람이 없습니다
+        </p>
+        <div v-for="r in filteredRoster" :key="'a-'+r.user_id" class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: roleColor(r.role) }"></span>
           <span class="text-sm text-gray-700 flex-1 truncate" :title="r.name">{{ r.name }}</span>
           <!--

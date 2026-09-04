@@ -10,7 +10,7 @@
     <!-- 개인 지령 채널(event.{id}.dispatch.{userId}) 구독용 본인 id -->
     <script>window.__authUserId = {{ auth()->id() }};</script>
 
-    <div id="dispatchApp"
+    <div id="dispatchApp" v-cloak
          class="space-y-4"
          data-project-id="{{ $project->id }}"
          data-role="{{ $role }}"

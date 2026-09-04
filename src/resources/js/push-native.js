@@ -16,6 +16,34 @@ import { hasNativeCapability, nativePlatform, NativeCapability } from './native/
 /** 마지막으로 받은 FCM/APNs 토큰. 해제할 때 서버에 알려줘야 한다. */
 let lastToken = null;
 
+/**
+ * 「켜 뒀다」는 기록 — 페이지를 넘어서 살아남아야 한다.
+ *
+ * 🔴 lastToken 은 모듈 변수라 «페이지마다» 사라진다(앱 셸은 원격 URL 이라 화면 이동이
+ *    곧 새 번들 인스턴스다). 그것만 보면 프로필에서 켠 뒤 다른 화면을 다녀오는 순간
+ *    토글이 「알림 꺼짐」으로 읽혔다 — 서버는 여전히 보내는데 화면만 거짓이었다.
+ *    토큰 자체는 저장하지 않는다(자격증명) — 끌 때는 플러그인에서 다시 받는다.
+ */
+const ENABLED_KEY = 'gps119.push.enabled';
+
+function readEnabled(env) {
+    try {
+        return env.localStorage?.getItem(ENABLED_KEY) === '1';
+    } catch (e) {
+        // 저장소가 막힌 환경(프라이빗 모드 등). 이 페이지 안에서는 lastToken 으로 버틴다.
+        return false;
+    }
+}
+
+function writeEnabled(env, on) {
+    try {
+        if (on) env.localStorage?.setItem(ENABLED_KEY, '1');
+        else env.localStorage?.removeItem(ENABLED_KEY);
+    } catch (e) {
+        // 위와 같다. 기록이 안 되면 다음 페이지에서 «꺼짐»으로 보이는데, 그건 종전과 같다.
+    }
+}
+
 /** 이 페이지에서 앱 푸시를 쓸 수 있는가. */
 export function isNativePushSupported(env = globalThis) {
     return hasNativeCapability(NativeCapability.PUSH_TOKEN, env);
@@ -45,8 +73,9 @@ export async function nativePushStatus(env = globalThis) {
     if (receive === 'denied') return 'denied';
     if (receive !== 'granted') return 'default';
 
-    // 권한이 있어도 «서버가 아는가»는 별개다. 등록해 둔 토큰이 있어야 켜진 것이다.
-    return lastToken ? 'subscribed' : 'default';
+    // 권한이 있어도 «서버가 아는가»는 별개다. 등록해 둔 기록이 있어야 켜진 것이다 —
+    // 이 페이지에서 켰으면 lastToken, 다른 페이지에서 켰으면 저장소의 기록.
+    return lastToken || readEnabled(env) ? 'subscribed' : 'default';
 }
 
 /**
@@ -90,6 +119,7 @@ export async function enableNativePush(env = globalThis) {
     }
 
     lastToken = token;
+    writeEnabled(env, true);
 
     return { ok: true };
 }
@@ -101,15 +131,32 @@ export async function enableNativePush(env = globalThis) {
  * 「서버가 안 보낸다」로 충분하다.
  */
 export async function disableNativePush(env = globalThis) {
-    if (!lastToken) return { ok: true };
+    let token = lastToken;
+
+    if (!token) {
+        // 이 페이지에서 켠 게 아니다. 켠 기록도 없으면 끌 것이 없다.
+        if (!readEnabled(env)) return { ok: true };
+
+        // 다른 페이지에서 켰다 — 토큰을 플러그인에서 다시 받아 서버에 알린다.
+        try {
+            ({ token } = await plugin(env).getToken());
+        } catch (e) {
+            token = null;
+        }
+
+        // 토큰을 못 받으면 서버의 통로를 지울 수 없다. 기록만 지우면 화면은 «꺼짐»인데
+        // 알림은 계속 오는 상태가 된다 — 실패로 보고한다.
+        if (!token) return { ok: false, reason: 'server-error' };
+    }
 
     try {
-        await env.axios.delete('/api/devices/current', { data: { token: lastToken } });
+        await env.axios.delete('/api/devices/current', { data: { token } });
     } catch (e) {
         return { ok: false, reason: 'server-error' };
     }
 
     lastToken = null;
+    writeEnabled(env, false);
 
     return { ok: true };
 }
