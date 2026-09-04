@@ -5,6 +5,7 @@
 import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool';
 import { TrackLayer } from './trackLayer';
 import { filterRoster } from './rosterSearch';
+import { formatCoords, kakaoMapUrl, shareText, clampMenuPosition, MENU_SIZE, pickAddress, locationText } from './mapContextMenu';
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
     dispatchStatusMeta, DISPATCH_STATUS_ORDER, requestTypeMeta, presenceState,
@@ -34,6 +35,11 @@ export default {
             mapReady: false,
             mapError: false,
             loadingRoster: false,
+
+            // 지도 우클릭 컨텍스트 메뉴 — 우클릭 지점의 좌표를 복사·공유한다.
+            // x,y 는 지도 컨테이너(relative) 기준 px. 판정·포맷은 mapContextMenu.js(순수).
+            ctxMenu: { open: false, x: 0, y: 0, lat: null, lng: null },
+            mapToast: '',
             railCollapsed: false,
 
             // ── 모바일(<lg) 분기 ────────────────────────────────
@@ -115,6 +121,11 @@ export default {
         /** 역할 배정 패널에 보이는 명단 — 검색어로 좁힌 것. 판정은 rosterSearch.js(순수). */
         filteredRoster() {
             return filterRoster(this.roster, this.rosterQuery, this.roleLabel);
+        },
+
+        /** 우클릭 메뉴 상단에 보이는 좌표 라벨. */
+        ctxCoordsLabel() {
+            return this.ctxMenu.lat == null ? '' : formatCoords(this.ctxMenu.lat, this.ctxMenu.lng);
         },
 
         /**
@@ -313,6 +324,15 @@ export default {
                             });
                             this.map.addControl(new kakao.maps.ZoomControl(),
                                 kakao.maps.ControlPosition.RIGHT);
+
+                            // 우클릭 → 좌표 액션 메뉴. 지도를 만지면(클릭·이동·줌) 닫는다.
+                            kakao.maps.event.addListener(this.map, 'rightclick', (me) => this._openMapMenu(me.latLng));
+                            kakao.maps.event.addListener(this.map, 'click', () => this.closeMapMenu());
+                            kakao.maps.event.addListener(this.map, 'dragstart', () => this.closeMapMenu());
+                            kakao.maps.event.addListener(this.map, 'zoom_changed', () => this.closeMapMenu());
+                            // 카카오 rightclick 위에서 브라우저 기본 메뉴가 뜨지 않게.
+                            el.addEventListener('contextmenu', (e) => e.preventDefault());
+
                             this.mapReady = true;
                             resolve();
                         });
@@ -1040,6 +1060,112 @@ export default {
             if (this.isMobile) this.sheetSnap = 'peek';
         },
 
+        // ── 지도 우클릭 메뉴 ─────────────────────────────────────
+        // 우클릭 지점의 좌표를 컨테이너 px 로 되돌려(latLng→containerPoint) 그 자리에 메뉴를 띄운다.
+        _openMapMenu(latLng) {
+            if (!this.map || !latLng) return;
+
+            const lat = latLng.getLat();
+            const lng = latLng.getLng();
+            const el = document.getElementById('control-map');
+            const container = { width: el?.clientWidth || 0, height: el?.clientHeight || 0 };
+
+            let point = { x: container.width / 2, y: container.height / 2 };
+            try {
+                const pt = this.map.getProjection().containerPointFromCoords(latLng);
+                if (pt) point = { x: pt.x, y: pt.y };
+            } catch (e) { /* 구버전 SDK 폴백: 컨테이너 중앙 */ }
+
+            const pos = clampMenuPosition(point, MENU_SIZE, container);
+            this.ctxMenu = { open: true, x: pos.x, y: pos.y, lat, lng };
+        },
+
+        closeMapMenu() {
+            if (this.ctxMenu.open) this.ctxMenu.open = false;
+        },
+
+        // 위치정보 복사 = 주소 + 좌표. 역지오코딩(카카오)이 비동기라 메뉴를 먼저 닫고,
+        // 조회가 실패하거나 SDK 가 없으면 좌표만 복사한다(주소는 «있으면 더 좋은» 것).
+        async copyLocationInfo() {
+            const { lat, lng } = this.ctxMenu;
+            this.closeMapMenu();
+            const address = await this._reverseGeocode(lat, lng);
+            const ok = await this._copyToClipboard(locationText(address, lat, lng));
+            const what = address ? '주소·좌표를' : '좌표를';
+            this._flashToast(ok ? `${what} 복사했습니다` : '복사에 실패했습니다');
+        },
+
+        // 좌표만 복사.
+        async copyMapCoords() {
+            const ok = await this._copyToClipboard(formatCoords(this.ctxMenu.lat, this.ctxMenu.lng));
+            this._flashToast(ok ? '좌표를 복사했습니다' : '복사에 실패했습니다');
+            this.closeMapMenu();
+        },
+
+        // 좌표 → 주소 (카카오 역지오코딩). 실패·미로드는 null 로 돌려 좌표만 쓰게 한다.
+        // coord2Address 는 «경도, 위도» 순서다 — 뒤집으면 엉뚱한 주소가 나온다.
+        _reverseGeocode(lat, lng) {
+            return new Promise((resolve) => {
+                const services = window.kakao?.maps?.services;
+                if (!services) return resolve(null);
+                try {
+                    new services.Geocoder().coord2Address(lng, lat, (result, status) => {
+                        resolve(status === services.Status.OK ? pickAddress(result) : null);
+                    });
+                } catch (e) {
+                    resolve(null);
+                }
+            });
+        },
+
+        async shareMapLocation() {
+            const text = shareText(this.ctxMenu.lat, this.ctxMenu.lng);
+            const url = kakaoMapUrl(this.ctxMenu.lat, this.ctxMenu.lng);
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: '구조 지점', text, url });
+                } catch (e) { /* 사용자가 취소했거나 미지원 — 조용히 넘긴다 */ }
+            } else {
+                const ok = await this._copyToClipboard(text);
+                this._flashToast(ok ? '공유 정보를 복사했습니다' : '복사에 실패했습니다');
+            }
+            this.closeMapMenu();
+        },
+
+        openInKakaoMap() {
+            window.open(kakaoMapUrl(this.ctxMenu.lat, this.ctxMenu.lng), '_blank', 'noopener');
+            this.closeMapMenu();
+        },
+
+        // 클립보드 쓰기 — HTTPS 가 아니거나 미지원이면 execCommand 로 폴백. 실패는 값으로 돌려준다.
+        async _copyToClipboard(text) {
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (e) { /* 폴백으로 */ }
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        _flashToast(msg) {
+            this.mapToast = msg;
+            clearTimeout(this._toastTimer);
+            this._toastTimer = setTimeout(() => { this.mapToast = ''; }, 1800);
+        },
+
         toggleRequest(id) { this.expandedRequestId = this.expandedRequestId === id ? null : id; },
         fmtTime(iso) {
             if (!iso) return '';
@@ -1236,6 +1362,35 @@ export default {
     <!-- MAP -->
     <div class="relative overflow-hidden bg-gray-200">
       <div id="control-map" class="absolute inset-0"></div>
+
+      <!-- 우클릭 액션 메뉴 (FE) — 지도 위 아무 곳이나 우클릭하면 그 지점 좌표로 복사·공유 -->
+      <template v-if="ctxMenu.open">
+        <!-- 메뉴 밖 클릭/우클릭으로 닫는 백드롭 (메뉴보다 아래) -->
+        <div class="absolute inset-0 z-20" @click="closeMapMenu" @contextmenu.prevent="closeMapMenu"></div>
+        <div class="absolute z-30 w-44 select-none rounded-lg border border-gray-200 bg-white py-1 text-sm shadow-xl"
+             :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @click.stop>
+          <div class="border-b border-gray-100 px-3 py-1.5 text-[11px] tabular-nums text-gray-400">{{ ctxCoordsLabel }}</div>
+          <button @click="copyLocationInfo" class="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50">
+            <svg class="h-4 w-4 flex-none text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            위치정보 복사<span class="ml-auto text-[10px] text-gray-400">주소+좌표</span>
+          </button>
+          <button @click="copyMapCoords" class="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50">
+            <svg class="h-4 w-4 flex-none text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+            좌표 복사
+          </button>
+          <button @click="shareMapLocation" class="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50">
+            <svg class="h-4 w-4 flex-none text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 3.9M15.4 6.6 8.6 10.5"/></svg>
+            공유하기
+          </button>
+          <button @click="openInKakaoMap" class="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-50">
+            <svg class="h-4 w-4 flex-none text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            카카오맵에서 열기
+          </button>
+        </div>
+      </template>
+
+      <!-- 액션 결과 토스트 -->
+      <div v-if="mapToast" class="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-lg bg-gray-900/90 px-3 py-2 text-xs text-white shadow">{{ mapToast }}</div>
 
       <div v-if="!hasProject" class="absolute inset-0 flex items-center justify-center bg-gray-50/95 z-10">
         <div class="text-center">
