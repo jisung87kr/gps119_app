@@ -217,6 +217,63 @@ class AdminParticipantImportTest extends TestCase
     }
 
     /**
+     * 🔴 2026-09-04 실제 사고: 엑셀 「텍스트(탭으로 분리)」로 저장한 뒤 확장자만 .csv 로 바꾼
+     *    161행 명단이 «전화번호가 비어 있습니다» 로 전부 실패했다. 탭 파일을 쉼표로 읽으면
+     *    한 줄이 통째로 «이름» 셀이 되고 전화번호 열은 비기 때문이다.
+     *    그 파일의 모양(CP949 + 탭 + CRLF + 제목행)을 그대로 재현한다.
+     */
+    public function test_a_tab_delimited_cp949_file_is_parsed_like_a_csv(): void
+    {
+        $project = $this->project();
+
+        $tsv = mb_convert_encoding(
+            "이름\t전화번호\t역할\r\n김경숙\t010-5027-1259\t운영진\r\n박코스\t010 9541 7049\t자원봉사자(코스)\r\n",
+            'CP949',
+            'UTF-8',
+        );
+
+        $this->upload($project, $tsv)->assertRedirect();
+
+        $report = session('importReport');
+        $this->assertSame(2, $report['total']);
+        $this->assertSame(2, $report['success'], json_encode($report['errors'], JSON_UNESCAPED_UNICODE));
+        $this->assertDatabaseHas('event_rosters', ['name' => '김경숙', 'phone' => '01050271259', 'role' => EventRole::STAFF->value]);
+        $this->assertDatabaseHas('event_rosters', ['name' => '박코스', 'phone' => '01095417049', 'role' => EventRole::VOLUNTEER_COURSE->value]);
+    }
+
+    public function test_a_semicolon_delimited_file_is_accepted(): void
+    {
+        $project = $this->project();
+
+        $this->upload($project, "이름;전화번호;역할\n홍길동;01011112222;구급대\n")->assertRedirect();
+
+        $this->assertSame(1, session('importReport')['success']);
+        $this->assertDatabaseHas('event_rosters', ['name' => '홍길동', 'phone' => '01011112222']);
+    }
+
+    /** 엑셀 「유니코드 텍스트」 — BOM 붙은 UTF-16LE + 탭. 같은 저장 메뉴에서 나오는 쌍둥이 함정. */
+    public function test_an_excel_unicode_text_export_is_accepted(): void
+    {
+        $project = $this->project();
+
+        $utf16 = "\xFF\xFE".mb_convert_encoding("이름\t전화번호\t역할\r\n홍길동\t01011112222\t구급대\r\n", 'UTF-16LE', 'UTF-8');
+
+        $this->upload($project, $utf16)->assertRedirect();
+
+        $this->assertSame(1, session('importReport')['success']);
+        $this->assertDatabaseHas('event_rosters', ['name' => '홍길동', 'phone' => '01011112222']);
+    }
+
+    public function test_delimiter_detection_picks_the_most_frequent_separator(): void
+    {
+        $this->assertSame(',', ParticipantImportService::detectDelimiter("이름,전화번호,역할\n"));
+        $this->assertSame("\t", ParticipantImportService::detectDelimiter("\n\n이름\t전화번호\t역할\n"));
+        $this->assertSame(';', ParticipantImportService::detectDelimiter("홍길동;01011112222;구급대\n"));
+        // 구분자가 없으면 쉼표 — 한 열짜리 파일은 행 단위 «전화번호 없음» 으로 보고된다.
+        $this->assertSame(',', ParticipantImportService::detectDelimiter("홍길동\n"));
+    }
+
+    /**
      * 🔑 한 행이 틀렸다고 전체를 롤백하지 않는다 — 100명 중 1명 오타로 99명이 안 들어가면
      *    현장에서 못 쓴다.
      */

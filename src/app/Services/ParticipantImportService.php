@@ -19,6 +19,7 @@ use RuntimeException;
  *                        명단에 있으면 그 역할, 없으면 일반 참가자.
  *
  * 컬럼: 이름, 전화번호, 역할  (헤더 행 유무 무관)
+ * 구분자: 쉼표·탭·세미콜론 자동 감지 — 엑셀 「텍스트(탭으로 분리)」 저장본을 .csv 로 올려도 된다.
  *
  * 설계상 지켜야 하는 것 3가지 —
  *  1. **역할 배정의 단일 writer 는 EventParticipantService::assignRole** 이다.
@@ -172,7 +173,8 @@ class ParticipantImportService
     /**
      * CSV 원문 → 데이터 행 목록 (순수 함수).
      *
-     * - UTF-8 BOM 제거, CP949(엑셀 기본 "CSV") 자동 변환
+     * - UTF-8 BOM 제거, CP949(엑셀 기본 "CSV") · UTF-16(엑셀 "유니코드 텍스트") 자동 변환
+     * - 구분자(쉼표·탭·세미콜론) 자동 감지
      * - 헤더 행 자동 감지 후 스킵
      * - 완전 빈 행 스킵
      * - line 은 «파일의 물리 행 번호»(1부터, 헤더 포함) — 엑셀에서 그 줄을 바로 찾을 수 있어야 한다.
@@ -182,6 +184,7 @@ class ParticipantImportService
     public function parse(string $csv): array
     {
         $csv = self::decode($csv);
+        $delimiter = self::detectDelimiter($csv);
 
         $handle = fopen('php://memory', 'r+');
         fwrite($handle, $csv);
@@ -190,7 +193,7 @@ class ParticipantImportService
         $rows = [];
         $line = 0;
 
-        while (($cells = fgetcsv($handle)) !== false) {
+        while (($cells = fgetcsv($handle, separator: $delimiter)) !== false) {
             $line++;
 
             // fgetcsv 는 빈 줄을 [null] 로 준다.
@@ -225,8 +228,9 @@ class ParticipantImportService
     /**
      * BOM 제거 + 인코딩 정규화.
      *
-     * 엑셀의 "CSV UTF-8" 은 BOM 붙은 UTF-8, 그냥 "CSV" 는 CP949 를 뱉는다.
-     * 후자를 그대로 읽으면 한글 이름이 전부 깨진 채 회원이 생성되므로 여기서 흡수한다.
+     * 엑셀의 "CSV UTF-8" 은 BOM 붙은 UTF-8, 그냥 "CSV"·"텍스트(탭으로 분리)" 는 CP949,
+     * "유니코드 텍스트" 는 BOM 붙은 UTF-16LE 를 뱉는다. CP949 를 그대로 읽으면 한글 이름이
+     * 전부 깨진 채 명단에 오르고, UTF-16 은 NUL 이 섞여 한 글자도 못 맞추므로 여기서 흡수한다.
      */
     private static function decode(string $csv): string
     {
@@ -235,11 +239,50 @@ class ParticipantImportService
             return substr($csv, strlen($bom));
         }
 
+        // UTF-16 은 BOM 이 있을 때만 판별한다 — 없으면 CP949 와 구분할 방법이 없고,
+        // 엑셀은 항상 BOM 을 붙인다.
+        foreach (["\xFF\xFE" => 'UTF-16LE', "\xFE\xFF" => 'UTF-16BE'] as $utf16Bom => $encoding) {
+            if (str_starts_with($csv, $utf16Bom)) {
+                return (string) mb_convert_encoding(substr($csv, 2), 'UTF-8', $encoding);
+            }
+        }
+
         if (! mb_check_encoding($csv, 'UTF-8')) {
             return (string) mb_convert_encoding($csv, 'UTF-8', 'CP949');
         }
 
         return $csv;
+    }
+
+    /**
+     * 구분자 자동 감지 — 쉼표·탭·세미콜론 (순수 함수).
+     *
+     * 엑셀 「텍스트(탭으로 분리)」·「유니코드 텍스트」는 탭으로, 일부 로캘의 「CSV」는
+     * 세미콜론으로 저장한다. 확장자만 .csv 로 바꿔 올리면 fgetcsv 기본값(쉼표)은 한 줄을
+     * 통째로 «이름» 한 셀로 읽어 전화번호 열이 비고, 전 행이 «전화번호가 비어 있습니다» 로
+     * 실패한다 — 2026-09-04 에 161행짜리 탭 파일이 정확히 그렇게 전부 실패했다.
+     *
+     * 첫 «내용 있는» 줄에서 가장 많이 나온 구분자를 고른다(동률이면 쉼표). 하나도 없으면
+     * 쉼표 — 한 열짜리 파일은 어차피 전화번호 없음으로 행 단위 오류가 보고된다.
+     */
+    public static function detectDelimiter(string $csv): string
+    {
+        foreach (preg_split('/\r\n|\r|\n/', $csv) as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+
+            $best = ',';
+            foreach (["\t", ';'] as $candidate) {
+                if (substr_count($line, $candidate) > substr_count($line, $best)) {
+                    $best = $candidate;
+                }
+            }
+
+            return $best;
+        }
+
+        return ',';
     }
 
     /**
