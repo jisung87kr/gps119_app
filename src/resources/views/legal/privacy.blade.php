@@ -43,6 +43,11 @@
                             <td class="py-2">회원가입 시</td>
                         </tr>
                         <tr class="border-b border-ink-100">
+                            <td class="py-2 pr-3 font-bold text-ink-900">운영진 계정</td>
+                            <td class="py-2 pr-3">이름, 휴대전화번호(행사 주최자가 운영진 명단으로 제공)</td>
+                            <td class="py-2">주최자가 운영진 계정을 대리 발급할 때. 본인이 첫 로그인 시 비밀번호를 설정하고 약관에 동의합니다.</td>
+                        </tr>
+                        <tr class="border-b border-ink-100">
                             <td class="py-2 pr-3 font-bold text-ink-900">간편 로그인</td>
                             <td class="py-2 pr-3">네이버가 제공하는 회원 식별자, 이름, 이메일</td>
                             <td class="py-2">네이버 로그인 이용 시</td>

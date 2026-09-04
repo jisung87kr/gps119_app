@@ -22,5 +22,6 @@
 | [0006](0006-production-hosting-aws-seoul.md) | 운영 배포 대상 — AWS 서울 단일 VM (공공 진입 시 NCP 이전) | Accepted |
 | [0007](0007-dispatch-recall-and-request-cancellation.md) | 지령 회수를 독립 상태로, 신고 취소를 단일 진입점으로 | Accepted |
 | [0008](0008-location-permission-as-separate-axis.md) | OS 위치 권한을 «공유 의도»와 분리된 축으로 — 관제 상태는 서버 파생 | Accepted |
+| [0009](0009-admin-issued-operator-accounts.md) | 운영진 계정을 관리자가 초기 비밀번호로 일괄 발급 — 첫 로그인에서 변경+동의 강제 | Accepted |
 
 > 배경 설계는 [`../epics/realtime-dispatch-control/`](../epics/realtime-dispatch-control/) 참조.

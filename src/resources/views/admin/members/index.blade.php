@@ -1,5 +1,12 @@
 <x-layouts.admin title="회원 관리 - GPS119 관리자">
     <div class="p-5 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        @if(session('success'))
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-800">{{ session('success') }}</div>
+        @endif
+        @error('reissue')
+            <div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-medium text-red-700">{{ $message }}</div>
+        @enderror
+
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
             <div>
@@ -75,6 +82,9 @@
                                 @else
                                     <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                 @endif
+                                @if($member->isIssuedPending())
+                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200">미로그인 발급</span>
+                                @endif
                             </div>
                         </div>
 
@@ -106,6 +116,13 @@
                             <a href="{{ route('admin.members.edit', $member->id) }}"
                                class="flex-1 inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-medium text-slate-700 active:bg-slate-50">수정</a>
                         </div>
+                        @if($member->isIssuedPending())
+                            <form action="{{ route('admin.members.reissue-password', $member->id) }}" method="POST"
+                                  onsubmit="return confirm('초기 비밀번호를 «password» 로 재설정합니다. 계속할까요?')">
+                                @csrf
+                                <button type="submit" class="w-full inline-flex h-11 items-center justify-center rounded-xl bg-amber-50 text-sm font-medium text-amber-700 active:bg-amber-100">초기 비밀번호 재설정</button>
+                            </form>
+                        @endif
                     </li>
                 @empty
                     <li class="px-4 py-14 text-center text-sm text-slate-400">검색된 회원이 없습니다.</li>
@@ -148,6 +165,9 @@
                                         @else
                                             <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">일반회원</span>
                                         @endif
+                                        @if($member->isIssuedPending())
+                                            <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200">미로그인 발급</span>
+                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700 tabular-nums">
@@ -162,6 +182,13 @@
                                            class="text-blue-600 hover:text-blue-700">상세보기</a>
                                         <a href="{{ route('admin.members.edit', $member->id) }}"
                                            class="text-slate-500 hover:text-slate-700">수정</a>
+                                        @if($member->isIssuedPending())
+                                            <form action="{{ route('admin.members.reissue-password', $member->id) }}" method="POST" class="inline"
+                                                  onsubmit="return confirm('초기 비밀번호를 «password» 로 재설정합니다. 계속할까요?')">
+                                                @csrf
+                                                <button type="submit" class="text-amber-600 hover:text-amber-700">비밀번호 재설정</button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

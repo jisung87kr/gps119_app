@@ -321,6 +321,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/members/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'memberShow'])->name('members.show');
     Route::get('/members/{id}/edit', [\App\Http\Controllers\Admin\AdminController::class, 'memberEdit'])->name('members.edit');
     Route::patch('/members/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'memberUpdate'])->name('members.update');
+    // 발급 계정 비밀번호 재발급 (CSV 분실 복구) — 아직 활성화 전 계정에만 (ADR-0009).
+    Route::post('/members/{id}/reissue-password', [\App\Http\Controllers\Admin\AdminController::class, 'memberReissuePassword'])->name('members.reissue-password');
 
     // 신고 상세·상태변경 (목록 SPA는 실시간 관제로 대체되어 제거 — ADR-0005 이후)
     Route::get('/requests/{id}', [\App\Http\Controllers\Admin\AdminController::class, 'requestShow'])->name('requests.show');
@@ -333,6 +335,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/projects/{project}/participants/import', [\App\Http\Controllers\Admin\EventParticipantController::class, 'import'])->name('projects.participants.import');
     Route::get('/projects/{project}/participants/template', [\App\Http\Controllers\Admin\EventParticipantController::class, 'importTemplate'])->name('projects.participants.template');
     Route::delete('/projects/{project}/roster/{roster}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'rosterDestroy'])->name('projects.roster.destroy');
+    // 운영진 회원계정 일괄 발급 — claim 대기 명단에 초기 비밀번호로 계정을 만든다 (ADR-0009). CSV 반환.
+    Route::post('/projects/{project}/participants/issue-accounts', [\App\Http\Controllers\Admin\EventParticipantController::class, 'issueAccounts'])->name('projects.participants.issue');
     Route::patch('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'update'])->name('projects.participants.update');
     Route::delete('/projects/{project}/participants/{user}', [\App\Http\Controllers\Admin\EventParticipantController::class, 'destroy'])->name('projects.participants.destroy');
 
@@ -379,6 +383,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/consent', [ConsentController::class, 'show'])->name('consent.show');
     Route::post('/consent', [ConsentController::class, 'store'])->name('consent.store');
     Route::post('/consent/decline', [ConsentController::class, 'decline'])->name('consent.decline');
+
+    // 발급 계정 첫 로그인 셋업 — 비밀번호 변경 + 필수 동의 (ADR-0009).
+    Route::get('/account/setup', [\App\Http\Controllers\Auth\AccountSetupController::class, 'show'])->name('account.setup.show');
+    Route::post('/account/setup', [\App\Http\Controllers\Auth\AccountSetupController::class, 'store'])->name('account.setup.store');
 });
 
 Route::get('/login/{driver}', [SocialController::class, 'redirect'])->name('login.social');

@@ -9,6 +9,7 @@ use App\Models\EventParticipant;
 use App\Models\EventRoster;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\AccountIssueService;
 use App\Services\EventParticipantService;
 use App\Services\ParticipantImportService;
 use Illuminate\Http\Request;
@@ -65,6 +66,8 @@ class EventParticipantController extends Controller
             'addableUsers' => $addableUsers,
             'rosterPending' => $rosterPending,
             'rosterTotal' => EventRoster::forProject($project->id)->count(),
+            // 발급 «가능»한 대기 인원 = 아직 회원이 아닌 claim-대기 명단 (ADR-0009).
+            'rosterIssuable' => $rosterPending->filter(fn ($r) => ! User::where('phone', $r->phone)->exists())->count(),
             'roles' => EventRole::cases(),
             'statuses' => ParticipantStatus::cases(),
         ]);
@@ -173,5 +176,35 @@ class EventParticipantController extends Controller
             ->delete();
 
         return back()->with('success', '참가자를 행사에서 제외했습니다.');
+    }
+
+    /**
+     * 운영진 회원계정 일괄 발급 (ADR-0009).
+     *
+     * claim 대기 명단 중 «아직 계정이 없는» 사람에게 계정을 만든다. 초기 비밀번호는 전원 동일한
+     * «password» 이고(운영 요청), 본인이 첫 로그인에서 반드시 바꾼다. 이미 회원인 행은 계정을
+     * 만들지 않고 역할만 붙는다. 서로 다른 비밀번호가 없으므로 CSV 없이 결과 요약만 돌려준다.
+     */
+    public function issueAccounts(Project $project, AccountIssueService $issuer)
+    {
+        $report = $issuer->issueForRoster($project, auth()->user());
+
+        if ($report['issued'] === 0) {
+            $msg = $report['linked'] > 0
+                ? "{$report['linked']}명은 이미 회원이라 역할만 배정했습니다. 새로 발급할 계정이 없습니다."
+                : '발급할 대상이 없습니다. (입장 대기 명단에 계정 없는 운영진이 없습니다.)';
+
+            return back()->with('success', $msg);
+        }
+
+        $parts = ["운영진 {$report['issued']}명에게 회원계정을 발급했습니다. 초기 비밀번호는 모두 «password» 입니다 — 각자 첫 로그인에서 변경합니다."];
+        if ($report['linked'] > 0) {
+            $parts[] = "이미 회원인 {$report['linked']}명은 역할만 배정했습니다.";
+        }
+        if ($report['failed'] > 0) {
+            $parts[] = "{$report['failed']}건은 실패했습니다.";
+        }
+
+        return back()->with('success', implode(' ', $parts));
     }
 }

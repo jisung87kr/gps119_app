@@ -31,6 +31,9 @@ class User extends Authenticatable
         'provider',
         'provider_id',
         'avatar',
+        'must_change_password',
+        'issued_at',
+        'issued_by',
     ];
 
     /**
@@ -57,7 +60,20 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'must_change_password' => 'boolean',
+            'issued_at' => 'datetime',
         ];
+    }
+
+    /**
+     * 관리자가 대리 발급했고 «본인이 아직 처음 로그인하지 않은» 계정인가 (ADR-0009).
+     *
+     * 첫 로그인에서 비밀번호를 바꾸면 must_change_password 가 내려가 이 값이 false 가 된다.
+     * 재발급은 이 상태에서만 허용한다 — 본인이 정한 비밀번호를 덮지 않기 위해서다.
+     */
+    public function isIssuedPending(): bool
+    {
+        return $this->must_change_password && $this->issued_at !== null;
     }
 
     public function consents(): \Illuminate\Database\Eloquent\Relations\HasMany

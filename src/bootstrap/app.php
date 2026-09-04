@@ -23,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             // \Illuminate\Session\Middleware\AuthenticateSession::class,
+            // 발급 계정은 첫 로그인에서 비밀번호 변경 + 동의를 마칠 때까지 다른 화면에 못 닿는다 (ADR-0009).
+            \App\Http\Middleware\EnsurePasswordSetup::class,
         ]);
 
         $middleware->group('api', [

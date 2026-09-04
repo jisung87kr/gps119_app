@@ -10,6 +10,7 @@ use App\Models\Dispatch;
 use App\Models\Project;
 use App\Models\Request as RescueRequest;
 use App\Models\User;
+use App\Services\AccountIssueService;
 use App\Services\RequestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -361,5 +362,23 @@ class AdminController extends Controller
 
         return redirect()->route('admin.members.show', $user->id)
             ->with('success', '회원이 성공적으로 생성되었습니다.');
+    }
+
+    /**
+     * 발급 계정 비밀번호를 초기값(«password»)으로 재설정 (ADR-0009 D4).
+     *
+     * 🔑 «아직 본인이 안 쓴» 계정(isIssuedPending)에만 허용한다. 본인이 정한 비밀번호를 덮지 않는다.
+     */
+    public function memberReissuePassword($id, AccountIssueService $issuer)
+    {
+        $member = User::findOrFail($id);
+
+        try {
+            $issuer->reissuePassword($member);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['reissue' => $e->getMessage()]);
+        }
+
+        return back()->with('success', "{$member->name}님의 초기 비밀번호를 «password» 로 재설정했습니다.");
     }
 }

@@ -215,6 +215,32 @@
                     {{ number_format($rosterPending->count()) }} / {{ number_format($rosterTotal) }}
                 </span>
             </div>
+            {{-- 운영진 회원계정 일괄 발급 (ADR-0009). 계정 없는 대기 인원에게 계정을 만든다. --}}
+            @if($rosterIssuable > 0)
+                <div class="px-6 py-3.5 border-b border-amber-100 bg-amber-50/30 flex flex-wrap items-center gap-x-3 gap-y-2"
+                     x-data="{ issuing: false }">
+                    <p class="text-xs text-amber-800/90 flex-1 min-w-[200px]">
+                        아직 <b>계정이 없는 운영진 {{ number_format($rosterIssuable) }}명</b>에게 회원계정을 발급할 수 있습니다.
+                        초기 비밀번호는 모두 <b>password</b> 이고, 본인이 첫 로그인에서 비밀번호를 바꾸고 약관에 동의합니다.
+                        <span class="text-amber-700/70">인원이 많으면 발급에 수십 초가 걸릴 수 있습니다 — 버튼을 한 번만 누르고 기다려 주세요.</span>
+                    </p>
+                    <form action="{{ route('admin.projects.participants.issue', $project->id) }}" method="POST" class="flex-none"
+                          @submit="issuing = true"
+                          onsubmit="return confirm('계정 없는 운영진 {{ $rosterIssuable }}명에게 회원계정을 발급합니다. 초기 비밀번호는 모두 password 입니다. 계속할까요?')">
+                        @csrf
+                        <button type="submit" x-bind:disabled="issuing"
+                                class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-amber-600 rounded-xl hover:bg-amber-700 shadow-sm shadow-amber-600/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                            {{-- 처리 중 스피너 --}}
+                            <svg x-show="issuing" x-cloak class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/>
+                            </svg>
+                            <svg x-show="!issuing" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                            <span x-text="issuing ? '발급 중…' : '회원계정 일괄 발급'">회원계정 일괄 발급</span>
+                        </button>
+                    </form>
+                </div>
+            @endif
             <div class="divide-y divide-slate-100">
                 @foreach($rosterPending as $row)
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">

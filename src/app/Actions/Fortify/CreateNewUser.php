@@ -41,7 +41,11 @@ class CreateNewUser implements CreatesNewUsers
             // 필수 항목이 «전부» 들어와야 한다. 하나만 체크한 제출을 통과시키지 않는다.
             'consents' => ['required', 'array'],
             'consents.*' => [Rule::in($required)],
-        ], [], [
+        ], [
+            // 🔑 이미 발급된 번호(운영진 대리 발급)로 가입을 시도하는 경우까지 덮는 안내다 —
+            //    전화-점유 함정(ADR-0009)의 직접 대응. 「이미 사용 중」 대신 로그인을 안내한다.
+            'phone.unique' => '이미 가입된 번호입니다. 로그인해 주세요. (운영진이라면 발급받은 초기 비밀번호로 로그인하세요.)',
+        ], [
             'consents' => '약관 동의',
         ])->after(function ($validator) use ($input, $required) {
             $given = (array) ($input['consents'] ?? []);
