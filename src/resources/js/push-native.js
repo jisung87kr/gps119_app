@@ -75,6 +75,33 @@ function enabledForCurrentUser(env) {
     return me === null ? true : owner === me;
 }
 
+/**
+ * 셸의 버전·빌드 번호 — `"1.0 (2)"` 꼴. 모르면 null.
+ *
+ * 🔑 등록(`POST /api/devices`)에 `app_version` 으로 싣는다 (2026-09-07 현장). 알림 아이콘이
+ *    Capacitor 기본 로고로 온 것을 보고서야 「이 폰은 빌드 1」임을 알았다 — 서버 `device_tokens`
+ *    에는 열만 있고 앱이 안 보내고 있었다. 어느 기기가 어느 빌드인지는 서버에서 보여야 한다
+ *    (사이렌 파일이 있는 빌드인지, 아이콘이 바뀐 빌드인지가 전부 여기에 달린다).
+ *
+ * @returns {Promise<string|null>}
+ */
+export async function appVersion(env = globalThis) {
+    const app = env.Capacitor?.Plugins?.App;
+    if (typeof app?.getInfo !== 'function') return null;
+
+    try {
+        const info = await app.getInfo();
+        const version = typeof info?.version === 'string' ? info.version : '';
+        const build = typeof info?.build === 'string' ? info.build : '';
+
+        if (version === '' && build === '') return null;
+
+        return build !== '' ? `${version} (${build})` : version;
+    } catch (e) {
+        return null;
+    }
+}
+
 /** 이 페이지에서 앱 푸시를 쓸 수 있는가. */
 export function isNativePushSupported(env = globalThis) {
     return hasNativeCapability(NativeCapability.PUSH_TOKEN, env);
@@ -148,6 +175,7 @@ export async function enableNativePush(env = globalThis) {
         await env.axios.post('/api/devices', {
             platform: nativePlatform(env),
             token,
+            app_version: await appVersion(env),
         });
     } catch (e) {
         // 서버가 모르면 알림은 «영영» 오지 않는다. 켜진 것처럼 보이게 두지 않는다.
@@ -191,7 +219,11 @@ export async function syncNativePushOwner(env = globalThis) {
     if (!token) return { ok: false, changed: false, reason: 'registration-failed' };
 
     try {
-        await env.axios.post('/api/devices', { platform: nativePlatform(env), token });
+        await env.axios.post('/api/devices', {
+            platform: nativePlatform(env),
+            token,
+            app_version: await appVersion(env),
+        });
     } catch (e) {
         return { ok: false, changed: false, reason: 'server-rejected' };
     }
