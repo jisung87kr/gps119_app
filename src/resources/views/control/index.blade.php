@@ -9,6 +9,8 @@
     --}}
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- 푸시 등록의 «주인» 판정용 — layouts/app 과 같다. --}}
+    @auth<meta name="gps119-user" content="{{ auth()->id() }}">@endauth
     {{--
         웹 푸시 VAPID 공개키. 관제에 «특히» 필요하다 — Reverb 는 이 탭이 떠 있을 때만
         닿으므로, 탭을 접어두거나 화면을 끄면 신규 신고를 놓친다.

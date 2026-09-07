@@ -8,6 +8,7 @@ import {
 import { isNativeApp, nativeInfo, nativePlatform } from './native/bridge';
 import { initPwa } from './pwa';
 import { initPushToggles } from './push-toggle';
+import { syncPushRegistration } from './push';
 import { initNativePushRouting } from './push-native';
 import { createNativeLocationTracker } from './native/locationTracker';
 import { createNativeCurrentPosition } from './native/currentPosition';
@@ -42,6 +43,13 @@ initPushToggles();
 // 같은 일을 한다 — 규약(payload.url)이 같아서 착지 처리를 두 벌로 짜지 않는다.
 // 앱이 아니거나 플러그인이 없으면 아무것도 하지 않는다.
 initNativePushRouting();
+
+// 🔴 푸시 등록을 «로그인한 사람»에게 맞춘다 (2026-09-07 현장). 같은 기기·브라우저를 다른
+//    계정이 쓰면 토큰·구독이 이전 사람 것으로 남아 새 사람은 알림을 못 받는다. 페이지마다
+//    주인을 비교해 다를 때만 다시 등록한다 — 대부분의 로드에서는 아무 요청도 안 나간다.
+//    /control 은 서비스워커를 등록하지 않아(ready 가 영영 안 풀린다) 여기서만 부른다;
+//    그쪽은 initNativePushRouting 안의 네이티브 동기화만 탄다.
+syncPushRegistration().catch(() => {});
 
 // 위치 «취득» 트래커를 전역으로 넘긴다 (N3 / 02 §3-3).
 //
