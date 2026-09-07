@@ -10,6 +10,7 @@ import { initPwa } from './pwa';
 import { initPushToggles } from './push-toggle';
 import { initNativePushRouting } from './push-native';
 import { createNativeLocationTracker } from './native/locationTracker';
+import { createNativeCurrentPosition } from './native/currentPosition';
 import {
     decidePermissionStep,
     openLocationSettings,
@@ -54,6 +55,10 @@ initNativePushRouting();
 window.__gps119Bridge = {
     ...(window.__gps119Bridge || {}),
     locationTracker: createNativeLocationTracker(),
+
+    // 신고 화면의 1회 위치 취득 (F-12). iOS 앱에서만 함수이고 그 외엔 null —
+    // mapHelpers.getCurrentPositionOnce 가 null 이면 원래의 navigator.geolocation 을 쓴다.
+    getCurrentPosition: createNativeCurrentPosition(),
 
     // 권한 3단계 UX (02 §4). 화면은 「지금 어느 단계인가」만 물어보고 그린다 —
     // 판정은 여기(순수 함수)에 있고 Vitest 가 지킨다.

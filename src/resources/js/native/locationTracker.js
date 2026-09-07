@@ -30,6 +30,33 @@ import { hasNativeCapability, isNativeApp, NativeCapability } from './bridge';
 const PLUGIN = 'BackgroundGeolocation';
 
 /**
+ * 플러그인 객체. 이 파일 밖에서 이름을 부르지 않기 위한 유일한 통로다
+ * (currentPosition.js 가 신고 화면의 1회 취득에 같은 플러그인을 쓴다 — F-12).
+ */
+export function nativeLocationPlugin(env = globalThis) {
+    return env.Capacitor?.Plugins?.[PLUGIN] ?? null;
+}
+
+/**
+ * 플러그인의 위치 → W3C GeolocationPosition «모양».
+ *
+ * 🔑 그게 이미 locationShare.js·mapHelpers.js 안쪽의 계약이라, 여기서 맞춰 주면 웹 경로는
+ *    무변환이고 적응은 네이티브 쪽에서만 일어난다.
+ */
+export function toGeolocationPosition(location) {
+    return {
+        coords: {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            heading: location.bearing ?? null,
+            speed: location.speed ?? null,
+        },
+        timestamp: location.time ?? Date.now(),
+    };
+}
+
+/**
  * 권한 «상태»를 읽는 셸 자체 플러그인 (M-5).
  *
  * 🔴 **배경 위치 플러그인에는 `checkPermissions()` 가 없다.** watcher 가
@@ -125,7 +152,7 @@ export function createNativeLocationTracker(env = globalThis) {
     if (!isNativeApp(env)) return null;
     if (!hasNativeCapability(NativeCapability.BACKGROUND_LOCATION, env)) return null;
 
-    const plugin = env.Capacitor?.Plugins?.[PLUGIN];
+    const plugin = nativeLocationPlugin(env);
     if (!plugin) return null;
 
     let watcherId = null;
@@ -174,16 +201,7 @@ export function createNativeLocationTracker(env = globalThis) {
                     }
                     if (!location) return;
 
-                    onFix({
-                        coords: {
-                            latitude: location.latitude,
-                            longitude: location.longitude,
-                            accuracy: location.accuracy,
-                            heading: location.bearing ?? null,
-                            speed: location.speed ?? null,
-                        },
-                        timestamp: location.time ?? Date.now(),
-                    });
+                    onFix(toGeolocationPosition(location));
                 },
             );
         },
