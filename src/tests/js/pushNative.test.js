@@ -704,3 +704,19 @@ describe('🔴 앱 푸시 — 기록은 기기에 남고 계정은 바뀐다 (20
         expect(currentUserId({})).toBeNull();
     });
 });
+
+describe('🔴 앱 푸시 — 이미 허용이어도 권한을 다시 요청한다 (2026-09-07 현장: 「사운드」 행이 없는 아이폰)', () => {
+    it('granted 여도 requestPermissions 를 부른다 — 빠진 옵션(sound)을 채우기 위해', async () => {
+        const env = nativeEnv({ receive: 'granted' });
+
+        expect(await enableNativePush(env)).toEqual({ ok: true });
+        expect(env.__plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    });
+
+    it('denied 면 요청하지 않는다 — 앱 안에서 되돌릴 수 없고 OS 설정으로 안내한다', async () => {
+        const env = nativeEnv({ receive: 'denied' });
+
+        expect(await enableNativePush(env)).toEqual({ ok: false, reason: 'denied' });
+        expect(env.__plugin.requestPermissions).not.toHaveBeenCalled();
+    });
+});
