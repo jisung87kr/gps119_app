@@ -101,10 +101,12 @@ describe('관제 — 지도 없이도 세는 것들', () => {
 
     it('신규 신고는 지도가 없어도 목록에 올라간다', () => {
         // 예전에는 핀부터 찍어서 지도가 없으면 여기서 터지고 목록에도 안 올라갔다.
-        // _onRequestCreated 가 내부에서 _requestCount 를 부르므로 같이 붙인다
+        // _onRequestCreated 가 내부에서 _requestCount·_announceRequest(토스트+알림음, 2026-09-07)를
+        // 부르므로 같이 붙인다. 알림음은 마운트 전이라 없을 수 있다 — 그래도 목록 갱신은 돼야 한다.
         const ctx = {
-            requestPins: null, requests: [], requestCount: 0,
+            requestPins: null, requests: [], requestCount: 0, requestToast: null, _alertSound: null,
             _requestCount: ControlApp.methods._requestCount,
+            _announceRequest: ControlApp.methods._announceRequest,
         };
         ControlApp.methods._onRequestCreated.call(ctx, { request_id: 7 });
 

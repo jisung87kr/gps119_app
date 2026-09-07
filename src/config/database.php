@@ -57,6 +57,10 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // 🔴 세션 time_zone. 앱 시간대(Asia/Seoul)와 «한 쌍»이다 — config/app.php 의 timezone 주석 참조.
+            //    TIMESTAMP 열은 내부적으로 UTC 로 저장되고 이 값으로 변환돼 읽힌다. 이름(Asia/Seoul)은
+            //    MySQL 의 tz 테이블이 필요하므로 오프셋으로 적는다(한국은 서머타임이 없다).
+            'timezone' => '+09:00',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
