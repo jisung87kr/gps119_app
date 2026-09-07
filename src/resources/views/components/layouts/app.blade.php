@@ -44,6 +44,10 @@
     --}}
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- 푸시 등록의 «주인» 판정용 (2026-09-07). 같은 기기·브라우저를 다른 계정이 쓰면 토큰이
+         이전 사람 것으로 남아 새 사람은 알림을 못 받는다. push.js/push-native.js 가 이 값과
+         저장된 주인을 비교해 다르면 다시 등록한다. 숫자 id 뿐이라 노출돼도 무방하다. --}}
+    @auth<meta name="gps119-user" content="{{ auth()->id() }}">@endauth
     {{-- 웹 푸시 구독용 VAPID 공개키. «공개»키라 노출이 정상이다(개인키는 서버에만). --}}
     <meta name="vapid-public-key" content="{{ config('push.vapid.public_key') }}">
     <title>{{ $title ?? 'GPS119' }}</title>

@@ -17,31 +17,62 @@ import { hasNativeCapability, nativePlatform, NativeCapability } from './native/
 let lastToken = null;
 
 /**
- * 「켜 뒀다」는 기록 — 페이지를 넘어서 살아남아야 한다.
+ * 「켜 뒀다」는 기록 — 페이지를 넘어서 살아남아야 한다. 값은 **등록한 사용자의 id** 다.
  *
  * 🔴 lastToken 은 모듈 변수라 «페이지마다» 사라진다(앱 셸은 원격 URL 이라 화면 이동이
  *    곧 새 번들 인스턴스다). 그것만 보면 프로필에서 켠 뒤 다른 화면을 다녀오는 순간
  *    토글이 「알림 꺼짐」으로 읽혔다 — 서버는 여전히 보내는데 화면만 거짓이었다.
  *    토큰 자체는 저장하지 않는다(자격증명) — 끌 때는 플러그인에서 다시 받는다.
+ *
+ * 🔴 **기록은 기기에 남고, 계정은 바뀐다 (2026-09-07 현장).** 같은 아이폰을 A 가 쓰다
+ *    B 가 로그인하면, 기록은 '켜짐' 인데 서버의 토큰은 A 소유다 — B 의 화면은 「알림 받는 중」
+ *    이고 지령은 A 에게 간다. 그래서 값에 «누가» 켰는지를 적고, 로그인한 사람과 다르면
+ *    syncNativePushOwner() 가 현재 사용자로 다시 등록한다(서버 등록은 token_hash 기준
+ *    멱등이라 주인이 넘어온다). 예전 기록 '1' 은 「누군지 모름」으로 읽어 같은 길을 탄다.
  */
 const ENABLED_KEY = 'gps119.push.enabled';
 
-function readEnabled(env) {
+/** 예전 형식의 값 — 켜긴 했는데 누가 켰는지 모른다. */
+const LEGACY_OWNER = '1';
+
+function readOwner(env) {
     try {
-        return env.localStorage?.getItem(ENABLED_KEY) === '1';
+        return env.localStorage?.getItem(ENABLED_KEY) ?? null;
     } catch (e) {
         // 저장소가 막힌 환경(프라이빗 모드 등). 이 페이지 안에서는 lastToken 으로 버틴다.
-        return false;
+        return null;
     }
 }
 
-function writeEnabled(env, on) {
+function writeOwner(env, owner) {
     try {
-        if (on) env.localStorage?.setItem(ENABLED_KEY, '1');
+        if (owner) env.localStorage?.setItem(ENABLED_KEY, String(owner));
         else env.localStorage?.removeItem(ENABLED_KEY);
     } catch (e) {
         // 위와 같다. 기록이 안 되면 다음 페이지에서 «꺼짐»으로 보이는데, 그건 종전과 같다.
     }
+}
+
+/**
+ * 지금 로그인한 사용자 id. 레이아웃이 `<meta name="gps119-user">` 로 심는다.
+ * 없으면 null — 구버전 페이지이거나 비로그인. 그때는 예전처럼 «기록만» 본다.
+ *
+ * @returns {string|null}
+ */
+export function currentUserId(env = globalThis) {
+    const content = env.document?.querySelector?.('meta[name="gps119-user"]')?.content;
+
+    return typeof content === 'string' && content !== '' ? content : null;
+}
+
+/** 이 기기의 켜짐 기록이 «지금 로그인한 사람» 것인가. 사용자를 모르는 페이지에서는 기록만 본다. */
+function enabledForCurrentUser(env) {
+    const owner = readOwner(env);
+    if (!owner) return false;
+
+    const me = currentUserId(env);
+
+    return me === null ? true : owner === me;
 }
 
 /** 이 페이지에서 앱 푸시를 쓸 수 있는가. */
@@ -74,8 +105,8 @@ export async function nativePushStatus(env = globalThis) {
     if (receive !== 'granted') return 'default';
 
     // 권한이 있어도 «서버가 아는가»는 별개다. 등록해 둔 기록이 있어야 켜진 것이다 —
-    // 이 페이지에서 켰으면 lastToken, 다른 페이지에서 켰으면 저장소의 기록.
-    return lastToken || readEnabled(env) ? 'subscribed' : 'default';
+    // 이 페이지에서 켰으면 lastToken, 다른 페이지에서 켰으면 저장소의 기록(«내» 것일 때만).
+    return lastToken || enabledForCurrentUser(env) ? 'subscribed' : 'default';
 }
 
 /**
@@ -119,9 +150,51 @@ export async function enableNativePush(env = globalThis) {
     }
 
     lastToken = token;
-    writeEnabled(env, true);
+    writeOwner(env, currentUserId(env) ?? LEGACY_OWNER);
 
     return { ok: true };
+}
+
+/**
+ * 로그인한 사람이 바뀌었으면 이 기기의 토큰을 «그 사람» 것으로 다시 등록한다.
+ *
+ * 앱을 열 때마다 부른다(initNativePushRouting). 기록의 주인이 지금 사용자와 같으면 아무 일도
+ * 없다. 다르거나 예전 형식('1')이면 토큰을 다시 받아 POST /api/devices — 서버는 token_hash 로
+ * 찾아 user_id 를 바꾸므로 이전 사람에게 가던 지령이 여기서 끊긴다.
+ *
+ * 🔑 기록이 «없으면» 하지 않는다. 이 기기에서 아무도 켠 적이 없다는 뜻이고, 켤지는 사용자가 정한다.
+ *
+ * @returns {Promise<{ok: boolean, changed: boolean, reason?: string}>}
+ */
+export async function syncNativePushOwner(env = globalThis) {
+    const p = plugin(env);
+    if (!p) return { ok: false, changed: false, reason: 'unsupported' };
+
+    const owner = readOwner(env);
+    const me = currentUserId(env);
+    if (!owner || !me || owner === me) return { ok: true, changed: false };
+
+    const { receive } = await p.checkPermissions();
+    if (receive !== 'granted') return { ok: false, changed: false, reason: 'denied' };
+
+    let token;
+    try {
+        ({ token } = await p.getToken());
+    } catch (e) {
+        return { ok: false, changed: false, reason: 'registration-failed' };
+    }
+    if (!token) return { ok: false, changed: false, reason: 'registration-failed' };
+
+    try {
+        await env.axios.post('/api/devices', { platform: nativePlatform(env), token });
+    } catch (e) {
+        return { ok: false, changed: false, reason: 'server-rejected' };
+    }
+
+    lastToken = token;
+    writeOwner(env, me);
+
+    return { ok: true, changed: true };
 }
 
 /**
@@ -135,7 +208,7 @@ export async function disableNativePush(env = globalThis) {
 
     if (!token) {
         // 이 페이지에서 켠 게 아니다. 켠 기록도 없으면 끌 것이 없다.
-        if (!readEnabled(env)) return { ok: true };
+        if (!readOwner(env)) return { ok: true };
 
         // 다른 페이지에서 켰다 — 토큰을 플러그인에서 다시 받아 서버에 알린다.
         try {
@@ -156,7 +229,7 @@ export async function disableNativePush(env = globalThis) {
     }
 
     lastToken = null;
-    writeEnabled(env, false);
+    writeOwner(env, null);
 
     return { ok: true };
 }
@@ -170,6 +243,9 @@ export async function disableNativePush(env = globalThis) {
 export function initNativePushRouting(env = globalThis) {
     const p = plugin(env);
     if (!p) return;
+
+    // 로그인한 사람이 바뀌었으면 토큰 주인을 넘긴다 — 결과는 기다리지 않는다(라우팅을 막지 않는다).
+    syncNativePushOwner(env).catch(() => {});
 
     // 앱을 열었다는 것 자체가 「봤다」는 뜻이다. 여기서 안 지우면 숫자가 영영 남는다.
     clearAppBadge(env);

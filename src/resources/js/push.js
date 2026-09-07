@@ -14,7 +14,36 @@
 
 import {
     isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
+    syncNativePushOwner, currentUserId,
 } from './push-native';
+
+/**
+ * 이 브라우저의 구독을 «누구» 계정으로 등록했는가 — 사용자 id.
+ *
+ * 🔴 브라우저 구독은 계정이 아니라 브라우저에 묶인다 (2026-09-07 현장). A 가 켠 PC 에서 B 가
+ *    로그인하면 구독은 그대로 있어 화면은 「알림 받는 중」인데 서버 등록은 A 소유다 —
+ *    B 의 지령이 A 에게 간다. 그래서 주인을 적어 두고, 다르면 같은 구독을 B 로 다시 등록한다
+ *    (POST /api/devices 는 token_hash 기준 멱등이라 주인이 넘어온다). 기록이 없는데 구독이 있으면
+ *    (이 변경 전에 켠 브라우저) 한 번 다시 등록해 주인을 채운다.
+ */
+const WEB_OWNER_KEY = 'gps119.push.web.owner';
+
+function readWebOwner(env) {
+    try {
+        return env.localStorage?.getItem(WEB_OWNER_KEY) ?? null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function writeWebOwner(env, owner) {
+    try {
+        if (owner) env.localStorage?.setItem(WEB_OWNER_KEY, String(owner));
+        else env.localStorage?.removeItem(WEB_OWNER_KEY);
+    } catch (e) {
+        // 저장소가 막힌 환경. 다음 페이지에서 한 번 더 등록될 뿐이다(멱등).
+    }
+}
 
 /** VAPID 공개키는 서버가 meta 태그로 심는다(공개키라 노출되어도 무방). */
 export function vapidPublicKey(doc = document) {
@@ -65,8 +94,54 @@ export async function pushStatus(env = globalThis) {
 
     const registration = await env.navigator.serviceWorker.ready;
     const existing = await registration.pushManager.getSubscription();
+    if (!existing) return 'default';
 
-    return existing ? 'subscribed' : 'default';
+    // 구독이 있어도 «다른 사람» 것으로 등록돼 있으면 이 사람에게는 꺼진 것이다.
+    // 「켜기」를 누르면 enablePush 가 같은 구독을 이 사람으로 다시 등록한다.
+    const owner = readWebOwner(env);
+    const me = currentUserId(env);
+    if (owner && me && owner !== me) return 'default';
+
+    return 'subscribed';
+}
+
+/**
+ * 로그인한 사람이 바뀌었으면 이 브라우저의 구독을 «그 사람» 것으로 다시 등록한다.
+ * 앱 안에서는 네이티브 쪽(syncNativePushOwner)으로 넘긴다. 페이지마다 한 번 부른다(app.js).
+ *
+ * 🔑 구독이 없으면 아무것도 하지 않는다 — 켤지는 사용자가 정한다. 권한이 없어도 마찬가지.
+ *
+ * @returns {Promise<{ok: boolean, changed: boolean, reason?: string}>}
+ */
+export async function syncPushRegistration(env = globalThis) {
+    if (isNativePushSupported(env)) return syncNativePushOwner(env);
+
+    if (!isSupported(env)) return { ok: false, changed: false, reason: 'unsupported' };
+    if (env.Notification.permission !== 'granted') return { ok: true, changed: false };
+
+    const me = currentUserId(env);
+    if (!me) return { ok: true, changed: false };
+
+    const registration = await env.navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+        writeWebOwner(env, null);
+
+        return { ok: true, changed: false };
+    }
+
+    if (readWebOwner(env) === me) return { ok: true, changed: false };
+
+    try {
+        await env.axios.post('/api/devices', subscriptionToPayload(subscription));
+    } catch (e) {
+        return { ok: false, changed: false, reason: 'server-rejected' };
+    }
+
+    writeWebOwner(env, me);
+
+    return { ok: true, changed: true };
 }
 
 export function isSupported(env = globalThis) {
@@ -121,6 +196,8 @@ export async function enablePush(env = globalThis) {
         return { ok: false, reason: 'server-rejected' };
     }
 
+    writeWebOwner(env, currentUserId(env));
+
     return { ok: true };
 }
 
@@ -155,6 +232,7 @@ export async function disablePush(env = globalThis) {
     }
 
     await subscription.unsubscribe();
+    writeWebOwner(env, null);
 
     return { ok: true };
 }

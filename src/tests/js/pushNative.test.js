@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
     isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
-    initNativePushRouting, __resetNativePushState, safePath,
+    initNativePushRouting, __resetNativePushState, safePath, syncNativePushOwner, currentUserId,
     toForegroundNotification, needsForegroundNotification, notificationId, clearAppBadge,
 } from '../../resources/js/push-native.js';
 import { pushStatus, enablePush } from '../../resources/js/push.js';
@@ -22,7 +22,7 @@ import { pushStatus, enablePush } from '../../resources/js/push.js';
 
 
 /** showForegroundBanner 폴백 검증용 최소 DOM. Vitest 환경은 node 라 document 가 없다. */
-function fakeDocument() {
+function fakeDocument(userId = null) {
     const make = () => ({
         style: { cssText: '' },
         __children: [],
@@ -35,7 +35,13 @@ function fakeDocument() {
         get textContent() { return this.__text; },
     });
 
-    return { createElement: make, getElementById: () => null, body: make() };
+    return {
+        createElement: make,
+        getElementById: () => null,
+        body: make(),
+        // <meta name="gps119-user"> — 레이아웃이 심는 로그인 사용자 id. null 이면 구버전 페이지.
+        querySelector: (sel) => (sel === 'meta[name="gps119-user"]' && userId != null ? { content: String(userId) } : null),
+    };
 }
 
 /** localStorage 흉내 — 「켜 뒀다」 기록은 페이지를 넘어 살아야 하므로 env 에 붙인다. */
@@ -58,6 +64,8 @@ function nativeEnv({
     localNotifications = true, scheduleFails = false, badge = true, storage = true,
     // 셸이 만들어 둔 채널 목록. 기본은 «지금» 셸(v2). null 이면 listChannels 가 실패한다.
     channels = ['gps119-rescue-v2'],
+    // 로그인한 사용자 id(meta) 와, 이 기기에 남아 있는 «켜짐 기록»의 주인.
+    userId = null, storedOwner = null,
 } = {}) {
     const listeners = {};
     const local = localNotifications ? {
@@ -103,7 +111,7 @@ function nativeEnv({
         },
         axios: { post: vi.fn(async () => ({})), delete: vi.fn(async () => ({})) },
         location: { assign: vi.fn() },
-        document: fakeDocument(),
+        document: fakeDocument(userId),
         __plugin: plugin,
         __local: local,
         __badge: badgePlugin,
@@ -113,6 +121,8 @@ function nativeEnv({
     if (!storage) {
         // 프라이빗 모드처럼 «접근 자체가» 던지는 환경.
         Object.defineProperty(env, 'localStorage', { get() { throw new Error('SecurityError'); } });
+    } else if (storedOwner != null) {
+        env.localStorage.setItem('gps119.push.enabled', storedOwner);
     }
 
     return env;
@@ -587,6 +597,15 @@ describe('푸시 라우팅이 «모든» 진입점에 배선돼 있다', () => {
         expect(code).toMatch(/import\s*\{[^}]*initNativePushRouting[^}]*\}\s*from/);
         expect(code).toMatch(/^\s*initNativePushRouting\(\s*\);/m);
     });
+
+    // 로그인한 사람에게 푸시 등록을 맞추는 동기화(2026-09-07). /control 은 서비스워커가 없어
+    // 웹 동기화를 부르면 안 되고(ready 가 영영 안 풀린다), 네이티브 쪽은 initNativePushRouting 안에 있다.
+    it('app.js 가 syncPushRegistration 을 부른다', () => {
+        const code = codeOf('app.js');
+
+        expect(code).toMatch(/import\s*\{[^}]*syncPushRegistration[^}]*\}\s*from/);
+        expect(code).toMatch(/^\s*syncPushRegistration\(\s*\)/m);
+    });
 });
 
 describe('push.js 가 앱에서 네이티브로 갈라진다', () => {
@@ -608,5 +627,80 @@ describe('push.js 가 앱에서 네이티브로 갈라진다', () => {
     it('웹 브라우저는 기존 경로 그대로다', async () => {
         // 네이티브 분기가 웹을 건드리면 «있던 기능»이 사라진다.
         expect(await pushStatus({})).toBe('unsupported');
+    });
+});
+
+describe('🔴 앱 푸시 — 기록은 기기에 남고 계정은 바뀐다 (2026-09-07 현장)', () => {
+    // 같은 아이폰을 A(7) 가 쓰다 B(204) 가 로그인했다. 기록은 「켜짐」인데 서버 토큰은 A 소유였고,
+    // B 의 화면은 「알림 받는 중」이면서 지령은 A 에게 갔다.
+
+    it('주인이 다른 사용자면 초기화 때 현재 사용자로 다시 등록한다', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '7', token: 'tok-9' });
+        initNativePushRouting(env);
+        await flush();
+
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', { platform: 'android', token: 'tok-9' });
+        expect(env.localStorage.getItem('gps119.push.enabled')).toBe('204');
+        expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    it('주인이 같으면 아무 요청도 안 나간다', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '204' });
+        initNativePushRouting(env);
+        await flush();
+
+        expect(env.axios.post).not.toHaveBeenCalled();
+        expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    it('예전 형식 기록(1)은 「누군지 모름」 — 재등록 대상', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '1' });
+        const res = await syncNativePushOwner(env);
+
+        expect(res).toEqual({ ok: true, changed: true });
+        expect(env.axios.post).toHaveBeenCalledTimes(1);
+        expect(env.localStorage.getItem('gps119.push.enabled')).toBe('204');
+    });
+
+    it('🔑 기록이 없으면(이 기기에서 아무도 안 켬) 재등록하지 않는다 — 켤지는 사용자가 정한다', async () => {
+        const env = nativeEnv({ userId: 204 });
+        expect(await syncNativePushOwner(env)).toEqual({ ok: true, changed: false });
+        expect(env.axios.post).not.toHaveBeenCalled();
+    });
+
+    it('페이지가 사용자를 안 알려주면(구버전 레이아웃) 예전 판정 — 기록만 보고 켜짐', async () => {
+        const env = nativeEnv({ storedOwner: '7' });
+        expect(await syncNativePushOwner(env)).toEqual({ ok: true, changed: false });
+        expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    it('주인이 다른데 재등록 전이면 화면은 «꺼짐» — 「켜기」가 곧 재등록이다', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '7' });
+        expect(await nativePushStatus(env)).toBe('default');
+
+        expect(await enableNativePush(env)).toEqual({ ok: true });
+        expect(env.localStorage.getItem('gps119.push.enabled')).toBe('204');
+        expect(await nativePushStatus(env)).toBe('subscribed');
+    });
+
+    it('OS 권한이 없으면 재등록하지 않는다(프롬프트를 띄우지 않는다)', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '7', receive: 'prompt' });
+        expect(await syncNativePushOwner(env)).toEqual({ ok: false, changed: false, reason: 'denied' });
+        expect(env.__plugin.requestPermissions).not.toHaveBeenCalled();
+        expect(env.axios.post).not.toHaveBeenCalled();
+    });
+
+    it('서버가 거절하면 기록을 넘기지 않는다 — 다음 페이지에서 다시 시도된다', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '7' });
+        env.axios.post = vi.fn(async () => { throw new Error('500'); });
+
+        expect(await syncNativePushOwner(env)).toEqual({ ok: false, changed: false, reason: 'server-rejected' });
+        expect(env.localStorage.getItem('gps119.push.enabled')).toBe('7');
+    });
+
+    it('currentUserId 는 meta 에서 읽고 없으면 null', () => {
+        expect(currentUserId(nativeEnv({ userId: 42 }))).toBe('42');
+        expect(currentUserId(nativeEnv())).toBeNull();
+        expect(currentUserId({})).toBeNull();
     });
 });

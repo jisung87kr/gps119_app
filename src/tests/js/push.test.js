@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     urlBase64ToUint8Array, subscriptionToPayload, isSupported,
-    pushStatus, enablePush, disablePush, vapidPublicKey,
+    pushStatus, enablePush, disablePush, vapidPublicKey, syncPushRegistration,
 } from '../../resources/js/push.js';
 
 /**
@@ -26,11 +26,25 @@ function makeSubscription(overrides = {}) {
     };
 }
 
+/** localStorage 흉내 — 구독의 «주인» 기록이 페이지를 넘어 살아야 한다. */
+function fakeStorage(preset = {}) {
+    const m = new Map(Object.entries(preset));
+
+    return {
+        getItem: (k) => (m.has(k) ? m.get(k) : null),
+        setItem: (k, v) => { m.set(k, String(v)); },
+        removeItem: (k) => { m.delete(k); },
+    };
+}
+
 function makeEnv({
     permission = 'default',
     existing = null,
     key = 'BNjoJG_test-key',
     axiosImpl = {},
+    // 로그인한 사용자 id(meta) 와, 이 브라우저 구독의 «주인» 기록.
+    userId = null,
+    owner = null,
 } = {}) {
     const subscription = makeSubscription();
 
@@ -52,8 +66,13 @@ function makeEnv({
                 serviceWorker: { ready: Promise.resolve({ pushManager }) },
             },
             document: {
-                querySelector: () => (key ? { content: key } : null),
+                querySelector: (sel) => {
+                    if (sel === 'meta[name="gps119-user"]') return userId != null ? { content: String(userId) } : null;
+
+                    return key ? { content: key } : null;
+                },
             },
+            localStorage: fakeStorage(owner != null ? { 'gps119.push.web.owner': owner } : {}),
             axios: {
                 post: vi.fn().mockResolvedValue({}),
                 delete: vi.fn().mockResolvedValue({}),
@@ -213,5 +232,78 @@ describe('isSupported', () => {
         expect(isSupported({ navigator: {}, PushManager: function () {}, Notification: {} })).toBe(false);
         expect(isSupported({ navigator: { serviceWorker: {} }, Notification: {} })).toBe(false);
         expect(isSupported({ navigator: { serviceWorker: {} }, PushManager: function () {} })).toBe(false);
+    });
+});
+
+describe('🔴 웹 푸시 — 구독은 브라우저에, 계정은 사람에 (2026-09-07 현장)', () => {
+    // A 가 켠 PC 에서 B 가 로그인하면 구독은 그대로라 화면은 「알림 받는 중」인데
+    // 서버 등록은 A 소유 — B 의 지령이 A 에게 간다.
+
+    it('주인이 다른 사용자면 같은 구독을 현재 사용자로 다시 등록한다', async () => {
+        const { env, subscription } = makeEnv({ permission: 'granted', existing: makeSubscription(), userId: 204, owner: '7' });
+
+        expect(await syncPushRegistration(env)).toEqual({ ok: true, changed: true });
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', expect.objectContaining({ platform: 'web', token: REAL_ENDPOINT }));
+        expect(env.localStorage.getItem('gps119.push.web.owner')).toBe('204');
+        expect(await pushStatus(env)).toBe('subscribed');
+        expect(subscription.unsubscribe).not.toHaveBeenCalled();
+    });
+
+    it('주인이 같으면 아무 요청도 안 나간다', async () => {
+        const { env } = makeEnv({ permission: 'granted', existing: makeSubscription(), userId: 204, owner: '204' });
+
+        expect(await syncPushRegistration(env)).toEqual({ ok: true, changed: false });
+        expect(env.axios.post).not.toHaveBeenCalled();
+    });
+
+    it('기록이 없는데 구독이 있으면(이 변경 전에 켠 브라우저) 한 번 등록해 주인을 채운다', async () => {
+        const { env } = makeEnv({ permission: 'granted', existing: makeSubscription(), userId: 204 });
+
+        expect(await syncPushRegistration(env)).toEqual({ ok: true, changed: true });
+        expect(env.localStorage.getItem('gps119.push.web.owner')).toBe('204');
+    });
+
+    it('구독이 없으면 아무것도 하지 않는다 — 켤지는 사용자가 정한다', async () => {
+        const { env } = makeEnv({ permission: 'granted', userId: 204, owner: '7' });
+
+        expect(await syncPushRegistration(env)).toEqual({ ok: true, changed: false });
+        expect(env.axios.post).not.toHaveBeenCalled();
+        // 구독이 없는데 기록만 남아 있던 것은 지운다.
+        expect(env.localStorage.getItem('gps119.push.web.owner')).toBeNull();
+    });
+
+    it('권한이 없거나 사용자를 모르면 건드리지 않는다', async () => {
+        expect(await syncPushRegistration(makeEnv({ permission: 'default', existing: makeSubscription(), userId: 204, owner: '7' }).env))
+            .toEqual({ ok: true, changed: false });
+        expect(await syncPushRegistration(makeEnv({ permission: 'granted', existing: makeSubscription(), owner: '7' }).env))
+            .toEqual({ ok: true, changed: false });
+    });
+
+    it('주인이 다른 구독은 화면에 «꺼짐»으로 — 「켜기」가 같은 구독을 이 사람으로 등록한다', async () => {
+        const { env, pushManager } = makeEnv({ permission: 'granted', existing: makeSubscription(), userId: 204, owner: '7' });
+
+        expect(await pushStatus(env)).toBe('default');
+
+        expect(await enablePush(env)).toEqual({ ok: true });
+        expect(pushManager.subscribe).not.toHaveBeenCalled();           // 재구독 아님
+        expect(env.localStorage.getItem('gps119.push.web.owner')).toBe('204');
+        expect(await pushStatus(env)).toBe('subscribed');
+    });
+
+    it('끄면 주인 기록도 지운다', async () => {
+        const { env } = makeEnv({ permission: 'granted', existing: makeSubscription(), userId: 204, owner: '204' });
+
+        expect(await disablePush(env)).toEqual({ ok: true });
+        expect(env.localStorage.getItem('gps119.push.web.owner')).toBeNull();
+    });
+
+    it('서버가 거절하면 기록을 넘기지 않는다', async () => {
+        const { env } = makeEnv({
+            permission: 'granted', existing: makeSubscription(), userId: 204, owner: '7',
+            axiosImpl: { post: vi.fn().mockRejectedValue(new Error('500')) },
+        });
+
+        expect(await syncPushRegistration(env)).toEqual({ ok: false, changed: false, reason: 'server-rejected' });
+        expect(env.localStorage.getItem('gps119.push.web.owner')).toBe('7');
     });
 });
