@@ -358,6 +358,10 @@ export async function clearAppBadge(env = globalThis) {
  *    최신을 쓴다(`resolveRescueChannelId`). 못 물으면 가장 오래된 것 — 그 셸 세대가 아는 유일한 id 다.
  */
 const RESCUE_CHANNEL_IDS = ['gps119-rescue-v2', 'gps119-rescue-v1'];
+
+/** 셸의 단색 상태바 아이콘 리소스 이름과 brand-600. 매니페스트의 FCM 기본값과 같은 값이어야 한다. */
+const RESCUE_SMALL_ICON = 'ic_stat_gps119';
+const RESCUE_ICON_COLOR = '#0E6E7C';
 const OLDEST_RESCUE_CHANNEL_ID = RESCUE_CHANNEL_IDS[RESCUE_CHANNEL_IDS.length - 1];
 
 /** 이 셸에 실제로 있는 구조 채널. 앱을 열 때 한 번 정하고(initNativePushRouting) 그대로 쓴다. */
@@ -413,6 +417,12 @@ function presentForeground(spec, env = globalThis) {
             title: spec.title,
             body: spec.body,
             channelId: rescueChannelId,
+            // 🔴 상태바 아이콘·색 (2026-09-07 현장: 「푸시 아이콘이 프레임워크 기본값」). 백그라운드
+            //    FCM 알림은 셸 매니페스트가 ic_stat_gps119 를 지정하지만, 여기서 «우리가» 올리는
+            //    포그라운드 알림은 지정하지 않으면 플러그인 기본 아이콘이 붙는다. 리소스 이름은 셸의
+            //    res/drawable/ic_stat_gps119.xml, 색은 res/values/notification.xml 의 notification_accent.
+            smallIcon: RESCUE_SMALL_ICON,
+            iconColor: RESCUE_ICON_COLOR,
             extra: { url: spec.url },
         }],
     })).catch(() => showForegroundBanner(spec, env));

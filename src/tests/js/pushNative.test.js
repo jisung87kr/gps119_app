@@ -396,6 +396,9 @@ describe('앱 푸시 — 포그라운드 수신', () => {
         expect(sent.extra).toEqual({ url: '/control?request=9' });
         // 셸이 만든 heads-up 채널을 써야 한다. 어긋나면 조용히 기본 채널로 떨어진다.
         expect(sent.channelId).toBe('gps119-rescue-v2');
+        // 상태바 아이콘·색 — 안 넘기면 플러그인 기본 아이콘(2026-09-07 현장). 셸 리소스 이름과 같아야 한다.
+        expect(sent.smallIcon).toBe('ic_stat_gps119');
+        expect(sent.iconColor).toBe('#0E6E7C');
     });
 
     it('🔴 구버전 셸(v1 채널만)에서는 v1 — 원격 URL 번들이라 옛 앱에서도 이 코드가 돈다', async () => {
