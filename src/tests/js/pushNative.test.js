@@ -521,30 +521,56 @@ describe('앱 푸시 — 포그라운드 수신', () => {
  * 다음 푸시가 올 때까지 숫자가 남는다. 앱을 열었다는 것 자체가 「봤다」는 뜻이다.
  */
 describe('앱 푸시 — 뱃지 지우기', () => {
-    it('🔑 앱이 «열릴 때» 뱃지를 지운다', () => {
+    it('🔑 앱이 «열릴 때» 뱃지를 지운다 (알림 권한이 이미 허용일 때)', async () => {
         const env = nativeEnv({ platform: 'ios' });
         initNativePushRouting(env);
+        await flush();
 
         expect(env.__badge.clear).toHaveBeenCalledTimes(1);
     });
 
-    it('🔑 백그라운드에서 «돌아올 때»도 지운다 — 페이지가 새로 뜨지 않는다', () => {
+    it('🔑 백그라운드에서 «돌아올 때»도 지운다 — 페이지가 새로 뜨지 않는다', async () => {
         // 앱 전환으로 복귀하면 웹뷰는 그대로다. 이게 없으면 「앱을 열었는데 숫자가 남아 있다」.
         const env = nativeEnv({ platform: 'ios' });
         initNativePushRouting(env);
+        await flush();
 
         env.__listeners.appStateChange({ isActive: true });
+        await flush();
 
         expect(env.__badge.clear).toHaveBeenCalledTimes(2);
     });
 
-    it('백그라운드로 «나갈 때»는 지우지 않는다', () => {
+    it('백그라운드로 «나갈 때»는 지우지 않는다', async () => {
         const env = nativeEnv({ platform: 'ios' });
         initNativePushRouting(env);
+        await flush();
 
         env.__listeners.appStateChange({ isActive: false });
+        await flush();
 
         expect(env.__badge.clear).toHaveBeenCalledTimes(1);
+    });
+
+    it('🔴 알림 권한이 아직 «정해지지 않았으면» 뱃지를 건드리지 않는다 — 첫 권한 요청이 「배지만」이 되는 것을 막는다', async () => {
+        // 2026-09-07 현장: 뱃지 플러그인 clear() 가 iOS 에서 .badge 만으로 권한을 요청한다. 새 설치의
+        // 첫 요청이 그것이 되자 iOS 가 배지만 허가한 채 굳었고, 이후 alert·sound 요청은 무시됐다.
+        // 설정 → 알림 목록에 다른 앱은 「배너, 사운드, 배지」, GPS119 만 「배지」였다.
+        const env = nativeEnv({ platform: 'ios', receive: 'prompt' });
+        initNativePushRouting(env);
+        await flush();
+        env.__listeners.appStateChange({ isActive: true });
+        await flush();
+
+        expect(env.__badge.clear).not.toHaveBeenCalled();
+        expect(env.__plugin.requestPermissions).not.toHaveBeenCalled();
+    });
+
+    it('권한이 거부된 기기에서도 뱃지 플러그인을 부르지 않는다', async () => {
+        const env = nativeEnv({ platform: 'ios', receive: 'denied' });
+
+        expect(await clearAppBadge(env)).toBe(false);
+        expect(env.__badge.clear).not.toHaveBeenCalled();
     });
 
     it('🔑 플러그인 없는 «구버전 셸»에서도 라우팅은 계속 붙는다', () => {

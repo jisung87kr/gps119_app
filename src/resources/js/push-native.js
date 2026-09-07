@@ -320,8 +320,29 @@ function localNotifications(env = globalThis) {
  * ⚠️ 플러그인이 없는 «구버전 셸»에서는 조용히 아무것도 하지 않는다. 뱃지 하나 때문에
  *    푸시 라우팅 전체가 예외로 죽으면 지령을 놓친다 — 우선순위가 비교가 안 된다.
  */
-export function clearAppBadge(env = globalThis) {
-    env.Capacitor?.Plugins?.Badge?.clear?.();
+export async function clearAppBadge(env = globalThis) {
+    const badge = env.Capacitor?.Plugins?.Badge;
+    if (typeof badge?.clear !== 'function') return false;
+
+    // 🔴 **알림 권한이 «아직 정해지지 않았으면» 뱃지를 건드리지 않는다 (2026-09-07 현장).**
+    //    뱃지 플러그인의 clear() 는 iOS 에서 `.badge` «만»으로 권한을 요청한다. 앱을 열 때마다
+    //    여기서 지우므로 새로 설치한 앱의 «첫» 권한 요청이 배지뿐이 됐고, 사용자가 허용을 누르면
+    //    iOS 는 그 상태로 굳는다 — 이후 alert·sound 를 요청해도 무시한다. 설정 → 알림 목록에
+    //    다른 앱은 「배너, 사운드, 배지」인데 GPS119 만 「배지」였던 것이 그 증거다. 첫 요청은
+    //    FirebaseMessaging(alert·badge·sound)이 해야 하고, 새 설치에는 지울 뱃지도 없다.
+    const p = plugin(env);
+    if (p?.checkPermissions) {
+        try {
+            const { receive } = await p.checkPermissions();
+            if (receive !== 'granted') return false;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    badge.clear();
+
+    return true;
 }
 
 /**
