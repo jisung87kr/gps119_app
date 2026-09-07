@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
     isNativePushSupported, nativePushStatus, enableNativePush, disableNativePush,
-    initNativePushRouting, __resetNativePushState, safePath, syncNativePushOwner, currentUserId,
+    initNativePushRouting, __resetNativePushState, safePath, syncNativePushOwner, currentUserId, appVersion,
     toForegroundNotification, needsForegroundNotification, notificationId, clearAppBadge,
 } from '../../resources/js/push-native.js';
 import { pushStatus, enablePush } from '../../resources/js/push.js';
@@ -95,7 +95,11 @@ function nativeEnv({
     };
 
     const badgePlugin = badge ? { clear: vi.fn(async () => ({})) } : null;
-    const appPlugin = { addListener: vi.fn((name, cb) => { listeners[name] = cb; }) };
+    const appPlugin = {
+        addListener: vi.fn((name, cb) => { listeners[name] = cb; }),
+        // 셸 버전·빌드. 등록 페이로드의 app_version 이 여기서 나온다.
+        getInfo: vi.fn(async () => ({ name: 'GPS119', id: 'kr.co.gps119.app', version: '1.0', build: '2' })),
+    };
 
     const plugins = { FirebaseMessaging: plugin, App: appPlugin };
     if (local) plugins.LocalNotifications = local;
@@ -160,10 +164,10 @@ describe('앱 푸시 — 켜기', () => {
         const result = await enableNativePush(env);
 
         expect(result).toEqual({ ok: true });
-        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', {
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', expect.objectContaining({
             platform: 'android',
             token: 'fcm-tok-1',
-        });
+        }));
     });
 
     it('iOS 는 platform 을 ios 로 보낸다', async () => {
@@ -668,7 +672,7 @@ describe('🔴 앱 푸시 — 기록은 기기에 남고 계정은 바뀐다 (20
         initNativePushRouting(env);
         await flush();
 
-        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', { platform: 'android', token: 'tok-9' });
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', expect.objectContaining({ platform: 'android', token: 'tok-9' }));
         expect(env.localStorage.getItem('gps119.push.enabled')).toBe('204');
         expect(await nativePushStatus(env)).toBe('subscribed');
     });
@@ -747,5 +751,32 @@ describe('🔴 앱 푸시 — 이미 허용이어도 권한을 다시 요청한�
 
         expect(await enableNativePush(env)).toEqual({ ok: false, reason: 'denied' });
         expect(env.__plugin.requestPermissions).not.toHaveBeenCalled();
+    });
+});
+
+describe('앱 푸시 — 등록에 앱 버전·빌드를 싣는다 (2026-09-07 현장: 「이 폰이 빌드 1 인지」를 서버가 몰랐다)', () => {
+    it('켜기 때 app_version 을 "버전 (빌드)" 꼴로 보낸다', async () => {
+        const env = nativeEnv();
+        await enableNativePush(env);
+
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', expect.objectContaining({ app_version: '1.0 (2)' }));
+    });
+
+    it('주인 동기화 재등록에도 싣는다', async () => {
+        const env = nativeEnv({ userId: 204, storedOwner: '7' });
+        await syncNativePushOwner(env);
+
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', expect.objectContaining({ app_version: '1.0 (2)' }));
+    });
+
+    it('App.getInfo 가 없는 셸·실패하는 셸에서는 null — 등록은 그대로 된다', async () => {
+        expect(await appVersion({ Capacitor: { Plugins: {} } })).toBeNull();
+        expect(await appVersion({ Capacitor: { Plugins: { App: { getInfo: async () => { throw new Error('x'); } } } } })).toBeNull();
+        expect(await appVersion({ Capacitor: { Plugins: { App: { getInfo: async () => ({ version: '1.1', build: '' }) } } } })).toBe('1.1');
+
+        const env = nativeEnv();
+        env.Capacitor.Plugins.App.getInfo = undefined;
+        expect(await enableNativePush(env)).toEqual({ ok: true });
+        expect(env.axios.post).toHaveBeenCalledWith('/api/devices', expect.objectContaining({ app_version: null }));
     });
 });
