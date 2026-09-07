@@ -5,6 +5,7 @@
 import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool';
 import { TrackLayer } from './trackLayer';
 import { filterRoster, sortRoster } from './rosterSearch';
+import { createAlertSound } from './alertSound';
 import { formatCoords, kakaoMapUrl, shareText, clampMenuPosition, MENU_SIZE, pickAddress, locationText } from './mapContextMenu';
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
@@ -40,6 +41,8 @@ export default {
             // x,y 는 지도 컨테이너(relative) 기준 px. 판정·포맷은 mapContextMenu.js(순수).
             ctxMenu: { open: false, x: 0, y: 0, lat: null, lng: null },
             mapToast: '',
+            // 신고 접수 토스트 (2026-09-07). null 이면 없음. {id, title, body}
+            requestToast: null,
             railCollapsed: false,
 
             // ── 모바일(<lg) 분기 ────────────────────────────────
@@ -200,6 +203,13 @@ export default {
     },
 
     mounted() {
+        // 신고 접수 알림음 — 첫 클릭·터치에서 «무음»으로 잠금을 풀어 둔다. 상황실은 관제를 켜 두고
+        // 다른 창을 보고 있다가 소리로 돌아온다(2026-09-07 현장 요청). 테스트는 _alertSound 를 주입한다.
+        this._alertSound = this._alertSound || createAlertSound();
+        const unlockAudio = () => { this._alertSound.unlock(); };
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+
         // lg(1024px) 경계로 3단 ↔ 시트 전환. Tailwind lg 브레이크포인트와 맞춘다.
         this._mq = window.matchMedia('(max-width: 1023px)');
         this.isMobile = this._mq.matches;
@@ -553,6 +563,42 @@ export default {
             this.requests.unshift(payload);
             if (this.requestPins) this.requestPins.upsert(payload);
             this.requestCount = this._requestCount();
+            this._announceRequest(payload);
+        },
+
+        /**
+         * 신고 접수 알림 — 토스트 + 알림음 + 진동 (2026-09-07 현장 요청).
+         *
+         * 목록에 조용히 한 줄 늘어나는 것으로는 놓친다 — 상황실은 관제를 하루 종일 켜 두고 다른 창을
+         * 본다. 토스트는 8초 뒤 스스로 접히고, 누르면 그 신고를 목록에서 펼친다.
+         * 알림음은 _alertSound 가 없으면 건너뛴다(마운트 전·테스트).
+         */
+        _announceRequest(payload) {
+            if (!payload || payload.request_id == null) return;
+
+            this.requestToast = {
+                id: payload.request_id,
+                title: `🚨 신고 접수 #${payload.request_id}`,
+                body: [requestTypeMeta(payload.type).label, payload.requester?.name, payload.address]
+                    .filter(Boolean).join(' · '),
+            };
+            clearTimeout(this._requestToastTimer);
+            this._requestToastTimer = setTimeout(() => { this.requestToast = null; }, 8000);
+
+            try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) { /* 미지원 */ }
+            if (this._alertSound && typeof this._alertSound.play === 'function') this._alertSound.play();
+        },
+
+        dismissRequestToast() {
+            clearTimeout(this._requestToastTimer);
+            this.requestToast = null;
+        },
+
+        /** 토스트를 누르면 그 신고를 목록에서 펼친다. */
+        focusRequestFromToast() {
+            const id = this.requestToast?.id;
+            this.dismissRequestToast();
+            if (id != null) this.expandedRequestId = id;
         },
 
         /** 신고 건수 — 지도가 없으면 핀을 셀 수 없으므로 목록 길이로 센다. */
@@ -1238,6 +1284,18 @@ export default {
     </div>
   </header>
 
+  <!-- 신고 접수 토스트 (2026-09-07). 어느 탭·창을 보고 있든 눈에 띄어야 하므로 fixed 최상단. -->
+  <div v-if="requestToast" role="alert"
+       class="fixed left-1/2 top-3 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 rounded-2xl bg-red-600 px-4 py-3 text-white shadow-2xl">
+    <div class="flex items-start gap-3">
+      <button type="button" class="min-w-0 flex-1 text-left" @click="focusRequestFromToast">
+        <p class="text-sm font-extrabold leading-tight">{{ requestToast.title }}</p>
+        <p v-if="requestToast.body" class="mt-0.5 truncate text-xs text-white/90">{{ requestToast.body }}</p>
+      </button>
+      <button type="button" class="flex-none px-1 text-lg leading-none text-white/80" aria-label="알림 닫기" @click="dismissRequestToast">✕</button>
+    </div>
+  </div>
+
   <!-- L-RAIL — 데스크톱 전용. 모바일에서는 시트의 [인력] 탭이 대체한다.
        특히 「참가자 역할 배정」은 모바일에서 노출하지 않는다: 이 셀렉트는 controller 까지
        옵션에 포함하고 서버(assignRole)도 허용하므로 controller 자기증식 경로가 된다.
@@ -1331,7 +1389,7 @@ export default {
           {{ filteredRoster.length }} / {{ roster.length }}
         </span>
       </div>
-      <div class="space-y-1.5 max-h-56 overflow-y-auto">
+      <div class="space-y-1.5 max-h-[50vh] overflow-y-auto">
         <p v-if="!filteredRoster.length" class="py-3 text-center text-xs text-gray-400">
           「{{ rosterQuery }}」에 맞는 사람이 없습니다
         </p>

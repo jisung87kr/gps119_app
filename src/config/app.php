@@ -63,9 +63,16 @@ return [
     | will be used by the PHP date and date-time functions. The timezone
     | is set to "UTC" by default as it is suitable for most use cases.
     |
+    | 🔴 GPS119 는 Asia/Seoul 이다 (2026-09-07). UTC 로 두었더니 출동이력·통계 등 서버가 그리는
+    |    모든 시각이 현장 시계와 9시간 어긋났다. DB 에는 계속 UTC 로 저장된다 — 이 앱의 시각 열은
+    |    전부 MySQL TIMESTAMP 라(마이그레이션에 dateTime() 이 없다) 세션 time_zone 으로 읽고 쓸 때
+    |    변환된다(config/database.php 의 mysql.timezone = +09:00). 그래서 기존 데이터를 옮기지 않았다.
+    |    ⚠️ 앞으로도 `->dateTime()` 컬럼을 만들지 말 것 — DATETIME 은 세션 시간대 변환이 없어 9시간 어긋난다.
+    |    한국은 서머타임이 없어 +09:00 고정이 맞다.
+    |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Seoul',
 
     /*
     |--------------------------------------------------------------------------
