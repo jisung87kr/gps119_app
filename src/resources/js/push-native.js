@@ -118,8 +118,13 @@ export async function enableNativePush(env = globalThis) {
     const p = plugin(env);
     if (!p) return { ok: false, reason: 'unsupported' };
 
+    // 🔴 «이미 허용»이어도 다시 요청한다 (2026-09-07 현장). iOS 는 권한을 alert·badge·sound 로
+    //    나눠 주는데, 어떤 경로로든 소리 없이 허가된 기기(설정에 「사운드」 행이 없다)는 켜기를
+    //    반복해도 영영 조용했다 — 「허용」이면 요청을 건너뛰었기 때문이다. 이미 정해진 권한에
+    //    다시 물으면 iOS·Android 모두 프롬프트 없이 즉시 답하고, 빠졌던 옵션(sound)은 채워진다.
+    //    denied 는 앱 안에서 못 되돌리므로 그때만 요청을 생략한다(OS 설정으로 안내).
     let permission = await p.checkPermissions();
-    if (permission.receive !== 'granted') {
+    if (permission.receive !== 'denied') {
         permission = await p.requestPermissions();
     }
 
