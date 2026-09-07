@@ -4,7 +4,7 @@
 > 작업은 **이 저장소에서** 진행한다. 셸 수정이 필요한 항목은 `~/Dev/gps119_app_mobile` 의 파일을 가리켜 두었다 — 그 저장소를 열어 고치고, 여기 표의 상태를 갱신한다.
 
 - 작성일: 2026-09-07
-- 운영에 떠 있는 것: 웹 `ea993dc`(**2026-09-07 배포 2회**, PR #34 21:02 · PR #37 21:43, `DEPLOY.md` §0) · iOS App Store 빌드 2(2026-09-02 제출) · Android 는 아직 Play 미제출(사이드로드)
+- 운영에 떠 있는 것: 웹 `f45b913`(**2026-09-07 배포 7회**, PR #34~#48, `DEPLOY.md` §0) · iOS **빌드 3 업로드 2026-09-07 22:52**(TestFlight 처리 대기, App Store 는 빌드 2 제출 상태) · Android 는 아직 Play 미제출(사이드로드)
 - 관련: [`mobile-app`](../mobile-app/README.md) · [ADR-0009](../../adr/0009-admin-issued-operator-accounts.md) · [ADR-0002](../../adr/0002-event-scoped-roles.md)
 
 ## 0. 한눈에
@@ -266,8 +266,10 @@ F-14 해소 직후. 진단 발송 4건(`default` 2·`rescue_alarm.caf` 2)이 전
 
 ### 6-3. 셸 배포 (스토어 심사)
 
-- [ ] 셸 브랜치 `feat/field-feedback-2026-09` (커밋 `963ae1d` M-26 · `c219850` F-07 ① · `55d3acf` F-03) → PR → `main`
-- [ ] iOS: `npm run open:ios:prod` → Xcode Archive → App Store Connect **빌드 3** (마케팅 버전 1.0 유지 여부 결정)
+- [x] 셸 PR #6 → `main` `5dc08d2` (2026-09-07) — M-26·F-07 ①·F-03·아이콘 기본값·APNs 키 문서
+- [x] iOS 빌드 3 업로드 2026-09-07 22:52 KST — CLI(`xcodebuild archive` → `-exportArchive` 업로드, 셸 README 절차). 아카이브 검증: 번들 URL 운영·`rescue_alarm.caf`·entitlements 3종. 마케팅 버전 1.0 유지
+- [ ] TestFlight 처리 완료 후 빌드 3 설치 → 사이렌(F-07 ①)·당겨서 새로고침(F-03)·설정 → 알림 「배너, 사운드, 배지」·`app_version` `1.0 (3)` 확인
+- [ ] App Store 심사 제출은 빌드 2 가 어떤 상태인지 보고 결정(빌드 3 로 교체 제출)
 - [ ] Android: `npm run bundle:android:prod` → **Play 첫 제출은 법무 선행조건에 막혀 있다**(개인정보처리방침 URL·데이터 안전 섹션, `05-store-release.md` §2). 그 전까지는 사이드로드 APK(`build:android:prod`)로 현장 기기에 배포
 - [ ] Play 에 올린 뒤 `assetlinks.json` 에 Play 앱 서명 키 지문 «추가» (`05 §밟기 쉬운 것 ③`)
 
