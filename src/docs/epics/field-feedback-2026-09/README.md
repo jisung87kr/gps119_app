@@ -261,7 +261,7 @@ F-14 해소 직후. 진단 발송 4건(`default` 2·`rescue_alarm.caf` 2)이 전
 - [x] PR #46 `9f83a30` 22:50 KST — Android 포그라운드 로컬 알림 상태바 아이콘·색(F-16). 마이그레이션 없음
 - [x] PR #48 `f45b913` 23:00 KST — 기기 등록에 `app_version`. 마이그레이션 없음
 - [ ] F-16 현장 확인: 갤럭시에서 앱을 «열어 둔 채» 배정 → 상태바에 GPS119 핀 아이콘·청록색
-- [ ] iOS 빌드 2 재설치(TestFlight `1.0 (2)`) → 알림 아이콘이 GPS119 핀인지 · `device_tokens.app_version` 이 `1.0 (2)` 인지
+- [x] iOS 빌드 2 재설치 → 알림 아이콘 GPS119 핀 확인(사용자, 23:05 KST). `app_version` 은 다음 «켜기» 또는 주인 변경 때 채워진다 — 지금 토큰 #19 는 23:00 배포 전 등록이라 아직 null
 - [x] F-15 현장 재확인 22:40 KST — 삭제 → 재시동 → 재설치 → 알림 받기 → 목록에 GPS119 「배너, 사운드, 배지」. 진단 푸시 E(`default`)·F(`rescue_alarm.caf`) **둘 다 소리 남** → 파일이 없는 빌드에서도 iOS 가 기본음으로 대체한다(F-07 ① 의 구버전 우려 해소). 운영 iOS 푸시 종단(배너·소리) 최종 확인
 
 ### 6-3. 셸 배포 (스토어 심사)
@@ -286,6 +286,7 @@ F-14 해소 직후. 진단 발송 4건(`default` 2·`rescue_alarm.caf` 2)이 전
 
 - 셸 `@capacitor/app-launcher` — F-10 을 `completed` 기반 확정 폴백으로 (코드 준비됨)
 - 셸에 알림 권한 상세(alert·sound·badge) 읽기 메서드 + 프로필 표시 — F-15 같은 «소리 없는 허가»를 원격에서 보이게
+- 앱 빌드가 바뀌면 자동 재등록 — 켜짐 기록에 빌드를 같이 적어(`<user>@<build>`) 다르면 `syncNativePushOwner` 가 다시 POST. 지금은 «켜기»를 다시 눌러야 `app_version` 이 갱신된다
 - 셸 `@capacitor/geolocation` — F-12 B안, Android 까지 같은 경로로
 - F-05 자원봉사자 통합(②) — 고객 답에 따라 데이터 이관 1건
 - Android 당겨서 새로고침 — 요청이 없어 두었다
