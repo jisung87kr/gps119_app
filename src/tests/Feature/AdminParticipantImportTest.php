@@ -174,6 +174,20 @@ class AdminParticipantImportTest extends TestCase
      * 했으므로(2026-08-12 결정), 최소한 «몇 명에게 줬는지»는 결과에서 보여야 한다 —
      * 붙여넣기 사고는 단서가 없으면 영영 발견되지 않는다.
      */
+    public function test_short_labels_written_in_the_field_resolve_to_roles(): void
+    {
+        // 2026-09-07 고객 명단은 「자원봉사자」「회송팀」「공무원」으로 적힌다 — 라벨 완전일치만
+        // 받으면 「자원봉사자」 행 전부가 거절된다(F-05).
+        $this->assertSame(EventRole::VOLUNTEER_COURSE, ParticipantImportService::resolveRole('자원봉사자'));
+        $this->assertSame(EventRole::VOLUNTEER_COURSE, ParticipantImportService::resolveRole(' 자원 봉사자 '));
+        $this->assertSame(EventRole::VOLUNTEER_MEDIC, ParticipantImportService::resolveRole('자원봉사자(구급)'));
+        $this->assertSame(EventRole::TRANSPORT, ParticipantImportService::resolveRole('회송팀'));
+        $this->assertSame(EventRole::TRANSPORT, ParticipantImportService::resolveRole('회송'));
+        $this->assertSame(EventRole::OFFICIAL, ParticipantImportService::resolveRole('공무원'));
+        $this->assertSame(EventRole::PARAMEDIC, ParticipantImportService::resolveRole('구급대원'));
+        $this->assertNull(ParticipantImportService::resolveRole('의료진'));
+    }
+
     public function test_the_report_surfaces_how_many_got_control_room_access(): void
     {
         $project = $this->project();

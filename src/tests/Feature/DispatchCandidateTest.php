@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 /**
- * 배정 후보는 구급대(PARAMEDIC)만 (2026-08-12 현장 피드백 #5).
+ * 배정 후보는 구급대(PARAMEDIC)·회송팀(TRANSPORT) (2026-08-12 현장 피드백 #5, 2026-09-07 F-05).
  *
  * 🔑 「후보인가」와 「지령 화면·개인 채널에 들어올 자격이 있는가」는 다른 질문이다.
  *    canReceiveDispatch() 를 그대로 좁혔다면, 이미 지령을 받아 이동 중인 자원봉사(구급)가
@@ -42,16 +42,21 @@ class DispatchCandidateTest extends TestCase
         ]);
     }
 
-    public function test_only_paramedic_is_a_dispatch_candidate(): void
+    public function test_only_paramedic_and_transport_are_dispatch_candidates(): void
     {
         $this->assertTrue(EventRole::PARAMEDIC->isDispatchCandidate());
+        $this->assertTrue(EventRole::TRANSPORT->isDispatchCandidate());
 
         foreach (EventRole::cases() as $role) {
-            if ($role === EventRole::PARAMEDIC) {
+            if (in_array($role, [EventRole::PARAMEDIC, EventRole::TRANSPORT], true)) {
                 continue;
             }
             $this->assertFalse($role->isDispatchCandidate(), "{$role->value} 는 배정 후보가 아니어야 한다");
         }
+
+        // 쿼리 스코프가 읽는 목록도 같은 판정에서 나와야 한다 — 어긋나면 후보인데 목록에 안 뜬다.
+        $this->assertSame(['paramedic', 'transport'], EventRole::dispatchCandidateValues());
+        $this->assertSame(['volunteer_medic', 'paramedic', 'transport'], EventRole::dispatchReceiverValues());
     }
 
     public function test_volunteer_medic_keeps_dispatch_screen_eligibility(): void
@@ -91,6 +96,22 @@ class DispatchCandidateTest extends TestCase
 
         $this->assertContains($p->id, $ids);
         $this->assertNotContains($v->id, $ids);
+    }
+
+    public function test_transport_team_is_listed_and_assignable(): void
+    {
+        ['project' => $project, 'request' => $r, 'controller' => $c] = $this->scenario();
+
+        $transport = User::factory()->create();
+        EventParticipant::factory()->create([
+            'project_id' => $project->id, 'user_id' => $transport->id, 'role' => EventRole::TRANSPORT,
+        ]);
+
+        $ids = collect($this->service->availableParamedics($r))->pluck('user_id')->all();
+        $this->assertContains($transport->id, $ids, '회송팀이 배정 후보 목록에 없다');
+
+        $dispatch = $this->service->assign($r, $transport, $c);
+        $this->assertSame($transport->id, $dispatch->paramedic_id);
     }
 
     public function test_assigning_a_volunteer_medic_is_refused(): void

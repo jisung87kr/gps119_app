@@ -345,8 +345,26 @@ class ParticipantImportService
             }
         }
 
-        return null;
+        return self::ROLE_ALIASES[$key] ?? null;
     }
+
+    /**
+     * 현장 명단에 흔히 적히는 «짧은» 이름 → 역할. 정규화 키(소문자·공백 제거) 기준.
+     *
+     * 🔴 2026-09-07 고객 명단은 역할을 「자원봉사자」로만 적는다. 라벨 완전일치만 받던 때는
+     *    그 행 전부가 「알 수 없는 역할」로 거절됐다 — 100명 명단이 통째로 안 들어간다.
+     *
+     * ⚠️ 「자원봉사자」만 적힌 행은 «코스» 자원봉사자로 본다. 고객 표에서 자원봉사자는 사고신고만
+     *    하는 역할이고 그건 코스 쪽이다. 구급 자원봉사자는 「자원봉사자(구급)」로 적어야 한다.
+     *    둘을 하나로 합칠지는 고객 확인 대기(field-feedback-2026-09 F-05).
+     */
+    private const ROLE_ALIASES = [
+        '자원봉사자' => EventRole::VOLUNTEER_COURSE,
+        '자원봉사' => EventRole::VOLUNTEER_COURSE,
+        '회송' => EventRole::TRANSPORT,
+        '회송반' => EventRole::TRANSPORT,
+        '구급대원' => EventRole::PARAMEDIC,
+    ];
 
     /** 역할 비교용 정규화 키: 소문자 + 공백 제거. */
     private static function roleKey(string $value): string
@@ -366,6 +384,7 @@ class ParticipantImportService
         fwrite($handle, chr(0xEF).chr(0xBB).chr(0xBF));
         fputcsv($handle, ['이름', '전화번호', '역할']);
         fputcsv($handle, ['홍길동', '010-1234-5678', '구급대']);
+        fputcsv($handle, ['박회송', '010-4444-5555', '회송팀']);
         fputcsv($handle, ['김운영', '010-2222-3333', '운영진']);
         fputcsv($handle, ['이참가', '01033334444', '참가자']);
 

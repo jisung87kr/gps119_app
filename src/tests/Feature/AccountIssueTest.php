@@ -19,7 +19,7 @@ use Tests\TestCase;
  *   ① 발급은 «계정 없는» 명단 행에만 계정을 만든다 — 이미 회원이면 역할만 붙인다.
  *   ② 발급 계정은 첫 로그인에서 비밀번호 변경을 «강제»한다(must_change_password).
  *   ③ 재실행이 안전하다 — 발급된 행은 claim 되어 두 번째 발급에서 빠진다.
- *   ④ 초기 비밀번호는 전원 «password» 이고 DB 에는 해시만 남는다.
+ *   ④ 초기 비밀번호는 «그 사람의 전화번호(숫자만)» 이고 DB 에는 해시만 남는다(2026-09-07 고객 요청, ADR-0009 D1).
  */
 class AccountIssueTest extends TestCase
 {
@@ -82,7 +82,7 @@ class AccountIssueTest extends TestCase
         $this->assertNotNull(EventRoster::where('phone', '01011112222')->first()->claimed_at);
     }
 
-    public function test_초기_비밀번호는_password_이고_해시로_저장된다(): void
+    public function test_초기_비밀번호는_전화번호이고_해시로_저장된다(): void
     {
         $project = $this->project();
         $this->roster($project, '01011112222', EventRole::STAFF);
@@ -90,17 +90,26 @@ class AccountIssueTest extends TestCase
         $this->svc()->issueForRoster($project, $this->admin());
 
         $user = User::where('phone', '01011112222')->firstOrFail();
-        $this->assertNotSame('password', $user->password);
-        $this->assertTrue(Hash::check('password', $user->password));
+        $this->assertNotSame('01011112222', $user->password);
+        $this->assertTrue(Hash::check('01011112222', $user->password));
+        // 예전 초기값으로는 «못» 들어와야 한다 — 바뀐 뒤에도 옛 안내가 돌면 여기서 걸린다.
+        $this->assertFalse(Hash::check('password', $user->password));
     }
 
-    public function test_발급된_계정은_password_로_로그인된다(): void
+    public function test_초기_비밀번호는_하이픈_없는_숫자만이다(): void
+    {
+        // 명단에 «010-1111-2222» 로 적혀 있어도 ID(users.phone)가 숫자만 저장되므로 비밀번호도 같아야 한다.
+        $this->assertSame('01011112222', AccountIssueService::initialPasswordFor('010-1111-2222'));
+        $this->assertSame('01011112222', AccountIssueService::initialPasswordFor(' 010 1111 2222 '));
+    }
+
+    public function test_발급된_계정은_전화번호로_로그인된다(): void
     {
         $project = $this->project();
         $this->roster($project, '01011112222', EventRole::STAFF);
         $this->svc()->issueForRoster($project, $this->admin());
 
-        $this->post('/login', ['phone' => '010-1111-2222', 'password' => 'password'])->assertRedirect();
+        $this->post('/login', ['phone' => '010-1111-2222', 'password' => '01011112222'])->assertRedirect();
         $this->assertAuthenticated();
     }
 
@@ -134,7 +143,7 @@ class AccountIssueTest extends TestCase
         $this->assertSame(1, User::where('phone', '01011112222')->count());
     }
 
-    public function test_재발급은_활성화_전_계정을_password_로_되돌린다(): void
+    public function test_재발급은_활성화_전_계정을_전화번호로_되돌린다(): void
     {
         $project = $this->project();
         $this->roster($project, '01011112222', EventRole::STAFF);
@@ -143,7 +152,7 @@ class AccountIssueTest extends TestCase
         $user = User::where('phone', '01011112222')->firstOrFail();
         $this->svc()->reissuePassword($user->fresh());
 
-        $this->assertTrue(Hash::check('password', $user->fresh()->password));
+        $this->assertTrue(Hash::check('01011112222', $user->fresh()->password));
         $this->assertTrue($user->fresh()->must_change_password);
     }
 
@@ -165,7 +174,7 @@ class AccountIssueTest extends TestCase
 
         $res->assertRedirect();
         $res->assertSessionHas('success');
-        $this->assertStringContainsString('password', session('success'));
+        $this->assertStringContainsString('전화번호', session('success'));
         $this->assertDatabaseHas('users', ['phone' => '01011112222', 'must_change_password' => true]);
     }
 

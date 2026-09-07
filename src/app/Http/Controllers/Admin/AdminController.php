@@ -365,7 +365,7 @@ class AdminController extends Controller
     }
 
     /**
-     * 발급 계정 비밀번호를 초기값(«password»)으로 재설정 (ADR-0009 D4).
+     * 발급 계정 비밀번호를 초기값(«전화번호»)으로 재설정 (ADR-0009 D4).
      *
      * 🔑 «아직 본인이 안 쓴» 계정(isIssuedPending)에만 허용한다. 본인이 정한 비밀번호를 덮지 않는다.
      */
@@ -379,6 +379,6 @@ class AdminController extends Controller
             return back()->withErrors(['reissue' => $e->getMessage()]);
         }
 
-        return back()->with('success', "{$member->name}님의 초기 비밀번호를 «password» 로 재설정했습니다.");
+        return back()->with('success', "{$member->name}님의 초기 비밀번호를 전화번호로 재설정했습니다.");
     }
 }

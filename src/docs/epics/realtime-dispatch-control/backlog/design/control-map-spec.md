@@ -49,7 +49,7 @@
 
 ---
 
-## 2. 역할 마커 시스템 (EventRole 7종 — 색 + 형태 병용)
+## 2. 역할 마커 시스템 (EventRole 9종 — 색 + 형태 병용)
 
 `EventRole::markerColor()`가 반환할 hex와, 마커에 얹을 Heroicons 형태를 1:1로 확정한다. **인접 역할은 색뿐 아니라 아이콘으로도 구분**(색맹 대비).
 
@@ -57,10 +57,12 @@
 |-----------|------|-----------|---------------|------------------|-----------|
 | `participant` | 참가자 | `#6B7280` | gray-500 | `user` (단일 인물) | 기본·무채에 가까운 중립 |
 | `staff` | 운영진 | `#2563EB` | blue-600 | `identification` (명찰) | 운영 = 파랑(기존 primary 계열) |
+| `official` | 공무원 | `#0891B2` | cyan-600 | `building-office` (관공서) | 행정 = 청록 건물 (2026-09-07 추가, F-05) |
 | `police` | 경찰 | `#1E3A8A` | blue-900 | `shield-check` (방패) | 공권력 = 진남색 방패 |
 | `volunteer_course` | 자원봉사자(코스) | `#16A34A` | green-600 | `flag` (코스 깃발) | 코스 운영 = 초록 깃발 |
 | `volunteer_medic` | 자원봉사자(구급) | `#F59E0B` | amber-500 | `plus-circle` (구급 +) | 구급 보조 = 주황 +원 |
 | `paramedic` | 구급대 | `#DC2626` | red-600 | `plus` solid bold (구급 +) | 정식 구급 = 빨강 +(굵게) |
+| `transport` | 회송팀 | `#EA580C` | orange-600 | `truck` (차량) | 회송 = 주황 차량 (2026-09-07 추가, F-05). 구급 계열과 색이 인접하므로 형태가 결정적 |
 | `controller` | 상황실 | `#7C3AED` | violet-600 | `command-line`/`signal` (관제) | 지휘 = 보라 |
 
 **색맹 구분 핵심 (검증 완료)**:

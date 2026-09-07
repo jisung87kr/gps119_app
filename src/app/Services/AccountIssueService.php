@@ -23,14 +23,24 @@ use RuntimeException;
  *  2. **역할 배정의 단일 writer 는 EventParticipantService::assignRole** 이다(임포트와 같다).
  *  3. **멱등.** 발급은 명단 행을 claim 하므로, 다시 눌러도 이미 발급된 행은 대기 목록에서 빠져
  *     건너뛴다. 초기 비밀번호를 잃었을 때의 재발급은 reissuePassword(계정 단위)로 따로 한다.
- *  4. **초기 비밀번호는 모두 «password» 로 통일한다.** 현장에서 100명 넘는 사람에게 서로 다른
- *     임의 비밀번호를 읽어 줄 수 없다(운영 요청). 첫 로그인에서 반드시 바꾸므로 이 값이 노출돼도
- *     창은 짧고, 회원 목록의 「미로그인 발급」 배지로 아직 안 바꾼 계정이 보인다(ADR-0009).
+ *  4. **초기 비밀번호는 «그 사람의 전화번호(숫자만)»다.** 현장에서 100명 넘는 사람에게 서로 다른
+ *     임의 비밀번호를 읽어 줄 수 없다(운영 요청). 처음엔 전원 «password» 였는데 2026-09-07 고객
+ *     요청으로 전화번호로 바꿨다 — 「ID 도 비밀번호도 내 번호」가 현장에서 설명하기 가장 쉽다.
+ *     첫 로그인에서 반드시 바꾸므로 이 값이 노출돼도 창은 짧고, 회원 목록의 「미로그인 발급」
+ *     배지로 아직 안 바꾼 계정이 보인다(ADR-0009 D1).
  */
 class AccountIssueService
 {
-    /** 발급 계정의 초기 비밀번호 — 전원 동일. 첫 로그인에서 강제로 바뀐다(ADR-0009). */
-    public const INITIAL_PASSWORD = 'password';
+    /**
+     * 발급 계정의 초기 비밀번호 — 그 사람의 전화번호(숫자만). 첫 로그인에서 강제로 바뀐다(ADR-0009 D1).
+     *
+     * 🔑 «숫자만»이다. 로그인 ID 인 users.phone 이 숫자만 저장하므로(User::setPhoneAttribute)
+     *    사용자가 하이픈을 넣어 치더라도 비밀번호는 저장된 형태와 같아야 한다.
+     */
+    public static function initialPasswordFor(string $phone): string
+    {
+        return (string) preg_replace('/[^0-9]/', '', $phone);
+    }
 
     public function __construct(private EventParticipantService $participants) {}
 
@@ -75,7 +85,7 @@ class AccountIssueService
     /**
      * 계정 한 개 재발급 — «아직 활성화 전»(isIssuedPending) 계정에만.
      *
-     * 초기 비밀번호를 다시 «password» 로 되돌린다. 본인이 이미 비밀번호를 정한 계정은 덮지 않는다.
+     * 초기 비밀번호를 다시 «전화번호» 로 되돌린다. 본인이 이미 비밀번호를 정한 계정은 덮지 않는다.
      *
      * @throws RuntimeException 활성화된 계정이거나 발급 계정이 아닐 때
      */
@@ -86,7 +96,7 @@ class AccountIssueService
         }
 
         $user->forceFill([
-            'password' => Hash::make(self::INITIAL_PASSWORD),
+            'password' => Hash::make(self::initialPasswordFor((string) $user->phone)),
             'must_change_password' => true,
         ])->save();
     }
@@ -115,7 +125,7 @@ class AccountIssueService
             $user = User::create([
                 'name' => $name,
                 'phone' => $phone,
-                'password' => Hash::make(self::INITIAL_PASSWORD),
+                'password' => Hash::make(self::initialPasswordFor($phone)),
                 'must_change_password' => true,
                 'issued_at' => now(),
                 'issued_by' => $issuedBy->id,

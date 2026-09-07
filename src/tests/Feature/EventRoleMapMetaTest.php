@@ -17,7 +17,7 @@ use Tests\TestCase;
  * 사람 눈으로 한 번 맞춰도 다음 사람이 또 어긋뜨리므로, 여기서 세 가지를 «판정»으로 남긴다.
  *
  *   ① markerColor() 가 control-map-spec §2 표와 정확히 같은가 (정본 고정)
- *   ② mapMeta() 가 7종 전부를 선언 순서대로 담는가 (관제 필터 순서가 여기서 나온다)
+ *   ② mapMeta() 가 9종 전부를 선언 순서대로 담는가 (관제 필터 순서가 여기서 나온다)
  *   ③ 그 값이 실제로 /control 페이지까지 «주입»되는가 (enum→blade→dataset 경로 전체)
  *
  * ③ 이 핵심이다. ①②만 있으면 뷰에서 주입을 빠뜨려도 초록불이 뜨고,
@@ -34,10 +34,12 @@ class EventRoleMapMetaTest extends TestCase
     private const SPEC_COLORS = [
         'participant' => '#6B7280',       // gray-500
         'staff' => '#2563EB',             // blue-600
+        'official' => '#0891B2',          // cyan-600  (2026-09-07, F-05)
         'police' => '#1E3A8A',            // blue-900
         'volunteer_course' => '#16A34A',  // green-600
         'volunteer_medic' => '#F59E0B',   // amber-500
         'paramedic' => '#DC2626',         // red-600
+        'transport' => '#EA580C',         // orange-600 (2026-09-07, F-05)
         'controller' => '#7C3AED',        // violet-600
     ];
 
@@ -84,6 +86,8 @@ class EventRoleMapMetaTest extends TestCase
         foreach (EventRole::cases() as $role) {
             $this->assertSame($role->label(), $meta[$role->value]['label']);
             $this->assertSame($role->markerColor(), $meta[$role->value]['color']);
+            // 관제 「구급만」 필터가 이 값을 읽는다 — JS 에 역할 목록 사본을 두지 않기 위해서다.
+            $this->assertSame($role->canReceiveDispatch(), $meta[$role->value]['receivesDispatch']);
         }
     }
 
@@ -104,7 +108,7 @@ class EventRoleMapMetaTest extends TestCase
             ->assertSee('data-role-meta', false)
             ->getContent();
 
-        // 7종의 색이 전부 페이지에 실려야 JS 가 사본 없이 렌더할 수 있다.
+        // 9종의 색이 전부 페이지에 실려야 JS 가 사본 없이 렌더할 수 있다.
         foreach (self::SPEC_COLORS as $role => $hex) {
             $this->assertStringContainsString(
                 $hex,
