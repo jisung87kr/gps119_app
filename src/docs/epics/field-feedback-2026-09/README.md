@@ -24,7 +24,8 @@
 | F-11 | iOS: 알림 켜도 계속 꺼짐으로 표기 | **09-04 배포(`eb2cf8b`)에서 수정 완료** — 피드백은 그 전 빌드 기준 | 웹 | ✅ 09-04 수정·배포 |
 | F-12 | iOS: 신고자 입장일 때 위치 동의 팝업 반복 | **원인 확정** — 신고 화면이 브라우저 geolocation 을 써서 WKWebView 가 페이지마다 다시 묻는다 | 웹(+선택 셸) | ✅ 09-07 A안 구현 · 실기기 QA 필요 |
 | F-13 | (현장 발견) 「알림 받는 중」인데 지령 안 옴 | 켜짐 기록·구독이 계정이 아니라 기기에 묶여 있었다 — 다른 계정이 먼저 쓴 기기 | 웹 | ✅ 09-07 구현·배포 `ea993dc` |
-| F-14 | (현장 발견) 운영 iOS 앱 푸시 전부 실패 | FCM 401 `THIRD_PARTY_AUTH_ERROR` / APNs `BadEnvironmentKeyInToken` — Firebase 의 APNs 키가 sandbox 전용 | **콘솔**(Apple·Firebase) + 로깅 | ✅ 09-07 22:10 키 교체(`5YP6MW3RP8`, Sandbox & Production) → 진단 발송 FCM 200 · 로깅 PR #39 |
+| F-14 | (현장 발견) 운영 iOS 앱 푸시 전부 실패 | FCM 401 `THIRD_PARTY_AUTH_ERROR` / APNs `BadEnvironmentKeyInToken` — Firebase 의 APNs 키가 sandbox 전용 | **콘솔**(Apple·Firebase) + 로깅 | ✅ 09-07 22:10 키 교체(`5YP6MW3RP8`) → 22:25 지령 #51 **실기기 수신·소리 확인** · 로깅 PR #39 |
+| F-15 | (현장 발견) 알림은 오는데 소리가 안 남 — 설정에 「사운드」 행 없음 | iOS 가 이 앱에 소리 없이 권한을 준 상태였고, 「허용」이면 재요청을 건너뛰어 고정됐다 | 웹 + 기기 | ✅ 09-07 PR #41(항상 재요청) + 앱 재설치로 해소 |
 
 배포 단위로 다시 묶으면:
 
@@ -197,7 +198,17 @@ FCM 이 APNs 에 넘길 때 Firebase 에 올려 둔 APNs 인증 키(.p8)가 **sa
 2. Firebase Console → 프로젝트 `gps119` → 프로젝트 설정 → **Cloud Messaging** → Apple 앱 구성 → **APNs 인증 키** 를 새 .p8(키 ID·팀 ID `KWL346JAR4`)로 교체
 3. 확인: 관제에서 배정 1건 → 로그에 `FCM 발송 거절` 이 «안» 뜨고 `delivered:1`
 
-✅ **2026-09-07 22:10 KST 해소.** 새 키 `5YP6MW3RP8`(Sandbox & Production, Team Scoped)을 만들어 Firebase 에 올렸고, 같은 토큰(#9)으로 다시 보낸 진단 발송이 **FCM 200 + message id** 로 바뀌었다. 키 파일은 `~/.gps119-keys/AuthKey_5YP6MW3RP8_apns_sandbox_production.p8`(셸 README 참조).
+✅ **2026-09-07 22:10 KST 해소.** 새 키 `5YP6MW3RP8`(Sandbox & Production, Team Scoped)을 만들어 Firebase 에 올렸고, 같은 토큰(#9)으로 다시 보낸 진단 발송이 **FCM 200 + message id** 로 바뀌었다. 키 파일은 `~/.gps119-keys/AuthKey_5YP6MW3RP8_apns_sandbox_production.p8`(셸 README 참조). **22:25 지령 #51 이 웹·iOS 양쪽 실기기에 도착했고 소리까지 확인** — `DEPLOY.md` §5 「운영 대상 푸시 종단 검증」 종료.
+
+### F-15. (현장에서 새로 발견) 알림은 오는데 소리가 안 난다 — 설정 → 알림 → GPS119 에 「사운드」 행이 없음
+
+F-14 해소 직후. 진단 발송 4건(`default` 2·`rescue_alarm.caf` 2)이 전부 배너만 뜨고 조용했다. 무음 스위치·잠금 상태와 무관.
+
+**원인.** iOS 가 이 앱에 **소리 없이**(alert·badge 만) 권한을 준 상태였다 — 설정에 「사운드」 행이 없는 것이 그 증거. 두 플러그인 모두 alert·badge·sound 를 요청하지만, `enableNativePush` 가 「이미 허용」이면 `requestPermissions` 를 건너뛰어 그 상태가 영구히 고정됐다. 어떻게 처음에 소리 없이 허가됐는지는 못 밝혔다(8-31 실기기 기록에도 «소리 남» 확인은 없다 — 처음부터였을 수 있다).
+
+✅ **해소.** ① 코드: `enableNativePush` 가 denied 가 아니면 항상 `requestPermissions` 를 다시 부른다(프롬프트 없이 빠진 옵션이 채워진다) — PR #41, 22:20 배포. ② 기기: 앱 삭제 → 재설치 → 알림 받기 켜기로 권한이 새로 잡혔고 **22:25 지령 #51 에서 소리가 났다.** ⚠️ iOS 는 같은 날 지웠다 깔면 예전 권한을 캐시에서 되살릴 수 있다 — 안 잡히면 «삭제 → 재시동 → 재설치». 「사운드」 행은 iOS 26 설정 화면에서 여전히 안 보이는데 소리는 나므로 UI 배치가 바뀐 것으로 본다.
+
+📌 다음 셸 빌드에 「기기의 알림 권한 상세(소리 포함 여부)」를 읽는 메서드를 넣고 프로필에 표시하면 이 종류를 원격에서 바로 안다(선택, §6-5).
 
 ✅ **코드 쪽(PR)**: `FcmSender` 가 거절 응답의 status·errorCode·APNs reason 을 `FCM 발송 거절` 경고로 남긴다(토큰·본문 제외). 다음엔 로그 한 줄로 안다. `FcmSenderTest` 1건.
 
@@ -242,7 +253,8 @@ FCM 이 APNs 에 넘길 때 Firebase 에 올려 둔 APNs 인증 키(.p8)가 **sa
 - [x] 로그인 확인(사용자, 2026-09-07): 관제 `/control` 역할 필터에 공무원·회송팀 · 관리자 참가자 페이지 피커 · 지령 화면 알림음 — 이상 없음
 - [ ] 🔴 **구버전 앱**으로 푸시 1건 — heads-up 이 살아 있는지(FCM 이 매니페스트 기본 채널로 떨어지는 경로)
 - [x] PR #37 `ea993dc` 21:43 KST — F-13 푸시 주인 동기화. 배포 후 확인: `/up` 200, 앱 번들에 `gps119.push.web.owner`, 게스트 페이지엔 `gps119-user` meta 없음
-- [ ] F-13 현장 재확인: 204 계정으로 로그인된 브라우저·앱에서 아무 화면이나 한 번 열기(주인 동기화) → 관제에서 다시 배정 → 웹·앱 모두 오는지
+- [x] PR #39·#41 `cb413bf` 22:20 KST — FCM 거절 로깅 + 알림 켜기 때 권한 항상 재요청(F-15). 마이그레이션 없음
+- [x] F-13·F-14·F-15 현장 확인 22:25 KST — 204 계정 웹(토큰 #18)·iOS(재설치 후 토큰 #19) 양쪽에 지령 #51 도착, iOS 소리 확인, 로그에 실패 없음
 
 ### 6-3. 셸 배포 (스토어 심사)
 
@@ -260,11 +272,12 @@ FCM 이 APNs 에 넘길 때 Firebase 에 올려 둔 APNs 인증 키(.p8)가 **sa
 | F-07 ② | 둘 다 | 푸시를 탭해 지령 화면에 들어온 직후 Reverb 지령에 소리가 나는가 |
 | F-10 | iPhone: 카카오내비 없음 / 카카오맵만 / 둘 다 없음 | 각각 어디로 가는가, 1.2초 뒤 폴백이 실제로 전환되는가 |
 | F-12 | iPhone | 신고 화면을 두 번째 열 때 위치 팝업이 «안» 뜨는가(OS 권한 허용 후) |
-| 푸시 종단 | iPhone, **운영 서버** | 알림 켜기 → 실제 수신 (`DEPLOY.md` §5 「운영 대상 iOS 푸시 종단 검증」 미완 — F-11 과는 별건) |
+| ~~푸시 종단~~ | iPhone, 운영 서버 | ✅ 09-07 22:25 — 웹·iOS 수신, iOS 소리 확인 (F-14·F-15 거쳐서) |
 
 ### 6-5. 선택 (이번엔 안 한 것)
 
 - 셸 `@capacitor/app-launcher` — F-10 을 `completed` 기반 확정 폴백으로 (코드 준비됨)
+- 셸에 알림 권한 상세(alert·sound·badge) 읽기 메서드 + 프로필 표시 — F-15 같은 «소리 없는 허가»를 원격에서 보이게
 - 셸 `@capacitor/geolocation` — F-12 B안, Android 까지 같은 경로로
 - F-05 자원봉사자 통합(②) — 고객 답에 따라 데이터 이관 1건
 - Android 당겨서 새로고침 — 요청이 없어 두었다
