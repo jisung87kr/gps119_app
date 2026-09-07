@@ -361,6 +361,7 @@ echo 'BACKUP_OFFSITE_CMD=aws s3 cp "$1" s3://gps119-backup/' >> ~/gps119_app/.en
       데이터 안전(Data safety) 섹션의 위치 수집 신고 내용이 방침과 어긋나면 반려된다
 - [ ] **실기기 푸시 종단 검증(운영 서버 대상)** — 지금까지 앱 푸시는 개발 서버로만 검증됐다.
       운영은 FCM 설정만 넣었을 뿐 실제 토큰이 등록된 적이 없다
+      🔴 **2026-09-07 첫 시도에서 막혔다.** iOS 발송이 전부 FCM 401 `THIRD_PARTY_AUTH_ERROR` / APNs `BadEnvironmentKeyInToken` — Firebase 에 올린 APNs 키가 **sandbox 전용**이라 스토어 빌드(production APNs)에는 못 보낸다. Apple Developer 에서 «Sandbox & Production» 키를 만들어 Firebase Cloud Messaging 의 APNs 인증 키를 교체해야 한다. 상세는 `src/docs/epics/field-feedback-2026-09/README.md` F-14
 
 ## 6. 아직 안 한 것 (의도적으로 남긴 것)
 

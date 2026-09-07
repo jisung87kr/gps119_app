@@ -24,6 +24,7 @@
 | F-11 | iOS: 알림 켜도 계속 꺼짐으로 표기 | **09-04 배포(`eb2cf8b`)에서 수정 완료** — 피드백은 그 전 빌드 기준 | 웹 | ✅ 09-04 수정·배포 |
 | F-12 | iOS: 신고자 입장일 때 위치 동의 팝업 반복 | **원인 확정** — 신고 화면이 브라우저 geolocation 을 써서 WKWebView 가 페이지마다 다시 묻는다 | 웹(+선택 셸) | ✅ 09-07 A안 구현 · 실기기 QA 필요 |
 | F-13 | (현장 발견) 「알림 받는 중」인데 지령 안 옴 | 켜짐 기록·구독이 계정이 아니라 기기에 묶여 있었다 — 다른 계정이 먼저 쓴 기기 | 웹 | ✅ 09-07 구현·배포 `ea993dc` |
+| F-14 | (현장 발견) 운영 iOS 앱 푸시 전부 실패 | FCM 401 `THIRD_PARTY_AUTH_ERROR` / APNs `BadEnvironmentKeyInToken` — Firebase 의 APNs 키가 sandbox 전용 | **콘솔**(Apple·Firebase) + 로깅 | ☐ 키 교체 필요 · 로깅 ✅ |
 
 배포 단위로 다시 묶으면:
 
@@ -182,6 +183,23 @@
 **원인 확정(서버 확인).** 배정 시점에 그 계정의 `device_tokens` 가 0건이라 발송이 없었다(리스너 14ms DONE). 그런데 화면은 「알림 받는 중」이었다 — 켜짐 기록(앱 `localStorage`)과 브라우저 구독이 **계정이 아니라 기기에** 묶여 있어서, 같은 아이폰·브라우저를 앞서 쓴 다른 계정의 것이 그대로 보였다. 서버의 토큰은 그 이전 계정 소유였고(토큰 #9, 09-03 생성), 12:32 UTC 에 토글을 다시 만지자 비로소 204 로 넘어왔다. **배포와 무관한 기존 결함**이고, 일괄 발급된 운영진이 공용 기기를 쓰면 똑같이 겪는다.
 
 ✅ **2026-09-07 구현(웹만, PR #37).** 켜짐 기록의 값을 «등록한 사용자 id» 로 바꾸고(앱 `gps119.push.enabled`, 웹 `gps119.push.web.owner`), 레이아웃이 `<meta name="gps119-user">` 로 로그인 사용자를 알린다. 페이지마다 `syncPushRegistration()` 이 주인과 현재 사용자를 비교해 다르면 같은 토큰·구독을 현재 사용자로 다시 `POST /api/devices` 한다 — 서버는 `token_hash` 기준이라 주인이 넘어오고 이전 사람은 더 못 받는다. 예전 기록('1')은 「누군지 모름」으로 한 번 재등록. 기록·구독이 없으면 건드리지 않는다(켤지는 사용자가 정한다). `/control` 은 서비스워커가 없어 웹 동기화를 부르지 않는다. 테스트: `pushNative.test.js` 9건·`push.test.js` 8건·`PushOwnerMetaTest`.
+
+### F-14. (현장에서 새로 발견) 운영 서버의 iOS 앱 푸시가 «전부» 실패한다 — APNs 키 환경
+
+F-13 을 고치고 다시 배정해도(21:51 KST, 지령 #45) 앱에 안 왔다. 이번엔 토큰이 있었고 리스너가 748ms 로 실제 발송을 했는데 `laravel-2026-09-07.log` 에 `failed:1` 집계만 남았다.
+
+**원인 확정.** 같은 토큰으로 FCM 에 손으로 보내 응답 본문을 받았다:
+`HTTP 401 UNAUTHENTICATED · errorCode THIRD_PARTY_AUTH_ERROR · "Invalid APNs credential." · ApnsError reason **BadEnvironmentKeyInToken**`.
+FCM 이 APNs 에 넘길 때 Firebase 에 올려 둔 APNs 인증 키(.p8)가 **sandbox(개발) 전용**이라 App Store/TestFlight 빌드(production APNs)로는 못 보낸다. 8-31 실기기 검증은 Xcode 개발 빌드(sandbox)였고, 오늘이 운영 서버 + 스토어 빌드 조합의 첫 iOS 푸시다 — `DEPLOY.md` §5 「운영 대상 푸시 종단 검증 미완」이 정확히 이것이었다. `validate_only` 로는 200 이라(토큰·프로젝트·서비스 계정은 정상) 실제 발송으로만 드러난다. 오늘 iOS 대상 발송 16건이 전부 이 이유로 실패했다(웹은 정상 배달).
+
+**고치는 곳 — 콘솔(코드 아님):**
+1. Apple Developer → Certificates, Identifiers & Profiles → **Keys** → 사용 중인 APNs 키의 환경이 **Sandbox & Production** 인지 확인. Sandbox 전용이면 새 키를 «Sandbox & Production» 으로 만든다(.p8 은 생성 때 한 번만 받는다)
+2. Firebase Console → 프로젝트 `gps119` → 프로젝트 설정 → **Cloud Messaging** → Apple 앱 구성 → **APNs 인증 키** 를 새 .p8(키 ID·팀 ID `KWL346JAR4`)로 교체
+3. 확인: 관제에서 배정 1건 → 로그에 `FCM 발송 거절` 이 «안» 뜨고 `delivered:1`
+
+✅ **코드 쪽(PR)**: `FcmSender` 가 거절 응답의 status·errorCode·APNs reason 을 `FCM 발송 거절` 경고로 남긴다(토큰·본문 제외). 다음엔 로그 한 줄로 안다. `FcmSenderTest` 1건.
+
+📌 Android 토큰 #4·#5(user 3, 09-01 생성)는 `UNREGISTERED` — 앱을 지웠거나 재설치한 기기. 다음 실제 발송에서 INVALID 로 폐기된다(정상 동작).
 
 ## 4. 앱 셸에서 고칠 것 — `~/Dev/gps119_app_mobile`
 

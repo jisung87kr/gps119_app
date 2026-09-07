@@ -9,6 +9,7 @@ use Closure;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -85,6 +86,21 @@ class FcmSender implements PushSender
         if ($response->successful()) {
             return PushDelivery::DELIVERED;
         }
+
+        // 🔴 거절 «이유»를 남긴다. 2026-09-07 운영 첫 iOS 푸시가 전부 401 THIRD_PARTY_AUTH_ERROR
+        //    (APNs 사유 BadEnvironmentKeyInToken — Firebase 에 올린 .p8 이 sandbox 전용이라
+        //    App Store 빌드에는 못 보냄)로 떨어졌는데, PushService 의 집계 경고(failed:1)만 남아
+        //    서버에서 요청을 손으로 재현해야 원인을 알 수 있었다. 설정 오류는 코드로 못 고치지만
+        //    «무엇이 틀렸는지»는 로그 한 줄이면 즉시 안다. 토큰·본문은 싣지 않는다(자격증명).
+        Log::warning('FCM 발송 거절', [
+            'status' => $response->status(),
+            'error' => $response->json('error.status'),
+            'code' => $response->json('error.details.0.errorCode'),
+            'reason' => $response->json('error.details.1.reason'),
+            'message' => $response->json('error.message'),
+            'platform' => $device->platform->value,
+            'device_id' => $device->id,
+        ]);
 
         // 🔑 401/403 은 «토큰이 상했다»는 뜻이다. 캐시를 비우지 않으면 남은 TTL 동안
         //    상한 토큰을 계속 써서 재시도가 전부 같은 이유로 실패한다 — 재시도가

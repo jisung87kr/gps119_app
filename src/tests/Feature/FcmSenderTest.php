@@ -11,6 +11,7 @@ use App\Services\Push\PushMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -126,6 +127,32 @@ class FcmSenderTest extends TestCase
         $sender->send($this->device(), $this->message());
 
         $this->assertSame(2, $calls, '401 이후에도 상한 토큰을 재사용하고 있다');
+    }
+
+    public function test_🔴_거절_응답의_이유를_로그에_남긴다(): void
+    {
+        // 2026-09-07 운영 첫 iOS 푸시: APNs 키가 sandbox 전용이라 401 THIRD_PARTY_AUTH_ERROR /
+        // BadEnvironmentKeyInToken 으로 전부 떨어졌는데, 집계 경고(failed:1)만 남아 서버에서
+        // 요청을 손으로 재현해야 원인을 알 수 있었다. 이유가 로그에 «그대로» 있어야 한다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([
+            'error' => [
+                'code' => 401, 'message' => 'Invalid APNs credential.', 'status' => 'UNAUTHENTICATED',
+                'details' => [
+                    ['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => 'THIRD_PARTY_AUTH_ERROR'],
+                    ['@type' => 'type.googleapis.com/google.firebase.fcm.v1.ApnsError', 'statusCode' => 403, 'reason' => 'BadEnvironmentKeyInToken'],
+                ],
+            ],
+        ], 401)]);
+
+        Log::shouldReceive('warning')->once()->withArgs(function ($message, $context) {
+            return $message === 'FCM 발송 거절'
+                && $context['status'] === 401
+                && $context['code'] === 'THIRD_PARTY_AUTH_ERROR'
+                && $context['reason'] === 'BadEnvironmentKeyInToken'
+                && ! array_key_exists('token', $context);
+        });
+
+        $this->assertSame(PushDelivery::FAILED, $this->sender()->send($this->device(), $this->message()));
     }
 
     public function test_만료가_짧으면_캐시도_짧게_잡는다(): void
