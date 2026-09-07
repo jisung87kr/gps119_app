@@ -24,7 +24,7 @@
 | F-11 | iOS: 알림 켜도 계속 꺼짐으로 표기 | **09-04 배포(`eb2cf8b`)에서 수정 완료** — 피드백은 그 전 빌드 기준 | 웹 | ✅ 09-04 수정·배포 |
 | F-12 | iOS: 신고자 입장일 때 위치 동의 팝업 반복 | **원인 확정** — 신고 화면이 브라우저 geolocation 을 써서 WKWebView 가 페이지마다 다시 묻는다 | 웹(+선택 셸) | ✅ 09-07 A안 구현 · 실기기 QA 필요 |
 | F-13 | (현장 발견) 「알림 받는 중」인데 지령 안 옴 | 켜짐 기록·구독이 계정이 아니라 기기에 묶여 있었다 — 다른 계정이 먼저 쓴 기기 | 웹 | ✅ 09-07 구현·배포 `ea993dc` |
-| F-14 | (현장 발견) 운영 iOS 앱 푸시 전부 실패 | FCM 401 `THIRD_PARTY_AUTH_ERROR` / APNs `BadEnvironmentKeyInToken` — Firebase 의 APNs 키가 sandbox 전용 | **콘솔**(Apple·Firebase) + 로깅 | ☐ 키 교체 필요 · 로깅 ✅ |
+| F-14 | (현장 발견) 운영 iOS 앱 푸시 전부 실패 | FCM 401 `THIRD_PARTY_AUTH_ERROR` / APNs `BadEnvironmentKeyInToken` — Firebase 의 APNs 키가 sandbox 전용 | **콘솔**(Apple·Firebase) + 로깅 | ✅ 09-07 22:10 키 교체(`5YP6MW3RP8`, Sandbox & Production) → 진단 발송 FCM 200 · 로깅 PR #39 |
 
 배포 단위로 다시 묶으면:
 
@@ -196,6 +196,8 @@ FCM 이 APNs 에 넘길 때 Firebase 에 올려 둔 APNs 인증 키(.p8)가 **sa
 1. Apple Developer → Certificates, Identifiers & Profiles → **Keys** → 사용 중인 APNs 키의 환경이 **Sandbox & Production** 인지 확인. Sandbox 전용이면 새 키를 «Sandbox & Production» 으로 만든다(.p8 은 생성 때 한 번만 받는다)
 2. Firebase Console → 프로젝트 `gps119` → 프로젝트 설정 → **Cloud Messaging** → Apple 앱 구성 → **APNs 인증 키** 를 새 .p8(키 ID·팀 ID `KWL346JAR4`)로 교체
 3. 확인: 관제에서 배정 1건 → 로그에 `FCM 발송 거절` 이 «안» 뜨고 `delivered:1`
+
+✅ **2026-09-07 22:10 KST 해소.** 새 키 `5YP6MW3RP8`(Sandbox & Production, Team Scoped)을 만들어 Firebase 에 올렸고, 같은 토큰(#9)으로 다시 보낸 진단 발송이 **FCM 200 + message id** 로 바뀌었다. 키 파일은 `~/.gps119-keys/AuthKey_5YP6MW3RP8_apns_sandbox_production.p8`(셸 README 참조).
 
 ✅ **코드 쪽(PR)**: `FcmSender` 가 거절 응답의 status·errorCode·APNs reason 을 `FCM 발송 거절` 경고로 남긴다(토큰·본문 제외). 다음엔 로그 한 줄로 안다. `FcmSenderTest` 1건.
 
