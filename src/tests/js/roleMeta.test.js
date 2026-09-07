@@ -19,10 +19,12 @@ import {
 const SERVER_META = {
     participant: { label: '참가자', color: '#6B7280' },
     staff: { label: '운영진', color: '#2563EB' },
+    official: { label: '공무원', color: '#0891B2', receivesDispatch: false },
     police: { label: '경찰', color: '#1E3A8A' },
     volunteer_course: { label: '자원봉사자(코스)', color: '#16A34A' },
     volunteer_medic: { label: '자원봉사자(구급)', color: '#F59E0B' },
-    paramedic: { label: '구급대', color: '#DC2626' },
+    paramedic: { label: '구급대', color: '#DC2626', receivesDispatch: true },
+    transport: { label: '회송팀', color: '#EA580C', receivesDispatch: true },
     controller: { label: '상황실', color: '#7C3AED' },
 };
 
@@ -115,7 +117,7 @@ describe('드리프트 재발 방지', () => {
             .toEqual([]);
     });
 
-    it('ROLE_ICONS 는 7종 전부를 덮는다', () => {
+    it('ROLE_ICONS 는 서버 역할 전부를 덮는다', () => {
         expect(Object.keys(ROLE_ICONS).sort()).toEqual(Object.keys(SERVER_META).sort());
     });
 });

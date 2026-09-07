@@ -70,11 +70,35 @@ export function reverseGeocode(long, lat) {
 }
 
 /**
- * navigator.geolocation.getCurrentPosition을 Promise로 래핑.
- * 미지원 브라우저 alert / loading 플래그는 호출자가 처리한다(화면별 동작 차이 보존).
+ * 현재 위치 1건. 미지원 브라우저 alert / loading 플래그는 호출자가 처리한다(화면별 동작 차이 보존).
+ *
+ * 🔑 앱 셸이 «네이티브 1회 취득»을 건넸으면 먼저 쓴다 (`__gps119Bridge.getCurrentPosition`,
+ *    iOS 에서 WebKit 위치 프롬프트가 페이지마다 다시 뜨던 것 — field-feedback-2026-09 F-12).
+ *    그 함수가 null 을 돌려주면(권한 없음·해당 없음) 원래의 navigator.geolocation 으로 간다.
+ *    이 파일은 Capacitor 를 모른다 — 주입 지점 이름만 안다(locationShare.js 와 같은 규칙).
+ *
  * @returns {Promise<GeolocationPosition>}
  */
 export function getCurrentPositionOnce(options = GEO_OPTIONS, env = globalThis) {
+    const native = env.__gps119Bridge?.getCurrentPosition;
+
+    if (typeof native !== 'function') {
+        return webCurrentPosition(options, env);
+    }
+
+    return Promise.resolve(native(options))
+        .then((position) => position ?? webCurrentPosition(options, env))
+        .catch((error) => {
+            // 위치 오류(code 있음)는 그대로 — 웹으로 다시 시도해도 같은 프롬프트·같은 실패다.
+            // 그 밖의 예외(플러그인 배선 문제)는 웹 경로로 살린다.
+            if (error && typeof error.code === 'number') throw error;
+
+            return webCurrentPosition(options, env);
+        });
+}
+
+/** 브라우저 navigator.geolocation.getCurrentPosition 을 Promise 로 래핑. */
+function webCurrentPosition(options, env) {
     return new Promise((resolve, reject) => {
         const geo = env.navigator?.geolocation;
         if (!geo) {

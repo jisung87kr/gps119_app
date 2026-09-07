@@ -11,10 +11,12 @@
 export const ROLE_ICONS = {
     participant: 'user',
     staff: 'badge',
+    official: 'building',
     police: 'shield',
     volunteer_course: 'flag',
     volunteer_medic: 'plusCircle',
     paramedic: 'plusBold',
+    transport: 'truck',
     controller: 'signal',
 };
 
@@ -48,6 +50,8 @@ export function initRoleMeta(injected) {
             label: meta.label,
             color: meta.color,
             icon: ROLE_ICONS[role] || UNKNOWN_ROLE.icon,
+            // 「구급만」 필터용. 역할 목록을 JS 에 따로 적지 않는다 — EventRole::canReceiveDispatch() 가 출처다.
+            receivesDispatch: Boolean(meta.receivesDispatch),
         };
     });
 
@@ -126,6 +130,10 @@ export const ICON_PATHS = {
     plusCircle: 'M12 3.75a8.25 8.25 0 100 16.5 8.25 8.25 0 000-16.5zM12 8.25v7.5M8.25 12h7.5',
     plusBold: 'M12 4.5v15M4.5 12h15',
     signal: 'M5 12a7 7 0 0114 0M8 12a4 4 0 018 0M12 12h.01',
+    // 공무원(official) — 관공서 건물. 운영진(명찰)·경찰(방패)과 형태로 구분한다.
+    building: 'M5.25 20.25V4.5A.75.75 0 016 3.75h9a.75.75 0 01.75.75v15.75M3.75 20.25h16.5M15.75 9h3a.75.75 0 01.75.75v10.5M8.25 7.5h1.5M11.25 7.5h1.5M8.25 11.25h1.5M11.25 11.25h1.5M8.25 15h1.5M11.25 15h1.5',
+    // 회송팀(transport) — 차량. 구급 계열(+)과 색이 인접(빨강·주황)하므로 형태가 결정적 구분이다.
+    truck: 'M2.25 7.5h11.25v9H2.25zM13.5 10.5h4.125l3.375 3.375V16.5H13.5zM6 18.75a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17.25 18.75a1.5 1.5 0 100-3 1.5 1.5 0 000 3z',
     // 신고핀 기본 글리프(경고 느낌표) — RequestType::markerIcon() 도입 전 임시
     alert: 'M12 9v3.75M12 16.5h.01M10.3 4.3l-7.4 12.8A1.5 1.5 0 004.2 19.5h15.6a1.5 1.5 0 001.3-2.4L13.7 4.3a1.5 1.5 0 00-2.6 0z',
 };

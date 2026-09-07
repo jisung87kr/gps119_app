@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterRoster } from '../../resources/js/control/rosterSearch.js';
+import { filterRoster, sortRoster } from '../../resources/js/control/rosterSearch.js';
 import ControlApp from '../../resources/js/control/ControlApp.js';
 
 /**
@@ -71,5 +71,47 @@ describe('관제 — 역할 배정 명단 검색', () => {
         });
 
         expect(ids(filtered)).toEqual([2, 3]);
+    });
+});
+
+describe('관제 — 역할 배정 명단 정렬 (F-08: 역할순 → 이름 가나다)', () => {
+    const ORDER = ['participant', 'staff', 'paramedic', 'controller'];
+    const list = [
+        { user_id: 1, name: '홍길동', role: 'paramedic' },
+        { user_id: 2, name: '김경숙', role: 'staff' },
+        { user_id: 3, name: '박민수', role: 'participant' },
+        { user_id: 4, name: '강나래', role: 'paramedic' },
+        { user_id: 5, name: '가나다', role: 'participant' },
+    ];
+
+    it('1순위 역할(서버 선언순), 2순위 이름 가나다', () => {
+        expect(ids(sortRoster(list, ORDER))).toEqual([5, 3, 2, 4, 1]);
+    });
+
+    it('원본 배열을 바꾸지 않는다', () => {
+        const before = ids(list);
+        sortRoster(list, ORDER);
+        expect(ids(list)).toEqual(before);
+    });
+
+    it('번들이 모르는 역할은 맨 뒤, 이름 없는 행은 그 역할 안에서 맨 뒤', () => {
+        const rows = [
+            { user_id: 1, name: null, role: 'staff' },
+            { user_id: 2, name: '김철수', role: 'brand_new_role' },
+            { user_id: 3, name: '이영희', role: 'staff' },
+        ];
+        expect(ids(sortRoster(rows, ORDER))).toEqual([3, 1, 2]);
+    });
+
+    it('같은 이름은 원래 순서를 지킨다(안정 정렬)', () => {
+        const rows = [
+            { user_id: 1, name: '김철수', role: 'staff' },
+            { user_id: 2, name: '김철수', role: 'staff' },
+        ];
+        expect(ids(sortRoster(rows, ORDER))).toEqual([1, 2]);
+    });
+
+    it('roleOrder 가 비어 있으면 이름 가나다만', () => {
+        expect(ids(sortRoster(list, []))).toEqual([5, 4, 2, 3, 1]);
     });
 });

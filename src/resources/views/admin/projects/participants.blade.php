@@ -69,16 +69,51 @@
         </div>
         <form action="{{ route('admin.projects.participants.store', $project->id) }}" method="POST" class="p-6 flex flex-col sm:flex-row flex-wrap items-end gap-3">
             @csrf
-            <div class="flex-1 min-w-[200px]">
+            {{-- 회원 피커 — 이름으로 검색해서 고른다 (2026-09-07 현장 피드백 F-06).
+                 회원 «전체» 셀렉트였는데 수백 명이면 스크롤로는 못 찾는다. 데이터는 이미 페이지에
+                 있으므로(이름 + 뒤 4자리) 서버 왕복 없이 여기서 거른다. 실제 값은 hidden user_id 다. --}}
+            <div class="flex-1 min-w-[240px]"
+                 x-data="{
+                    users: @js($addableUsers),
+                    q: '',
+                    selected: null,
+                    limit: 20,
+                    fold(v) { return String(v ?? '').toLowerCase().replace(/\s+/g, ''); },
+                    get matches() {
+                        const k = this.fold(this.q);
+                        if (k === '') return [];
+                        return this.users.filter((u) => this.fold(u.name).includes(k));
+                    },
+                    get shown() { return this.matches.slice(0, this.limit); },
+                    choose(u) { this.selected = u; this.q = ''; },
+                    clear() { this.selected = null; this.$nextTick(() => this.$refs.q?.focus()); },
+                 }">
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">회원</label>
-                <select name="user_id" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
-                    <option value="">회원 선택…</option>
-                    @foreach($addableUsers as $u)
-                        {{-- 셀렉트 옵션은 컴포넌트를 못 쓰므로 여기서 직접 가린다.
-                             동명이인 구분에 필요한 뒤 4자리만 남긴다. --}}
-                        <option value="{{ $u->id }}">{{ $u->name }}@if($u->phone) · ***{{ substr(preg_replace('/[^0-9]/', '', $u->phone), -4) }}@endif</option>
-                    @endforeach
-                </select>
+                <input type="hidden" name="user_id" :value="selected ? selected.id : ''">
+
+                <div x-show="selected" x-cloak
+                     class="flex items-center justify-between gap-2 px-3.5 py-2.5 border border-blue-200 rounded-xl bg-blue-50/40 text-sm text-slate-800">
+                    <span class="font-medium truncate" x-text="selected && selected.label"></span>
+                    <button type="button" @click="clear()" class="flex-none text-xs font-medium text-blue-600 hover:text-blue-700">변경</button>
+                </div>
+
+                <div x-show="!selected" class="relative">
+                    <input type="search" x-model="q" x-ref="q" autocomplete="off"
+                           placeholder="이름으로 검색 (예: 이지형)" aria-label="회원 검색"
+                           class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400">
+                    <ul x-show="q.trim() !== ''" x-cloak
+                        class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg py-1 text-sm">
+                        <template x-for="u in shown" :key="u.id">
+                            <li>
+                                <button type="button" @click="choose(u)"
+                                        class="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-slate-800" x-text="u.label"></button>
+                            </li>
+                        </template>
+                        <li x-show="matches.length === 0" class="px-3.5 py-2 text-slate-400">일치하는 회원이 없습니다</li>
+                        <li x-show="matches.length > limit" class="px-3.5 py-2 text-xs text-slate-400"
+                            x-text="'외 ' + (matches.length - limit) + '명 — 더 자세히 입력해 주세요'"></li>
+                    </ul>
+                </div>
             </div>
             <div class="min-w-[160px]">
                 <label class="block text-sm font-medium text-slate-700 mb-1.5">행사 역할</label>
@@ -221,12 +256,12 @@
                      x-data="{ issuing: false }">
                     <p class="text-xs text-amber-800/90 flex-1 min-w-[200px]">
                         아직 <b>계정이 없는 운영진 {{ number_format($rosterIssuable) }}명</b>에게 회원계정을 발급할 수 있습니다.
-                        초기 비밀번호는 모두 <b>password</b> 이고, 본인이 첫 로그인에서 비밀번호를 바꾸고 약관에 동의합니다.
+                        초기 비밀번호는 <b>각자의 전화번호</b>(숫자만)이고, 본인이 첫 로그인에서 비밀번호를 바꾸고 약관에 동의합니다.
                         <span class="text-amber-700/70">인원이 많으면 발급에 수십 초가 걸릴 수 있습니다 — 버튼을 한 번만 누르고 기다려 주세요.</span>
                     </p>
                     <form action="{{ route('admin.projects.participants.issue', $project->id) }}" method="POST" class="flex-none"
                           @submit="issuing = true"
-                          onsubmit="return confirm('계정 없는 운영진 {{ $rosterIssuable }}명에게 회원계정을 발급합니다. 초기 비밀번호는 모두 password 입니다. 계속할까요?')">
+                          onsubmit="return confirm('계정 없는 운영진 {{ $rosterIssuable }}명에게 회원계정을 발급합니다. 초기 비밀번호는 각자의 전화번호입니다. 계속할까요?')">
                         @csrf
                         <button type="submit" x-bind:disabled="issuing"
                                 class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-amber-600 rounded-xl hover:bg-amber-700 shadow-sm shadow-amber-600/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">

@@ -118,7 +118,7 @@
                         </div>
                         @if($member->isIssuedPending())
                             <form action="{{ route('admin.members.reissue-password', $member->id) }}" method="POST"
-                                  onsubmit="return confirm('초기 비밀번호를 «password» 로 재설정합니다. 계속할까요?')">
+                                  onsubmit="return confirm('초기 비밀번호를 전화번호로 재설정합니다. 계속할까요?')">
                                 @csrf
                                 <button type="submit" class="w-full inline-flex h-11 items-center justify-center rounded-xl bg-amber-50 text-sm font-medium text-amber-700 active:bg-amber-100">초기 비밀번호 재설정</button>
                             </form>
@@ -184,7 +184,7 @@
                                            class="text-slate-500 hover:text-slate-700">수정</a>
                                         @if($member->isIssuedPending())
                                             <form action="{{ route('admin.members.reissue-password', $member->id) }}" method="POST" class="inline"
-                                                  onsubmit="return confirm('초기 비밀번호를 «password» 로 재설정합니다. 계속할까요?')">
+                                                  onsubmit="return confirm('초기 비밀번호를 전화번호로 재설정합니다. 계속할까요?')">
                                                 @csrf
                                                 <button type="submit" class="text-amber-600 hover:text-amber-700">비밀번호 재설정</button>
                                             </form>

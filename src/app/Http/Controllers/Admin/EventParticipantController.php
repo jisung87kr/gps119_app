@@ -39,15 +39,31 @@ class EventParticipantController extends Controller
             ->with('user:id,name,phone')
             // status 우선순위(active→pending→left). FIELD()는 MySQL 전용이라 이식성 위해 CASE 사용.
             ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
-            ->orderBy('role')
+            // 역할은 «선언 순서»(참가자 → 운영진 → … → 상황실)로, 그 안에서 이름 가나다 (F-08).
+            ->orderByRaw(EventRole::orderByDeclarationSql('event_participants.role'))
+            ->orderBy(User::select('name')->whereColumn('users.id', 'event_participants.user_id'))
             ->get();
 
         $joinedIds = $participants->pluck('user_id');
 
-        // 아직 이 행사에 없는 회원 (추가용)
+        // 아직 이 행사에 없는 회원 (추가용 피커 데이터, F-06).
+        //
+        // 🔑 이름 + 전화 «뒤 4자리»만 내려보낸다. 회원 전체가 실리는 자리라 여기가 가장 크게
+        //    새는 곳이다(PhoneMaskingTest) — 동명이인 구분에 뒤 4자리면 충분하다.
         $addableUsers = User::whereNotIn('id', $joinedIds)
             ->orderBy('name')
-            ->get(['id', 'name', 'phone']);
+            ->get(['id', 'name', 'phone'])
+            ->map(function (User $u) {
+                $digits = preg_replace('/[^0-9]/', '', (string) $u->phone);
+                $tail = strlen($digits) >= 4 ? substr($digits, -4) : null;
+
+                return [
+                    'id' => $u->id,
+                    'name' => (string) $u->name,
+                    'label' => $tail ? "{$u->name} · ***{$tail}" : (string) $u->name,
+                ];
+            })
+            ->values();
 
         // 명단에는 있는데 아직 입장하지 않은 사람.
         //
@@ -56,7 +72,7 @@ class EventParticipantController extends Controller
         //    행사 시작 전에 이 목록이 비어 가는지 보면 발견할 수 있다.
         $rosterPending = EventRoster::forProject($project->id)
             ->unclaimed()
-            ->orderBy('role')
+            ->orderByRaw(EventRole::orderByDeclarationSql('role'))
             ->orderBy('name')
             ->get();
 
@@ -181,9 +197,9 @@ class EventParticipantController extends Controller
     /**
      * 운영진 회원계정 일괄 발급 (ADR-0009).
      *
-     * claim 대기 명단 중 «아직 계정이 없는» 사람에게 계정을 만든다. 초기 비밀번호는 전원 동일한
-     * «password» 이고(운영 요청), 본인이 첫 로그인에서 반드시 바꾼다. 이미 회원인 행은 계정을
-     * 만들지 않고 역할만 붙는다. 서로 다른 비밀번호가 없으므로 CSV 없이 결과 요약만 돌려준다.
+     * claim 대기 명단 중 «아직 계정이 없는» 사람에게 계정을 만든다. 초기 비밀번호는 각자의
+     * «전화번호» 이고(운영 요청, 2026-09-07), 본인이 첫 로그인에서 반드시 바꾼다. 이미 회원인 행은
+     * 계정을 만들지 않고 역할만 붙는다. 비밀번호가 곧 ID 라 CSV 없이 결과 요약만 돌려준다.
      */
     public function issueAccounts(Project $project, AccountIssueService $issuer)
     {
@@ -197,7 +213,7 @@ class EventParticipantController extends Controller
             return back()->with('success', $msg);
         }
 
-        $parts = ["운영진 {$report['issued']}명에게 회원계정을 발급했습니다. 초기 비밀번호는 모두 «password» 입니다 — 각자 첫 로그인에서 변경합니다."];
+        $parts = ["운영진 {$report['issued']}명에게 회원계정을 발급했습니다. 초기 비밀번호는 각자의 전화번호(숫자만)입니다 — 첫 로그인에서 변경합니다."];
         if ($report['linked'] > 0) {
             $parts[] = "이미 회원인 {$report['linked']}명은 역할만 배정했습니다.";
         }

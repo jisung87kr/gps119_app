@@ -68,15 +68,16 @@ class EventParticipant extends Model
      */
     public function scopeReceivers(Builder $query): Builder
     {
-        return $query->whereIn('role', [EventRole::PARAMEDIC->value, EventRole::VOLUNTEER_MEDIC->value]);
+        // 🔑 역할 값을 여기 적지 않는다 — EventRole::canReceiveDispatch() 가 단일 출처다.
+        return $query->whereIn('role', EventRole::dispatchReceiverValues());
     }
 
     /**
-     * 새 지령의 배정 «후보»(구급대만). EventRole::isDispatchCandidate() 와 짝.
+     * 새 지령의 배정 «후보»(구급대·회송팀). EventRole::isDispatchCandidate() 와 짝.
      */
     public function scopeDispatchCandidates(Builder $query): Builder
     {
-        return $query->where('role', EventRole::PARAMEDIC->value);
+        return $query->whereIn('role', EventRole::dispatchCandidateValues());
     }
 
     /**

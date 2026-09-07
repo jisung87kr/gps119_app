@@ -193,19 +193,58 @@
         const { createApp } = Vue;
         const root = document.getElementById('dispatchApp');
 
-        // 알림음(asset 없이 WebAudio 비프) — best-effort
+        // 알림음(asset 없이 WebAudio) — best-effort.
+        //
+        // 🔴 2026-09-07 현장 피드백 「안 들림」(field-feedback-2026-09 F-07 ②). 예전엔 880Hz
+        //    사인파 0.6초, 음량 0.3 이었다 — 주머니 속 폰에서는 안 들린다. 사이렌처럼 두 음을
+        //    번갈아 2초 남짓 울리고 음량을 올린다. 회수는 «짧게 세 번»으로 새 지령과 구분한다.
+        //
+        // 🔑 iOS·Android 웹뷰 모두 첫 제스처 전에는 AudioContext 가 잠겨 있다(suspended).
+        //    푸시를 탭해 들어온 직후가 정확히 그 상태라, 울리기 전에 resume() 을 시도하고
+        //    mounted 의 unlockAudio 가 첫 탭에서 «소리 없이» 잠금을 푼다(예전엔 첫 탭에 삐 소리가 났다).
+        //
+        // ⚠️ OS 푸시 알림음과는 별개다 — 이건 «화면이 떠 있을 때» Reverb 로 받은 지령의 소리다.
+        //    푸시 알림음 교체(채널 v2 + 사운드 파일)는 앱 셸 재배포와 한 쌍이라 F-07 ① 로 따로 간다.
         let audioCtx = null;
-        function beep() {
+        function audioContext() {
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended' && audioCtx.resume) audioCtx.resume().catch(() => {});
+            return audioCtx;
+        }
+        function tone(ctx, at, freq, dur, peak) {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.type = 'square'; o.frequency.value = freq;
+            g.gain.setValueAtTime(0.001, at);
+            g.gain.exponentialRampToValueAtTime(peak, at + 0.02);
+            g.gain.setValueAtTime(peak, at + dur - 0.03);
+            g.gain.exponentialRampToValueAtTime(0.001, at + dur);
+            o.start(at); o.stop(at + dur);
+        }
+        const BEEP_PATTERNS = {
+            // 새 지령: 1200/800Hz 를 0.25초씩 8번 ≈ 2초 사이렌
+            assign: Array.from({ length: 8 }, (_, i) => [i * 0.25, i % 2 === 0 ? 1200 : 800, 0.24]),
+            // 회수: 짧게 세 번
+            recall: [[0, 900, 0.12], [0.2, 900, 0.12], [0.4, 900, 0.12]],
+        };
+        function beep(pattern = 'assign') {
             try {
-                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-                const o = audioCtx.createOscillator();
-                const g = audioCtx.createGain();
-                o.connect(g); g.connect(audioCtx.destination);
-                o.type = 'sine'; o.frequency.value = 880;
-                g.gain.setValueAtTime(0.001, audioCtx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
-                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
-                o.start(); o.stop(audioCtx.currentTime + 0.6);
+                const ctx = audioContext();
+                const t0 = ctx.currentTime + 0.01;
+                (BEEP_PATTERNS[pattern] || BEEP_PATTERNS.assign)
+                    .forEach(([offset, freq, dur]) => tone(ctx, t0 + offset, freq, dur, 0.6));
+            } catch (e) { /* best-effort */ }
+        }
+        // 첫 제스처에서 «무음»으로 잠금만 푼다.
+        function unlockAudio() {
+            try {
+                const ctx = audioContext();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                g.gain.value = 0;
+                o.connect(g); g.connect(ctx.destination);
+                o.start(); o.stop(ctx.currentTime + 0.01);
             } catch (e) { /* best-effort */ }
         }
 
@@ -337,7 +376,7 @@
 
                     // 배정 알림과 «구분되는» 패턴(짧게 세 번). 같은 진동이면 새 지령으로 읽는다.
                     if (navigator.vibrate) navigator.vibrate([120, 90, 120, 90, 120]);
-                    beep();
+                    beep('recall');
 
                     // 회수된 그 지령을 풀스크린 알림/거절 모달이 붙잡고 있으면 먼저 놓는다.
                     // (이미 사라진 지령을 수락·거절하면 서버가 422 로 돌려준다.)
@@ -423,9 +462,9 @@
             async mounted() {
                 window.__dispatchApp = this; // 브라우저 QA용
 
-                // 오디오 unlock(첫 제스처) + 위치공유 시작
-                const unlock = () => { beep(); document.removeEventListener('click', unlock); };
-                document.addEventListener('click', unlock, { once: true });
+                // 오디오 unlock(첫 제스처, 무음) + 위치공유 시작
+                document.addEventListener('click', unlockAudio, { once: true });
+                document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 
                 await this.loadMine();
                 await this._subscribe();

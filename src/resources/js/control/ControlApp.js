@@ -4,7 +4,7 @@
 
 import { PersonMarkerPool, RequestPinLayer, CLUSTER_PROFILE } from './markerPool';
 import { TrackLayer } from './trackLayer';
-import { filterRoster } from './rosterSearch';
+import { filterRoster, sortRoster } from './rosterSearch';
 import { formatCoords, kakaoMapUrl, shareText, clampMenuPosition, MENU_SIZE, pickAddress, locationText } from './mapContextMenu';
 import {
     ROLE_ORDER, ROLE_META, roleMeta, priorityMeta,
@@ -118,9 +118,12 @@ export default {
     },
 
     computed: {
-        /** 역할 배정 패널에 보이는 명단 — 검색어로 좁힌 것. 판정은 rosterSearch.js(순수). */
+        /**
+         * 역할 배정 패널에 보이는 명단 — 검색어로 좁히고, 역할순 → 이름 가나다로 정렬한 것.
+         * 판정·정렬은 rosterSearch.js(순수). 역할 순서는 서버가 준 roleOrder 다.
+         */
         filteredRoster() {
-            return filterRoster(this.roster, this.rosterQuery, this.roleLabel);
+            return sortRoster(filterRoster(this.roster, this.rosterQuery, this.roleLabel), this.roleOrder);
         },
 
         /** 우클릭 메뉴 상단에 보이는 좌표 라벨. */
@@ -896,9 +899,10 @@ export default {
             this._applyFilterToPool();
         },
         // 모바일 필터 칩용 — 지령 수령 가능 역할(EventRole::canReceiveDispatch)만 남긴다.
+        // 🔑 역할 목록은 서버가 주입한 메타(receivesDispatch)에서 읽는다. 예전엔 여기 문자열로
+        //    적혀 있어서 회송팀을 추가하면 이 칩만 조용히 빠졌을 것이다.
         onlyMedics() {
-            const medics = new Set(['paramedic', 'volunteer_medic']);
-            this.roleOrder.forEach((r) => { this.roleFilter[r] = medics.has(r); });
+            this.roleOrder.forEach((r) => { this.roleFilter[r] = Boolean(ROLE_META[r]?.receivesDispatch); });
             this._applyFilterToPool();
         },
         clearRoles() {

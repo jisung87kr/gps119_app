@@ -13,6 +13,21 @@ namespace App\Services\Push;
 final class PushMessage
 {
     /**
+     * 안드로이드 알림 채널 — 셸의 `res/values/notification.xml` 과 «같은 문자열»이어야 한다.
+     *
+     * 🔴 v2 (2026-09-07, field-feedback F-07 ①): 채널에 사이렌 알림음을 붙이려면 id 를 올려야 했다.
+     *    구버전 앱(v1 만 있음)에는 FCM 이 매니페스트 기본 채널로 떨어뜨리므로 heads-up 은 산다 —
+     *    소리만 예전 기본음이다. 반대로 셸만 v2 로 나가고 여기가 v1 이면, 새 앱에서 v1 은 «지워진»
+     *    채널이라 기본 채널로 떨어진다. 그래서 둘은 한 쌍이다.
+     */
+    public const ANDROID_CHANNEL_ID = 'gps119-rescue-v2';
+
+    /**
+     * iOS 알림음 — 셸 번들의 `rescue_alarm.caf`. 파일이 없는 구버전 앱은 iOS 가 기본음으로 대체한다.
+     */
+    public const IOS_SOUND = 'rescue_alarm.caf';
+
+    /**
      * @param  string  $title  알림 제목
      * @param  string  $body  알림 본문. 연락처·상세 주소를 넣지 않는다.
      * @param  string|null  $url  탭했을 때 열 앱/웹 경로 (딥링크)
@@ -100,10 +115,16 @@ final class PushMessage
         //    ⚠️ apns 는 «하위 키»로 대입한다. `$payload['apns'] = [...]` 로 통째 대입하면
         //       아래 sound/interruption-level·badge 블록이 이 줄보다 먼저 실행될 때
         //       조용히 덮어써진다 — 순서에 의존하는 구조를 남기지 않는다.
+        //    ⚠️ android 도 «하위 키»로 대입한다 — 아래 channel_id 와 같은 키를 나눠 쓴다.
         if ($this->tag !== null) {
-            $payload['android'] = ['notification' => ['tag' => $this->tag]];
+            $payload['android']['notification']['tag'] = $this->tag;
             $payload['apns']['headers']['apns-collapse-id'] = $this->tag;
         }
+
+        // 🔴 안드로이드 채널 (F-07 ①). 없으면 FCM 이 매니페스트 기본 채널을 쓰는데, 그건 앱이
+        //    «지금» 무엇을 기본으로 두었느냐에 달려 있어 서버가 소리·중요도를 보장할 수 없다.
+        //    Android 8+ 에서 소리·진동·heads-up 은 전부 채널이 정하므로 sound 는 따로 싣지 않는다.
+        $payload['android']['notification']['channel_id'] = self::ANDROID_CHANNEL_ID;
 
         // 🔴 **iOS 가 «잠금화면에서 조용»했던 이유** (실기기 QA 2026-08-31).
         //    안드로이드는 채널을 IMPORTANCE_HIGH 로 만들어 heads-up 을 확보해 뒀는데
@@ -119,7 +140,9 @@ final class PushMessage
         //       왜 그대로지」로 돌아온다. 셸의 App.entitlements 와 한 쌍이고 따로 배포하면 안 된다.
         //
         //    critical(무음 스위치·집중 모드까지 무시)은 애플의 별도 승인이 필요해 쓰지 않는다.
-        $payload['apns']['payload']['aps']['sound'] = 'default';
+        //    🔴 sound 는 2026-09-07 부터 번들 사이렌(F-07 ①)이다. «default» 는 짧고 작아 현장에서
+        //       「안 들림」이었다. 파일이 없는 구버전 앱에서는 iOS 가 기본음으로 대체한다.
+        $payload['apns']['payload']['aps']['sound'] = self::IOS_SOUND;
         $payload['apns']['payload']['aps']['interruption-level'] = 'time-sensitive';
 
         // 🔑 iOS 앱 아이콘 뱃지는 **APNs 페이로드의 `aps.badge` 로만** 정해진다.
