@@ -272,7 +272,8 @@ F-14 해소 직후. 진단 발송 4건(`default` 2·`rescue_alarm.caf` 2)이 전
 - [x] 빌드 3 실기기(23:20): 사이렌 ✅ · 당겨서 새로고침 ❌ → 빌드 4
 - [x] iOS 빌드 4 업로드 2026-09-07 23:01 KST (셸 `bf461b4`, 같은 CLI 절차)
 - [x] 빌드 4 실기기(23:15): 목록 화면 당겨서 새로고침 ✅ (사용자 확인). 지도 화면 오작동 여부와 `app_version` 갱신은 다음 사용 때
-- [ ] App Store 심사 제출은 빌드 2 가 어떤 상태인지 보고 결정(빌드 3 로 교체 제출)
+- [ ] **2026-09-08 예정 — App Store 재심사 제출**: 심사 중인 빌드 2 를 **빌드 5** 로 교체(사이렌·새로고침·아이콘·네이버 로그인·APNs 키). 데모 계정·심사 노트는 `05-store-release.md` §2-1 그대로
+- [ ] **2026-09-08 예정 — Android 앱 등록(Play Console)**: `npm run bundle:android:prod` → AAB(versionCode 2) 업로드 → 앱 서명 키 지문을 `assetlinks.json` 에 «추가»(`05` §밟기 쉬운 것 ③). 🔴 개인정보처리방침 URL·데이터 안전 섹션·백그라운드 위치 선언 양식(시연 영상 `docs/store/background-location-video.md`)이 선행조건
 - [ ] Android: `npm run bundle:android:prod` → **Play 첫 제출은 법무 선행조건에 막혀 있다**(개인정보처리방침 URL·데이터 안전 섹션, `05-store-release.md` §2). 그 전까지는 사이드로드 APK(`build:android:prod`)로 현장 기기에 배포
 - [ ] Play 에 올린 뒤 `assetlinks.json` 에 Play 앱 서명 키 지문 «추가» (`05 §밟기 쉬운 것 ③`)
 
