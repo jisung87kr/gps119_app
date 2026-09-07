@@ -246,8 +246,28 @@ class FcmSenderTest extends TestCase
         Http::assertSent(function ($request) {
             $message = $request->data()['message'];
 
-            $this->assertArrayNotHasKey('android', $message);
+            // android 블록 자체는 채널 때문에 항상 있다(F-07 ①) — tag 키만 없어야 한다.
+            $this->assertArrayNotHasKey('tag', $message['android']['notification']);
             $this->assertArrayNotHasKey('headers', $message['apns']);
+
+            return true;
+        });
+    }
+
+    public function test_🔴_안드로이드_채널_id_는_tag_유무와_무관하게_실린다(): void
+    {
+        // F-07 ①: 채널이 소리·heads-up 을 정한다. 셸 notification.xml 의 값과 «같아야» 하고,
+        // tag 블록이 android 를 통째 대입하던 구조였다면 여기서 사라졌을 것이다.
+        Http::fake(['fcm.googleapis.com/*' => Http::response([], 200)]);
+
+        $this->sender()->send($this->device(), $this->message());
+        $this->sender()->send($this->device(), new PushMessage('t', 'b', null, [], 'request-9'));
+
+        Http::assertSent(function ($request) {
+            $notification = $request->data()['message']['android']['notification'];
+
+            $this->assertSame('gps119-rescue-v2', $notification['channel_id']);
+            $this->assertSame(PushMessage::ANDROID_CHANNEL_ID, $notification['channel_id']);
 
             return true;
         });
@@ -269,7 +289,9 @@ class FcmSenderTest extends TestCase
         Http::assertSent(function ($request) {
             $aps = $request->data()['message']['apns']['payload']['aps'];
 
-            $this->assertSame('default', $aps['sound']);
+            // 2026-09-07(F-07 ①): 기본음 → 번들 사이렌. 셸의 rescue_alarm.caf 와 «한 쌍».
+            $this->assertSame('rescue_alarm.caf', $aps['sound']);
+            $this->assertSame(PushMessage::IOS_SOUND, $aps['sound']);
             $this->assertSame('time-sensitive', $aps['interruption-level']);
 
             return true;
@@ -291,7 +313,7 @@ class FcmSenderTest extends TestCase
             $apns = $request->data()['message']['apns'];
 
             $this->assertSame('request-7', $apns['headers']['apns-collapse-id']);
-            $this->assertSame('default', $apns['payload']['aps']['sound']);
+            $this->assertSame('rescue_alarm.caf', $apns['payload']['aps']['sound']);
             $this->assertSame('time-sensitive', $apns['payload']['aps']['interruption-level']);
             $this->assertSame(2, $apns['payload']['aps']['badge']);
 

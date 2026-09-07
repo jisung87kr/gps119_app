@@ -188,6 +188,9 @@ export function initNativePushRouting(env = globalThis) {
     //    `No listeners found …` — 리스너가 없으면 그대로 증발한다.
     //    「대원이 앱을 켜 두고 있었더니 배정을 못 받았다」는 뒤집힌 결과다.
     if (needsForegroundNotification(env)) {
+        // 채널은 미리 정해 둔다 — 푸시가 온 «그때» 물어보면 알림이 마이크로태스크 뒤로 밀린다.
+        resolveRescueChannelId(env);
+
         p.addListener('notificationReceived', (event) => {
             const spec = toForegroundNotification(event);
 
@@ -241,13 +244,43 @@ export function clearAppBadge(env = globalThis) {
 }
 
 /**
- * 셸이 만들어 둔 구조 알림 채널.
+ * 셸이 만들어 둔 구조 알림 채널 — «최신 것부터».
  *
  * ⚠️ **셸의 `MainActivity.createRescueNotificationChannel()` 과 문자열이 같아야 한다.**
  *    (`android/app/src/main/res/values/notification.xml`) 어긋나면 안드로이드가 조용히
  *    기본 채널로 떨어뜨려 heads-up 이 사라진다 — 오류는 나지 않는다.
+ *
+ * 🔴 v2 (2026-09-07, F-07 ①): 사이렌 알림음을 붙이면서 id 를 올렸다. 그런데 이 번들은 원격 URL 이라
+ *    **구버전 앱(v1 만 있음)에서도 돈다.** v2 를 그대로 쓰면 그 앱에서는 «없는 채널»이라 로컬 알림이
+ *    조용히 기본 채널로 떨어진다. 그래서 채널 id 를 적지 않고 **플러그인에게 물어서** 있는 것 중
+ *    최신을 쓴다(`resolveRescueChannelId`). 못 물으면 가장 오래된 것 — 그 셸 세대가 아는 유일한 id 다.
  */
-const RESCUE_CHANNEL_ID = 'gps119-rescue-v1';
+const RESCUE_CHANNEL_IDS = ['gps119-rescue-v2', 'gps119-rescue-v1'];
+const OLDEST_RESCUE_CHANNEL_ID = RESCUE_CHANNEL_IDS[RESCUE_CHANNEL_IDS.length - 1];
+
+/** 이 셸에 실제로 있는 구조 채널. 앱을 열 때 한 번 정하고(initNativePushRouting) 그대로 쓴다. */
+let rescueChannelId = OLDEST_RESCUE_CHANNEL_ID;
+
+/**
+ * 셸이 만든 채널 중 «가장 최신»을 고른다. 목록을 못 받으면 가장 오래된 id.
+ *
+ * @returns {Promise<string>}
+ */
+export async function resolveRescueChannelId(env = globalThis) {
+    const ln = localNotifications(env);
+    let ids = [];
+
+    try {
+        const res = await ln?.listChannels?.();
+        ids = (res?.channels ?? []).map((c) => c?.id);
+    } catch (e) {
+        ids = [];
+    }
+
+    rescueChannelId = RESCUE_CHANNEL_IDS.find((id) => ids.includes(id)) ?? OLDEST_RESCUE_CHANNEL_ID;
+
+    return rescueChannelId;
+}
 
 /**
  * 포그라운드 알림을 실제로 띄운다.
@@ -277,7 +310,7 @@ function presentForeground(spec, env = globalThis) {
             id: spec.id,
             title: spec.title,
             body: spec.body,
-            channelId: RESCUE_CHANNEL_ID,
+            channelId: rescueChannelId,
             extra: { url: spec.url },
         }],
     })).catch(() => showForegroundBanner(spec, env));
@@ -413,4 +446,5 @@ export function showForegroundBanner({ title, body, url }, env = globalThis) {
 /** 테스트 전용 — 모듈 상태를 비운다. */
 export function __resetNativePushState() {
     lastToken = null;
+    rescueChannelId = OLDEST_RESCUE_CHANNEL_ID;
 }

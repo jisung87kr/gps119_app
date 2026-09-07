@@ -13,11 +13,11 @@
 |---|---|---|---|---|
 | F-01 | 앱 설치 시 실시간 관제에 위치 표시되나 | **된다** — 답변만 | — | ☐ 답변 |
 | F-02 | 백그라운드 위치 공유되나 | **된다**, OS 별 전제 있음 — 답변만 | — | ☐ 답변 |
-| F-03 | 아이폰 새로고침 방법 | 앱엔 양 OS 모두 없음. iOS 당겨서 새로고침 추가 | 셸 | ☐ |
+| F-03 | 아이폰 새로고침 방법 | 앱엔 양 OS 모두 없음. iOS 당겨서 새로고침 추가 | 셸 | ✅ 09-07 구현 · 실기기 QA 필요 |
 | F-04 | 일괄 회원가입 ID·PW = 전화번호 | **09-04 배포로 이미 있음**. PW 만 `password`→전화번호 | 웹 | ✅ 09-07 구현 |
 | F-05 | 역할 추가(구급대·회송팀·공무원·참가자·자원봉사자·경찰·상황실) | 회송팀·공무원 신설. 자원봉사자 통합은 **고객 확인 필요** | 웹 | ✅ 09-07 구현(신설 2종 + 「자원봉사자」 별칭) |
 | F-06 | 역할 배정 시 이름 검색 | 관제 패널은 09-04 배포로 있음. **관리자 「참가자 추가」 셀렉트**가 문제였을 가능성이 큼 → 이름 검색 피커로 교체 | 웹 | ✅ 09-07 구현 |
-| F-07 | 알람 소리 변경(안 들림) | ① 푸시음 교체(셸+웹 «한 쌍») ② 지령 화면 자체 알림음 | 셸+웹 | ② ✅ 09-07 구현 · ① ☐ 셸 |
+| F-07 | 알람 소리 변경(안 들림) | ① 푸시음 교체(셸+웹 «한 쌍») ② 지령 화면 자체 알림음 | 셸+웹 | ①② ✅ 09-07 구현 · ① 은 셸 재배포 후 실기기 QA |
 | F-08 | 역할 배정 정렬: 역할 → 가나다 | 관제 패널은 서버 순서 그대로. 정렬 추가 | 웹 | ✅ 09-07 구현(관제 패널 + 관리자 페이지) |
 | F-09 | Android: 도착을 눌러야 카카오맵, 출동으로 바꿔달라 | 코드는 처음부터 «출동»에서 띄움 — **실기기 재현 필요** | 재확인 | ☐ |
 | F-10 | iOS: 길안내 눌러도 카카오맵 안 됨 | **원인 확정** — 폴백 `window.open` 을 WKWebView 가 막음 | 웹 | ✅ 09-07 구현 · 실기기 QA 필요 |
@@ -27,7 +27,7 @@
 배포 단위로 다시 묶으면:
 
 - **웹만 배포(즉시)**: F-04, F-05, F-06(관리자 페이지), F-07 ② 지령 화면 알림음, F-08, F-10, F-12 — ✅ **2026-09-07 전부 구현, 브랜치 `feat/field-feedback-2026-09`** (PHP 534 · JS 405 통과, Pint 통과, Vite 빌드 통과 — 실행은 전부 컨테이너 안). 실기기 QA 는 F-07 ②·F-10·F-12
-- **셸 스토어 재배포**: F-03, F-07 ① 푸시음(웹 페이로드와 같이), F-12 B안(선택), F-10 `@capacitor/app-launcher`(선택)
+- **셸 스토어 재배포**: F-03, F-07 ① — ✅ **2026-09-07 구현, 셸 브랜치 `feat/field-feedback-2026-09`**(versionCode 2 · iOS 빌드 3). 선택 항목 F-12 B안·F-10 `@capacitor/app-launcher` 는 남김
 - **고객 재확인 먼저**: F-09, F-11, 그리고 F-05 자원봉사자 통합 여부
 
 🔑 **웹은 배포하면 즉시 반영되고 셸은 심사를 거친다.** 웹만으로 되는 것을 먼저 내고, 셸 변경은 한 번에 묶어 낸다(Android Play 첫 제출과 iOS 빌드 3).
@@ -55,8 +55,8 @@
 
 **앱에는 양 OS 모두 당겨서 새로고침이 없다.** 갤럭시에서 되던 것은 Chrome 브라우저의 기능이다. 관제·지령 화면은 실시간 갱신이라 새로고침이 필요 없고, 나머지 화면용으로 iOS 에 붙인다.
 
-- 🛠 셸 `~/Dev/gps119_app_mobile/ios/App/App/MainViewController.swift` — `webView?.scrollView.refreshControl = UIRefreshControl()` + `reload()`. 10줄 안팎.
-- ⚠️ 실기기 QA 필요: 지도 화면(카카오맵이 터치를 잡아 스크롤뷰가 안 당겨질 것으로 예상)과 `overflow:hidden` 화면(바운스가 없어 안 걸릴 것으로 예상). 예상이지 실측이 아니다.
+- ✅ **2026-09-07 구현** — 셸 `ios/App/App/MainViewController.swift` `installPullToRefresh()`: 웹뷰 스크롤뷰에 `UIRefreshControl`, 당기면 `reload()` 후 0.8초 뒤 스피너 종료.
+- ⚠️ 실기기 QA 필요: 지도 화면(카카오맵이 터치를 잡아 스크롤뷰가 안 당겨질 것으로 예상)과 `overflow:hidden` 화면(바운스가 없어 안 걸릴 것으로 예상). 예상이지 실측이 아니다. 잘못 걸리면 지도를 끌다 새로고침되는 사고가 된다.
 - Android 도 맞추려면 `SwipeRefreshLayout` 로 WebView 를 감싸야 해서 더 크다. 요청이 iOS 뿐이므로 iOS 만 한다.
 
 ---
@@ -115,9 +115,12 @@
 
 ① 은 **셸과 웹이 한 쌍**이다(time-sensitive 때와 같다 — 한쪽만 나가면 조용히 아무 일도 안 일어난다):
 
-- 🛠 셸 Android: `android/app/src/main/res/raw/rescue_alarm.mp3` 신규, `MainActivity.createRescueNotificationChannel()` 에 `setSound(uri, USAGE_ALARM)` — 🔴 **기존 채널은 못 바꾸므로 id 를 `gps119-rescue-v2` 로 올린다**(`res/values/notification.xml`, `AndroidManifest.xml` meta-data)
-- 🛠 셸 iOS: `ios/App/App/rescue_alarm.caf`(30초 이하) 를 번들에 추가
-- 웹: `PushMessage::toFcmPayload()` 의 `apns.sound` → `rescue_alarm.caf`, `android.notification.channel_id` → v2; `resources/js/push-native.js` `RESCUE_CHANNEL_ID` → v2(포그라운드 로컬 알림도 같은 채널을 쓴다)
+✅ **2026-09-07 구현(셸 + 웹).**
+- 셸 Android: `res/raw/rescue_alarm.wav`(외부 음원 없이 합성한 1200/800Hz 2.5초 사이렌), `MainActivity.createRescueNotificationChannel()` 이 **`gps119-rescue-v2`** 를 `setSound(…, USAGE_ALARM)` 으로 만들고 v1 은 지운다. 알람 볼륨·진동 모드에서도 울린다 — 판단이며, 되돌리려면 v3 + usage 변경
+- 셸 iOS: `ios/App/App/rescue_alarm.caf` 번들 + `project.pbxproj` 등록(BuildFile·FileReference·그룹·Resources 네 곳)
+- 웹: `PushMessage::ANDROID_CHANNEL_ID`(v2)·`IOS_SOUND`(rescue_alarm.caf) 를 페이로드에 항상 싣는다(tag 블록이 android 를 통째 대입하던 것도 하위 키로). `push-native.js` 는 채널 id 를 적지 않고 `listChannels()` 로 **있는 것 중 최신**을 고른다 — 원격 URL 번들이라 v1 만 있는 구버전 앱에서도 돌기 때문
+- 🔑 **따로 나가도 조용히 죽지 않게 했다.** 웹이 먼저 나가면 구버전 앱은 FCM 이 매니페스트 기본 채널(v1)로 떨어뜨리고 iOS 는 기본음 — heads-up 은 산다. 셸이 먼저 나가면 웹의 `listChannels` 가 v2 를 골라 로컬 알림은 맞고, FCM 만 v1(지워진 채널) → 기본 채널로 떨어져 heads-up 이 «그 사이» 약해진다. 그래서 **웹을 먼저** 배포한다
+- 테스트: `FcmSenderTest`(채널 id·사운드), `pushNative.test.js`(v2/v1/실패 폴백). ⚠️ 실기기 QA 필요 — 소리 크기·진동 모드·잠금화면
 - 📌 iOS 무음 모드를 뚫는 「긴급 알림(critical alert)」은 Apple 별도 승인 항목이라 범위 밖. 요청이 오면 그때.
 
 ② ✅ **2026-09-07 구현(웹).** `dispatch/index.blade.php` — 1200/800Hz 사각파를 0.25초씩 8번(≈2초) 사이렌, 음량 0.6. 회수는 짧게 세 번으로 구분. 울리기 전 `resume()`, 첫 탭/터치에서 **무음**으로 잠금 해제(예전엔 첫 탭에 삐 소리). ⚠️ 실기기 QA 필요 — 잠금화면·무음 스위치에서는 OS 푸시음(①)만이 답이다.
@@ -178,11 +181,11 @@
 
 | 항목 | 파일(셸 저장소 기준) |
 |---|---|
-| F-03 iOS 당겨서 새로고침 | `ios/App/App/MainViewController.swift` |
-| F-07 푸시음 | `android/app/src/main/res/raw/`(신규), `res/values/notification.xml`, `AndroidManifest.xml`, `.../MainActivity.java`, `ios/App/App/`(caf 번들 + `project.pbxproj` 등록) |
+| F-03 iOS 당겨서 새로고침 ✅ | `ios/App/App/MainViewController.swift` |
+| F-07 푸시음 ✅ | `android/app/src/main/res/raw/rescue_alarm.wav`, `res/values/notification.xml`, `.../MainActivity.java`, `ios/App/App/rescue_alarm.caf` + `project.pbxproj` |
 | F-12 B안 | `package.json`(`@capacitor/geolocation`), `npx cap sync` |
 | F-10 선택 | `package.json` 에 `@capacitor/app-launcher` — 있으면 웹 `kakaoNavi.js` 가 `completed` 기반 확정 폴백으로 자동 전환(코드 준비됨). 없어도 동작은 한다 |
-| 공통 | `android/app/build.gradle` `versionCode` 올리기 · Xcode 빌드 번호 3 · 셸 `README.md` 에 기록 |
+| 공통 ✅ | `versionCode` 1→2 · iOS 빌드 2→3 · 셸 `README.md` 기록. 마케팅 버전(1.0)은 그대로 — 올릴지는 결정 필요 |
 
 ⚠️ 셸 저장소의 `README.md` 「앱 내장 네이티브 플러그인 추가 시 관문 넷」과 「빌드한 뒤 번들 안을 눈으로 확인」을 그대로 따른다.
 

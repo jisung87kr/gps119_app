@@ -49,10 +49,15 @@ function fakeStorage() {
     };
 }
 
+/** 대기 중인 프라미스를 흘린다(listChannels 등). */
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
 /** Capacitor 셸이 주입한 전역을 흉내낸다. */
 function nativeEnv({
     receive = 'granted', token = 'fcm-tok-1', fail = false, platform = 'android',
     localNotifications = true, scheduleFails = false, badge = true, storage = true,
+    // 셸이 만들어 둔 채널 목록. 기본은 «지금» 셸(v2). null 이면 listChannels 가 실패한다.
+    channels = ['gps119-rescue-v2'],
 } = {}) {
     const listeners = {};
     const local = localNotifications ? {
@@ -61,6 +66,11 @@ function nativeEnv({
             if (scheduleFails) throw new Error('Notifications not enabled on this device');
 
             return {};
+        }),
+        listChannels: vi.fn(async () => {
+            if (channels === null) throw new Error('listChannels failed');
+
+            return { channels: channels.map((id) => ({ id, name: id })) };
         }),
         addListener: vi.fn((name, cb) => { listeners[name] = cb; }),
     } : null;
@@ -358,9 +368,10 @@ describe('앱 푸시 — 포그라운드 수신', () => {
         expect(needsForegroundNotification({})).toBe(false);
     });
 
-    it('🔑 Android 포그라운드 푸시 → «로컬 알림»을 올린다', () => {
+    it('🔑 Android 포그라운드 푸시 → «로컬 알림»을 올린다', async () => {
         const env = nativeEnv({ platform: 'android' });
         initNativePushRouting(env);
+        await flush(); // 채널 목록 조회
 
         env.__listeners.notificationReceived({
             notification: {
@@ -374,7 +385,37 @@ describe('앱 푸시 — 포그라운드 수신', () => {
         expect(sent.title).toBe('구조 배정');
         expect(sent.extra).toEqual({ url: '/control?request=9' });
         // 셸이 만든 heads-up 채널을 써야 한다. 어긋나면 조용히 기본 채널로 떨어진다.
-        expect(sent.channelId).toBe('gps119-rescue-v1');
+        expect(sent.channelId).toBe('gps119-rescue-v2');
+    });
+
+    it('🔴 구버전 셸(v1 채널만)에서는 v1 — 원격 URL 번들이라 옛 앱에서도 이 코드가 돈다', async () => {
+        const env = nativeEnv({ platform: 'android', channels: ['gps119-rescue-v1'] });
+        initNativePushRouting(env);
+        await flush();
+
+        env.__listeners.notificationReceived({ notification: { title: 't', body: 'b' } });
+
+        expect(env.__local.schedule.mock.calls[0][0].notifications[0].channelId).toBe('gps119-rescue-v1');
+    });
+
+    it('채널 목록을 못 받으면 가장 오래된 id 로 — 그 셸 세대가 확실히 아는 것', async () => {
+        const env = nativeEnv({ platform: 'android', channels: null });
+        initNativePushRouting(env);
+        await flush();
+
+        env.__listeners.notificationReceived({ notification: { title: 't', body: 'b' } });
+
+        expect(env.__local.schedule.mock.calls[0][0].notifications[0].channelId).toBe('gps119-rescue-v1');
+    });
+
+    it('둘 다 있으면 최신(v2)', async () => {
+        const env = nativeEnv({ platform: 'android', channels: ['gps119-rescue-v1', 'gps119-rescue-v2'] });
+        initNativePushRouting(env);
+        await flush();
+
+        env.__listeners.notificationReceived({ notification: { title: 't', body: 'b' } });
+
+        expect(env.__local.schedule.mock.calls[0][0].notifications[0].channelId).toBe('gps119-rescue-v2');
     });
 
     it('🔑 우리가 올린 알림의 «탭»도 딥링크로 간다 — FCM 이 아니라 로컬 알림 이벤트다', () => {
