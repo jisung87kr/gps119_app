@@ -60,6 +60,9 @@
 ### Play Store
 
 - [ ] `ACCESS_FINE_LOCATION` + `ACCESS_BACKGROUND_LOCATION` + `FOREGROUND_SERVICE_LOCATION` + `POST_NOTIFICATIONS`(13+)
+- [x] **내부 테스트 · 비공개 테스트 트랙 등록 + 테스터 등록** — ✅ 2026-09-08 (사용자 콘솔 작업). 등재 자산(스크린샷 4장·그래픽 이미지·아이콘)은 `docs/store/play/`
+  - 🔴 **다음 일: 앱 서명 키 SHA-256 을 `assetlinks.json` 에 «추가»**(교체 아님) — Play Console → 설정 → 앱 무결성 → 앱 서명 키 인증서. 지금 파일에는 업로드 키 지문(`A0:91:…:63`)만 있어 **스토어 설치본에서 QR 이 앱으로 안 열린다**. 추가 → 배포 → 실기기 `adb shell pm get-app-links kr.co.gps119.app` 가 `verified`
+  - ⚠️ 개인 개발자 계정은 **비공개 테스트에서 테스터 12명 이상 · 14일 연속** 을 채워야 프로덕션 신청 자격이 생긴다 — 이 요건은 Play 가 신규 개인 계정에 거는 것이라 시점에 다시 확인
 - [ ] **백그라운드 위치 선언 양식** + 시연 영상
 - [ ] **Data safety** 섹션
 - [ ] **타깃 API 레벨 — `targetSdkVersion` 36 이상**(Android 16). 2026-08-31 부터 **신규 앱·업데이트 모두** 이 기준이고, N4 는 그 이후일 가능성이 높다. 기한 연장(2026-11-01)은 Play Console 신청 사항이지 기본값이 아니다. 매년 상향되므로 **제출 시점에 다시 확인**한다 → <https://developer.android.com/google/play/requirements/target-sdk>
@@ -81,6 +84,9 @@
 > 포그라운드 알림 아이콘, `versionCode 2`). 웹 쪽 `PushMessage` 변경은 같은 날 먼저 배포됐다. 이번엔 Xcode GUI 가 아니라
 > **CLI**(`xcodebuild archive` → `-exportArchive` 업로드)로 올렸고 절차는 셸 `README.md` 에 있다
 > → [`field-feedback-2026-09`](../field-feedback-2026-09/README.md) §6-3.
+
+> 📌 **재심사 제출 (2026-09-08 밤)** — 빌드 2 의 2.1 Information Needed 에 회신하고 **빌드 5** 로 교체 제출. 실기기 녹화(iPhone 16 Pro, iOS 26.6.1),
+> 데모 계정 3종(`review:demo`, 행사 #5), 영문 6문항 답변. 상세는 [`app-review-reply-2026-09-08.md`](../../store/app-review-reply-2026-09-08.md).
 
 데모 계정은 기존 `01012345678` 을 그대로 썼다 — 제출 전에 운영 DB 에서 확인했다:
 비밀번호 일치, **동의 기록 2건**(당일 도입한 동의 게이트에 막히지 않음),
