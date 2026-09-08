@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AccountDeletionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\Rules;
 
 class ProfileController extends Controller
 {
@@ -24,7 +25,7 @@ class ProfileController extends Controller
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:20', 'unique:users,phone,' . Auth::id()],
+            'phone' => ['required', 'string', 'max:20', 'unique:users,phone,'.Auth::id()],
         ]);
 
         $user = Auth::user();
@@ -61,17 +62,21 @@ class ProfileController extends Controller
         return view('profile.delete-account');
     }
 
-    public function destroyAccount(Request $request)
+    /**
+     * 회원 탈퇴 — 물리 삭제가 아니라 익명화다 (ADR-0010, `AccountDeletionService`).
+     * 지령 이력이 있는 계정은 FK 때문에 삭제가 500 으로 죽었고, 행사 기록도 같이 사라졌다.
+     */
+    public function destroyAccount(Request $request, AccountDeletionService $deletion)
     {
         $request->validate([
             'password' => ['required', 'current_password'],
         ]);
 
         $user = Auth::user();
-        
+
         Auth::logout();
-        
-        $user->delete();
+
+        $deletion->delete($user);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

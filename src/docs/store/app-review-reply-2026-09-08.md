@@ -14,12 +14,11 @@ Apple 이 정형으로 보내는 6문항이고, 답변 + 실기기 녹화를 보
 |---|---|---|
 | 1 | **iPhone 을 최신 iOS 로 올린다** | Apple 이 "latest operating system" 을 명시했다. 기록상 시험기(iPhone 16 Pro)는 8월에 iOS 18.7 이었다 — 그대로면 결격 |
 | 2 | **TestFlight 로 빌드 5 를 설치**한다 | 녹화는 심사받을 빌드로. 빌드 5 의 네이버 로그인(R-1)도 이때 실기기 확인이 된다 |
-| 3 | **데모 계정 3종 + 심사용 행사**를 운영 DB 에 준비한다 (§2) | 지금까지는 참가자 1개(`01012345678`)만 냈다. Apple 이 «계정 종류별» 자격증명을 요구한다 |
+| 3 | **배포 후 `review:demo` 를 운영에서 한 번 돌린다** (§2) | 데모 계정 3종 + 심사용 행사를 만든다. 지금까지는 참가자 1개(`01012345678`)만 냈다. Apple 이 «계정 종류별» 자격증명을 요구한다 |
 | 4 | **녹화** (§1 대본) | iOS 화면 기록(제어 센터)이면 된다 — 권한 프롬프트·푸시 배너도 찍힌다 |
 | 5 | Notes 갱신 → Resolution Center 회신(녹화 첨부) → **제출 빌드를 2 → 5 로 교체** → 제출 | 빌드를 바꾸면 재제출이 된다. 회신만 하고 빌드 2 를 둘 이유가 없다(사이렌·새로고침·네이버 로그인 전부 빌드 5) |
 
-🔴 **먼저 결정할 것 하나 — 계정 삭제 결함(§4).** 구급대원·상황실 계정은 지령 이력이 있으면 삭제가 500 으로 죽는다.
-심사자가 그 계정으로 「계정 삭제」를 눌러보면 그 자리에서 2.1(버그)·5.1.1(v) 반려다.
+✅ **계정 삭제 결함(§4)은 고쳤다(ADR-0010).** 단, **운영에 배포돼야** 심사자가 밟지 않는다 — 3번 전에 배포가 먼저다.
 
 ---
 
@@ -36,7 +35,7 @@ Apple 요구: **앱 실행으로 시작**, 일반 흐름, **가입·로그인·�
 | 2 | 회원가입 | 전화번호 + 비밀번호 + 필수 동의 2종(개인정보처리방침·위치정보 이용약관) 체크 → 가입 |
 | 3 | 구조요청 화면 도착 | 일반 사용자의 랜딩. 큰 버튼과 상황 3종(사고·고장·기타) |
 | 4 | 행사 참가 | 6자리 코드 입력 → 심사용 행사 입장 |
-| 5 | 위치 공유 켜기 | 토글 → iOS 위치 권한 프롬프트(앱 사용 중) → 「항상 허용」 안내 카드 → 켜짐 상태 |
+| 5 | 위치 공유 | 입장하면 공유는 켜진 채로 시작한다 → iOS 위치 권한 프롬프트(앱 사용 중) → 「항상 허용」 안내 카드. **토글을 껐다가 다시 켜는 것**을 보여준다 — 「언제든 끌 수 있다」의 증거 |
 | 6 | 구조요청 | 「사고」 탭 → 접수 → 상태 화면(접수됨) |
 | 7 | *(선택, 2번째 기기·PC)* 상황실 `/control` | 지도에 신고 마커 → 데모 구급대원 배정 → 참가자 폰에 상태 변경·푸시 배너 |
 | 8 | 프로필 → 계정 삭제 | 비밀번호 입력 → 동의 체크 → 「계정 영구 삭제」 → 확인 → 로그인 화면으로 |
@@ -50,14 +49,28 @@ Apple 요구: **앱 실행으로 시작**, 일반 흐름, **가입·로그인·�
 
 Apple 문구: *"If the app has multiple account types, provide credentials for each type."*
 
-| 종류 | 로그인 | 행사 역할 | 랜딩 | 비고 |
-|---|---|---|---|---|
-| 참가자 | 전화번호 + 비밀번호 | participant | 구조요청 | 기존 `01012345678` 재사용 가능(09-02 운영 DB 확인: 동의 2건·상시운영 참가·공유 켜짐) |
-| 구급대원 | 전화번호 + 비밀번호 | paramedic | 지령 화면 | **새로 만든다** |
-| 상황실 | 전화번호 + 비밀번호 | controller | `/control` | **새로 만든다**. 시스템 admin(이메일 로그인)까지 줄 필요는 없다 — 참가자 관리 화면은 심사 대상 흐름이 아니다 |
+**`php artisan review:demo` 가 만든다** (`app/Console/Commands/ReviewDemoSetup.php`, 멱등, 테스트 `ReviewDemoSetupTest`).
+계정 3종을 만들고 실제 입장 경로(`joinByCode`)로 심사용 행사에 넣은 뒤 역할을 올린다. 동의 2종을 기록하므로 위치 공유 게이트에
+막히지 않는다. 비밀번호는 **stdout 에 한 번만** 나온다.
 
-만드는 법(운영, 관리자 콘솔): 웹 회원가입으로 가명 계정 2개 → 관리자 → 심사용 행사 → 참가자 관리에서 역할 지정.
-심사용 행사는 **종료일을 심사 기간 밖으로**(2~3주) 두고, `join_code` 를 Notes 에 적는다.
+| 종류 | ID(전화번호) | 행사 역할 | 랜딩 |
+|---|---|---|---|
+| 참가자 | `01000000001` | participant | `/requests/create` |
+| 구급대원 | `01000000002` | paramedic | `/events/{id}/dispatch` |
+| 상황실 | `01000000003` | controller | `/control?project={id}` |
+
+심사용 행사: `App Review 데모 행사` (slug `app-review-demo`), 종료일 = 실행일 + `--days`(기본 30). 다시 돌리면 종료일만 늘어난다.
+`010-0000-xxxx` 는 통신사가 배정하지 않는 대역이다. 기존 `01012345678`(상시운영)은 건드리지 않았다.
+
+운영에서(배포 뒤, **실서버 DB 에 쓴다**):
+
+```bash
+ssh gps119
+cd ~/gps119_app && docker compose --env-file .env.deploy -f docker-compose.prod.yml exec app php artisan review:demo --days=30
+#   → 표의 비밀번호와 입장 코드를 App Store Connect 에 옮겨 적는다
+# 종료일 연장(심사가 길어지면):        같은 명령을 다시
+# 비밀번호를 잃었으면:                 ... review:demo --reset-password
+```
 
 🔴 **자격증명은 이 저장소에 적지 않는다.** 콘솔에만 입력한다(`listing-ko.md` 의 규칙 그대로).
 
@@ -109,8 +122,8 @@ Demo event: "[event name]", join code: [ ]  (active until [date]).
 Typical flow:
   1) Sign in as the participant → the rescue-request screen (구조요청) opens.
   2) Events tab → enter the join code → the event screen opens.
-  3) Turn on location sharing (위치 공유) and allow location when iOS asks. Sharing is off by default
-     and can be turned off at any time.
+  3) Allow location when iOS asks. Location sharing (위치 공유) starts when a participant joins an
+     event and can be turned off — and back on — at any time from the event screen.
   4) Tap a situation button (사고 accident / 고장 breakdown / 기타 other) → the request is filed
      with your coordinates; its status is shown on the dashboard.
   5) Sign in as the control room on another device or in Safari → the map at
@@ -162,30 +175,25 @@ event's control room.
 
 ---
 
-## 4. 🔴 계정 삭제 결함 — 지령 이력이 있는 구급대원·상황실 계정은 삭제가 500
+## 4. ✅ 계정 삭제 결함 — 고쳤다 (ADR-0010, 2026-09-08)
 
-**실측(2026-09-08, 일회성 탐침 테스트로 확인 후 파일은 지웠다):**
+**발견(실측):** 지령 이력이 있는 구급대원·상황실 계정은 「계정 삭제」가 `FOREIGN KEY constraint failed` 로 500 이었다.
+`dispatches.paramedic_id` / `assigned_by` 가 RESTRICT 이고 `users` 가 물리 삭제였다. 계정 삭제 테스트가 없어 안 드러났다.
+심사자가 구급대원 데모 계정으로 삭제를 눌렀다면 그 자리에서 반려(2.1 + 5.1.1(v))였다.
 
-| 계정 | 결과 |
-|---|---|
-| 참가자(지령까지 받은 신고 보유) | ✅ 302, 계정·신고 삭제(cascade) |
-| 구급대원(지령 1건 수령 이력) | 🔴 `QueryException` — `FOREIGN KEY constraint failed` → 운영에선 500 페이지 |
+**결정:** 탈퇴 = **익명화** ([ADR-0010](../adr/0010-account-deletion-as-anonymization.md)). `AccountDeletionService` 하나가 진입점.
+사람(이름·전화·이메일·소셜·비밀번호·2FA·세션·토큰·참가·위치 이력·역할)은 지우고, 신고·지령 행은 연락처를 비운 채 행사 운영 기록으로 남긴다.
+`users.account_deleted_at` 표식 + `phone` nullable 마이그레이션. 탈퇴 화면·개인정보처리방침 §5 문구를 실제 동작에 맞췄다
+(방침 판은 올리지 않았다 — 올리면 전원 재동의 게이트가 걸린다. 결정 필요).
 
-원인: `dispatches.paramedic_id` / `dispatches.assigned_by` 가 `constrained('users')` 만 있고 삭제 규칙이 없다(RESTRICT).
-`users` 는 SoftDeletes 가 아니라 `ProfileController::destroyAccount` 의 `$user->delete()` 가 그대로 DB 제약에 걸린다.
-계정 삭제에 대한 테스트가 하나도 없어서 지금까지 안 드러났다.
+**검증:** `AccountDeletionTest` 6건(구급대원·상황실·신고자·재가입·오답 비밀번호·멱등) + 전체 552건 통과.
 
-심사 영향: 심사자가 **구급대원·상황실 데모 계정으로 「계정 삭제」를 눌러보면** 그 자리에서 반려(2.1 크래시/버그 + 5.1.1(v) 계정 삭제 의무).
-녹화·안내는 §1·§3 대로 «일회용 계정으로 삭제»를 유도해 두었지만, 심사자는 시키는 대로만 하지 않는다.
-
-방향(결정 필요 — DB 스키마·개인정보 정책이라 ADR 감):
-- **권고: 익명화 + 운영 기록 보존.** 지령 행은 행사 운영 기록이라 지우면 안 된다(사고 이력·보고서). 계정은 이름·전화·이메일·소셜 연결·토큰·참가·동의를 지우거나 «탈퇴 회원»으로 치환하고 users 행만 남긴다. Apple 의 «삭제»는 개인정보 제거가 핵심이라 이 방식이 통한다. 전화번호 unique 가 풀려 «같은 번호로 재가입» 약속도 지켜진다.
-- 대안: FK 를 `nullOnDelete` 로 — `paramedic_id` 가 null 인 지령은 `/dispatches/mine`·개인 채널 가정이 깨진다. 비권고.
-- 어느 쪽이든 **`AccountDeletionTest`(참가자·구급대원·상황실 3종) 를 같이 넣는다.**
+⚠️ 운영 반영은 배포(`deploy.sh` 가 마이그레이션 실행)로. 배포 전까지 운영은 여전히 500 이다.
 
 ---
 
 ## 5. 기록
 
 - 2026-09-08 반려 수신 — 빌드 2, 2.1 Information Needed. 기능 지적 없음.
+- 2026-09-08 계정 삭제 익명화(ADR-0010) + `review:demo` 명령 구현, 브랜치 `docs/app-review-2.1-reply`. 배포·운영 실행은 미완.
 - 회신·재제출: [ ] (제출 후 여기와 `05-store-release.md` §2-1 에 날짜·빌드를 적는다)
