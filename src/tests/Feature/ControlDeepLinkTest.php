@@ -111,14 +111,15 @@ class ControlDeepLinkTest extends TestCase
             ->assertSee('data-back-url="'.route('admin.dashboard').'"', false);
     }
 
-    public function test_an_event_controller_gets_no_admin_back_link(): void
+    public function test_an_event_controller_gets_a_profile_back_link_not_the_admin_one(): void
     {
-        // 짝 테스트. 상황실에게 주면 admin 미들웨어 뒤 403 으로 보내는 링크가 된다.
+        // 짝 테스트. 상황실에게 관리자 대시보드를 주면 admin 미들웨어 뒤 403 이고,
+        // 아무것도 안 주면 관제에 갇힌다(2026-09-08) — 마이페이지로 내보낸다.
         [$user] = $this->controllerOfTwo();
 
         $this->actingAs($user)->get('/control')
             ->assertOk()
-            ->assertSee('data-back-url=""', false)
+            ->assertSee('data-back-url="'.route('profile.show').'"', false)
             ->assertDontSee(route('admin.dashboard'), false);
     }
 

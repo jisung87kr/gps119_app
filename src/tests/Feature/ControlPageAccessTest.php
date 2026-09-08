@@ -64,6 +64,39 @@ class ControlPageAccessTest extends TestCase
         $this->actingAs($controller)->get(route('control'))->assertOk();
     }
 
+    /**
+     * 🔴 관제 화면에는 탭바도 GNB 도 없어 헤더 백링크가 유일한 출구다. 비관리자 상황실에게
+     *    관리자 대시보드를 주면 403 — 관제에 갇힌다(2026-09-08). 마이페이지로 내보낸다.
+     */
+    public function test_controller_back_link_goes_to_profile_not_admin_dashboard(): void
+    {
+        $project = $this->activeProject();
+        $controller = User::factory()->create();
+        EventParticipant::factory()->controller()->create([
+            'project_id' => $project->id, 'user_id' => $controller->id,
+        ]);
+
+        $this->actingAs($controller)->get(route('control'))
+            ->assertOk()
+            ->assertSee('data-back-url="'.route('profile.show').'"', false)
+            ->assertSee('data-back-label="마이페이지"', false);
+
+        // 그 링크가 실제로 열린다
+        $this->actingAs($controller)->get(route('profile.show'))->assertOk();
+    }
+
+    public function test_admin_back_link_goes_to_admin_dashboard(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $this->activeProject();
+
+        $this->actingAs($admin)->get(route('control'))
+            ->assertOk()
+            ->assertSee('data-back-url="'.route('admin.dashboard').'"', false)
+            ->assertSee('data-back-label="대시보드"', false);
+    }
+
     public function test_regular_participant_forbidden(): void
     {
         $project = $this->activeProject();

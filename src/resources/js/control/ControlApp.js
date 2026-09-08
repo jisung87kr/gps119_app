@@ -31,7 +31,8 @@ export default {
             projects: [],          // [{id,name}]
             selectedProjectId: null,
             projectName: '',
-            backUrl: null,         // 지정 시 헤더에 "대시보드로" 백링크 표시(관리자 진입)
+            backUrl: null,         // 지정 시 헤더에 백링크 표시 — 이 화면에서 나가는 유일한 문
+            backLabel: '대시보드', // 관리자: 대시보드 / 행사 상황실: 마이페이지 (서버가 정한다)
 
             mapReady: false,
             mapError: false,
@@ -237,6 +238,7 @@ export default {
         // 없으면 최신(첫 번째, id desc)을 자동 선택. 여러 개면 헤더 셀렉트로 전환.
         const root = document.getElementById('control-app');
         this.backUrl = root?.dataset.backUrl || null;
+        this.backLabel = root?.dataset.backLabel || this.backLabel;
         const wanted = Number(root?.dataset.selected) || null;
         if (wanted && this.projects.some((p) => p.id === wanted)) {
             this.selectProject(wanted);
@@ -1237,9 +1239,9 @@ export default {
   <header class="col-span-2 row-start-1 h-full bg-white border-b border-gray-200 flex items-center justify-between px-3 lg:px-4 gap-2"
           style="padding-top: var(--safe-top)">
     <div class="flex items-center gap-2 lg:gap-3 min-w-0">
-      <a v-if="backUrl" :href="backUrl" class="flex items-center gap-1 pl-1 pr-2 py-1.5 rounded-md hover:bg-gray-100 text-gray-500 text-sm font-medium" title="대시보드로 돌아가기">
+      <a v-if="backUrl" :href="backUrl" class="flex items-center gap-1 pl-1 pr-2 py-1.5 rounded-md hover:bg-gray-100 text-gray-500 text-sm font-medium" :title="backLabel + '로 돌아가기'">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        <span class="hidden sm:inline">대시보드</span>
+        <span class="hidden sm:inline">{{ backLabel }}</span>
       </a>
       <span v-if="backUrl" class="h-5 w-px bg-gray-200 hidden lg:block"></span>
       <!-- 레일은 데스크톱 전용. 모바일은 시트가 그 역할을 하므로 햄버거를 숨긴다 -->

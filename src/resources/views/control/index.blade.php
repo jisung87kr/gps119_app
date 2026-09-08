@@ -35,6 +35,7 @@
          {{-- 위치 추적 상태(M-5) 라벨·색·경보 여부. 역할 메타와 같은 이유로 서버가 준다 --}}
          data-tracking-meta='@json(\App\Enums\TrackingState::mapMeta())'
          data-selected="{{ $selectedId ?? '' }}"
-         data-back-url="{{ $backUrl ?? '' }}"></div>
+         data-back-url="{{ $backUrl ?? '' }}"
+         data-back-label="{{ $backLabel ?? '대시보드' }}"></div>
 </body>
 </html>
