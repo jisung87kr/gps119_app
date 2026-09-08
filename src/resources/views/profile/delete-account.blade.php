@@ -13,7 +13,8 @@
         <x-ui.card>
             <p class="text-base font-bold text-ink-950">삭제되는 내용</p>
             <ul class="mt-2 list-inside list-disc space-y-1.5 text-sm leading-relaxed text-ink-600">
-                <li>모든 개인 데이터와 구조 요청 기록이 영구 삭제됩니다.</li>
+                <li>이름·전화번호·이메일·소셜 로그인 연결·비밀번호·알림 등록·위치 이력이 영구 삭제됩니다.</li>
+                <li>구조요청·출동 기록은 행사 운영 기록으로 남되, 연락처가 지워져 본인을 식별할 수 없게 됩니다.</li>
                 <li>삭제된 데이터는 어떤 방법으로도 복구할 수 없습니다.</li>
                 <li>같은 연락처로 재가입은 가능하나 이전 데이터는 연동되지 않습니다.</li>
             </ul>

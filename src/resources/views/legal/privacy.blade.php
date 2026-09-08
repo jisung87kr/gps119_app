@@ -190,7 +190,7 @@
         <section class="space-y-2">
             <h2 class="text-lg font-extrabold text-ink-950">5. 보유 및 파기</h2>
             <ul class="list-disc space-y-1 pl-5">
-                <li>회원 정보: 회원 탈퇴 시까지. 탈퇴 시 지체 없이 파기합니다.</li>
+                <li>회원 정보: 회원 탈퇴 시까지. 탈퇴 시 지체 없이 파기합니다. 구조요청·출동 기록은 연락처를 삭제해 개인을 식별할 수 없는 형태로만 행사 운영 기록에 남습니다.</li>
                 <li>구조요청 기록(위치·연락처 포함): <strong class="text-ink-900">3년</strong>. 사고 경위 확인과 분쟁 대응에 필요한 기간입니다.</li>
                 <li>실시간 위치 이력: <strong class="text-ink-900">6개월</strong>. 행사 종료 후에는 기록 정리 목적으로만 보관합니다.</li>
                 <li>위치정보 이용·제공사실 확인자료: <strong class="text-ink-900">6개월</strong> (「위치정보의 보호 및 이용 등에 관한 법률」에 따른 최소 보관기간)</li>

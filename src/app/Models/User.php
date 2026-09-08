@@ -62,6 +62,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'issued_at' => 'datetime',
+            'account_deleted_at' => 'datetime',
         ];
     }
 
@@ -302,7 +303,15 @@ class User extends Authenticatable
      */
     public function setPhoneAttribute($value): void
     {
-        // Store phone number without formatting (numbers only)
-        $this->attributes['phone'] = preg_replace('/[^0-9]/', '', $value);
+        // Store phone number without formatting (numbers only).
+        // null 은 null 로 — 탈퇴(익명화)가 전화번호를 비운다. preg_replace(null) 은 '' 이 되어
+        // unique 에 걸린다(두 번째 탈퇴자부터 충돌).
+        $this->attributes['phone'] = $value === null ? null : preg_replace('/[^0-9]/', '', $value);
+    }
+
+    /** 탈퇴(익명화)한 계정인가 (ADR-0010). 기록 위에 「탈퇴 회원」으로만 남는다. */
+    public function isDeleted(): bool
+    {
+        return $this->account_deleted_at !== null;
     }
 }
