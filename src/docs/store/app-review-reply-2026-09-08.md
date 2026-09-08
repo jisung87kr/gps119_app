@@ -144,8 +144,6 @@ demo accounts stay available for the rest of the review. Sign-up is open in the 
     payloads never contain phone numbers.
   - Our own server on AWS Lightsail (Seoul region): the web application, a WebSocket server for
     real-time map updates, and a MySQL database. TLS by Let's Encrypt.
-  - An optional Discord webhook can post new-request alerts to the organizer's own channel; it is off
-    unless the operator configures it.
 No payment processor, no in-app purchases, no advertising, no analytics SDK, no AI services and no
 third-party data providers are used.
 
@@ -170,7 +168,7 @@ event's control room.
 - **UGC 없음** — 신고에는 자유 입력 칸이 없다(상황 버튼 3종 + 좌표). `dispatches.reject_reason` 만 자유 텍스트이고 상황실 전용이라 UGC(1.2) 범주가 아니다. `listing-ko.md` 의 연령 등급 답과 일치시켰다.
 - **3.2(특정 조직 전용 앱) 방어** — 참가자는 일반 대중이고 가입이 열려 있다는 문장을 일부러 넣었다. 「주최측 직원용」으로 읽히면 Custom App 배포로 보내진다.
 - **6번(규제 산업)** — «규제 산업 아님, 119 보조» 로 답한다. ⚠️ 국내 **위치기반서비스사업 신고**는 Apple 이 묻는 «규제 산업 인가»와 다른 축(국내법)이고 아직 미완이다. 회신에 끌어들이지 않는다 — 단, Play 는 이 축이 실제로 막고 있으니 별도로 계속 진행한다(`05-store-release.md` §2 한국 특수사항).
-- **디스코드 웹훅** — 운영 설정 여부를 이 세션에서 확인하지 못했다(운영 DB·env 조회 차단). 꺼져 있으면 그 줄을 지운다.
+- **디스코드 웹훅** — 운영에 설정돼 있지 않음을 확인(2026-09-08, `.env` 존재 여부만 조회)하고 회신에서 뺐다. 카카오 로그인도 운영에 미설정이라 외부 서비스 목록에 없다. 네이버 로그인은 설정돼 있다.
 - **Korea storefront only** — 대괄호 문장은 사용자 결정. 제품 성격과 맞고 심사 질문(5번)이 단순해진다.
 
 ---
