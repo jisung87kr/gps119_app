@@ -2,7 +2,7 @@
     회원 탈퇴 — 되돌릴 수 없는 작업이므로 이 화면에서는 danger 를 쓴다.
     (팔레트 규칙상 레드는 긴급 전용이지만, 영구 삭제도 같은 급의 경고다)
 --}}
-<x-layouts.app title="GPS119 - 회원 탈퇴" heading="회원 탈퇴" :back="route('profile.show')" tab="profile">
+<x-layouts.app title="GPS119 - 계정 삭제" heading="계정 삭제" :back="route('profile.show')" tab="profile">
     @php $user = auth()->user(); @endphp
 
     <div class="space-y-6">

@@ -67,6 +67,14 @@
             네이버로 시작
         </a>
 
+        {{-- Sign in with Apple — iOS 앱(플러그인이 든 빌드)에서만 JS 가 보이게 한다 (심사 4.8).
+             Apple 휴먼 인터페이스 지침: 검정 바탕·흰 로고, 다른 로그인 버튼과 같은 크기 이상. --}}
+        <button type="button" data-apple-signin hidden
+                class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-black py-4 text-base font-extrabold text-white active:brightness-90 disabled:opacity-60">
+            <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 814 1000" fill="currentColor"><path d="M788 341c-6 4-108 62-108 190 0 149 131 201 135 203-1 3-21 72-69 142-43 62-88 124-156 124s-86-40-164-40c-77 0-104 41-167 41s-106-57-156-127C45 791 0 666 0 548c0-191 124-292 246-292 65 0 119 43 160 43 39 0 100-45 174-45 28 0 129 3 196 99zM558 159c31-37 53-88 53-139 0-7-1-14-2-20-50 2-110 34-146 76-28 32-55 83-55 135 0 8 1 16 2 18 3 1 9 2 14 2 45 0 102-30 134-72z"/></svg>
+            Apple로 계속하기
+        </button>
+
         <p class="mt-8 text-center text-base text-ink-500">
             이미 계정이 있으신가요?
             <a href="{{ route('login') }}" class="font-extrabold text-brand-600 underline underline-offset-2">로그인하기</a>

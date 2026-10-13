@@ -35,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
                 ),
             ], $app->make(BadgeCounter::class));
         });
+
+        // Sign in with Apple 토큰 검증 — aud 로 비교할 앱 번들 ID 를 config 에서 받는다.
+        $this->app->bind(\App\Services\AppleIdentityVerifier::class, fn () => new \App\Services\AppleIdentityVerifier(
+            (string) config('services.apple.bundle_id'),
+        ));
     }
 
     /**
