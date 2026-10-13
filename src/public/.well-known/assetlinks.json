@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "kr.co.gps119.app",
       "sha256_cert_fingerprints": [
-        "A0:91:C9:E3:4B:26:F3:B6:0F:B7:A6:6C:F2:AA:FF:FB:5D:10:B2:BA:5C:9D:FE:E5:61:61:63:28:05:79:45:63"
+        "A0:91:C9:E3:4B:26:F3:B6:0F:B7:A6:6C:F2:AA:FF:FB:5D:10:B2:BA:5C:9D:FE:E5:61:61:63:28:05:79:45:63",
+        "AD:A8:D1:B8:8F:EB:39:8C:96:69:E9:8A:0A:70:F7:D3:21:8E:47:02:25:C1:59:1D:0A:DF:15:6D:12:81:86:06"
       ]
     }
   }

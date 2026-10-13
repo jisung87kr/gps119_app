@@ -64,6 +64,16 @@ class UniversalLinksTest extends TestCase
         }
     }
 
+    public function test_🔴_assetlinks_는_업로드_키와_Play_앱_서명_키를_둘_다_가진다(): void
+    {
+        // 스토어 설치본은 Play 가 «앱 서명 키»로 다시 서명하고, 사이드로드·내부 설치본은 업로드 키다.
+        // 하나만 두면 다른 쪽에서 QR 이 앱 대신 브라우저로 열린다 — 교체가 아니라 «추가»여야 한다.
+        $fps = $this->wellKnown('assetlinks.json')[0]['target']['sha256_cert_fingerprints'];
+
+        $this->assertContains('A0:91:C9:E3:4B:26:F3:B6:0F:B7:A6:6C:F2:AA:FF:FB:5D:10:B2:BA:5C:9D:FE:E5:61:61:63:28:05:79:45:63', $fps, '업로드 키');
+        $this->assertContains('AD:A8:D1:B8:8F:EB:39:8C:96:69:E9:8A:0A:70:F7:D3:21:8E:47:02:25:C1:59:1D:0A:DF:15:6D:12:81:86:06', $fps, 'Play 앱 서명 키');
+    }
+
     public function test_🔴_웹서버가_이_파일들을_그대로_돌려준다(): void
     {
         // Laravel 의 .htaccess 는 «파일이 실제로 있으면» index.php 로 넘기지 않는다.
