@@ -47,6 +47,7 @@
 | 2026-09-08 | `2e2da7f` | PR #60 — **회원 탈퇴를 익명화로**(ADR-0010, `AccountDeletionService`): 지령 이력이 있는 구급대원·상황실 계정은 삭제가 FK RESTRICT 로 500 이었다. **마이그레이션 1건**(`users.account_deleted_at` 추가, `phone` nullable). `review:demo` 명령 추가 — 배포 직후 운영에서 실행해 심사용 행사 #5 + 데모 계정 3종 생성(비밀번호는 콘솔에만). 접속 0건 시점, 20:17 KST |
 | 2026-09-08 | `f042687` | PR #62 — 상황실 계정에게 관제 화면의 출구(백링크 → 마이페이지). 마이그레이션 없음. 20:31 KST. *(기록 누락 — 2026-10-13 서버 `git reflog` 로 복원)* |
 | 2026-10-13 | `5bd8965` | PR #64 — **iOS 앱 Sign in with Apple**(App Store 심사 4.8 반려 대응): `POST /auth/apple/{nonce,native}`, `AppleIdentityVerifier`(JWKS·aud=번들ID·nonce). 버튼은 셸 빌드 6+ iOS 에서만 보인다. 프로필 「회원 탈퇴」→「계정 삭제」. 마이그레이션 없음. 접속 0건 시점, 21:34 KST |
+| 2026-10-13 | `b8d1c9a` | PR #66 — `assetlinks.json` 에 **Play 앱 서명 키 지문 추가**(업로드 키는 유지) — 스토어 설치본에서 QR·링크가 앱으로 열리게. Digital Asset Links API 로 두 지문 노출 확인. 마이그레이션 없음. 22:00 KST |
 
 > ⚠️ **08-13 두 건은 3주 가까이 기록되지 않은 채로 있었다.** 그동안 이 표와 `CLAUDE.md` 는
 > 마지막 배포를 `226f5b7` 로 가리켰고, 그래서 「PR #20·#21 은 아직 미배포」라는 판단이 나왔다.
