@@ -6,6 +6,7 @@ import {
     openBatteryOptimizationSettings,
 } from './native/batteryOptimization';
 import { isNativeApp, nativeInfo, nativePlatform } from './native/bridge';
+import { initAppleSignIn } from './native/appleSignIn';
 import { initPwa } from './pwa';
 import { initPushToggles } from './push-toggle';
 import { syncPushRegistration } from './push';
@@ -43,6 +44,9 @@ initPushToggles();
 // 같은 일을 한다 — 규약(payload.url)이 같아서 착지 처리를 두 벌로 짜지 않는다.
 // 앱이 아니거나 플러그인이 없으면 아무것도 하지 않는다.
 initNativePushRouting();
+
+// Sign in with Apple — 로그인·가입 화면의 [data-apple-signin] 버튼. iOS 앱(플러그인 있는 빌드)에서만 보인다.
+initAppleSignIn();
 
 // 🔴 푸시 등록을 «로그인한 사람»에게 맞춘다 (2026-09-07 현장). 같은 기기·브라우저를 다른
 //    계정이 쓰면 토큰·구독이 이전 사람 것으로 남아 새 사람은 알림을 못 받는다. 페이지마다

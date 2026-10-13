@@ -50,4 +50,11 @@ return [
         'client_secret' => env('KAKAO_CLIENT_SECRET'),
         'redirect' => env('KAKAO_REDIRECT_URI')
     ],
+
+    // Sign in with Apple — iOS 앱 셸의 «네이티브» 로그인만 받는다 (App Store 심사 4.8).
+    // identityToken 의 aud 는 웹 Services ID 가 아니라 «앱 번들 ID» 다. 웹 리다이렉트
+    // 방식은 쓰지 않으므로 client_secret·Services ID·키(.p8)가 필요 없다.
+    'apple' => [
+        'bundle_id' => env('APPLE_BUNDLE_ID', 'kr.co.gps119.app'),
+    ],
 ];

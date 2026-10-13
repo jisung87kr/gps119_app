@@ -110,7 +110,7 @@
                 @csrf
                 <x-ui.button type="submit" variant="secondary">로그아웃</x-ui.button>
             </form>
-            <x-ui.button :href="route('profile.delete')" variant="ghost">회원 탈퇴</x-ui.button>
+            <x-ui.button :href="route('profile.delete')" variant="ghost">계정 삭제</x-ui.button>
         </div>
 
         {{-- 사업자 정보 — 셸 푸터 제거에 따라 이관된 법적 표기 --}}

@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Services\ConsentService;
+use App\Services\SocialAccountService;
 use Exception;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -30,40 +29,12 @@ class SocialController extends Controller
         try {
             $socialUser = Socialite::driver($driver)->user();
 
-            // Check if user exists by provider and provider_id first
-            $user = User::where('provider', $driver)
-                       ->where('provider_id', $socialUser->getId())
-                       ->first();
-
-            // If not found, check by email
-            if (!$user && $socialUser->getEmail()) {
-                $user = User::where('email', $socialUser->getEmail())->first();
-
-                // Update existing user with social provider info
-                if ($user) {
-                    $user->update([
-                        'provider' => $driver,
-                        'provider_id' => $socialUser->getId(),
-                        'avatar' => $socialUser->getAvatar(),
-                    ]);
-                }
-            }
-
-            if (!$user) {
-                // Create new user if doesn't exist
-                $userData = [
-                    'name' => $socialUser->getName() ?: $socialUser->getNickname() ?: '사용자',
-                    'email' => $socialUser->getEmail(),
-                    'provider' => $driver,
-                    'provider_id' => $socialUser->getId(),
-                    'avatar' => $socialUser->getAvatar(),
-                ];
-
-                // Try to get phone from social provider response
-                $userData['phone'] = $this->extractPhoneNumber($driver, $socialUser);
-
-                $user = $this->createUser($userData);
-            }
+            $user = app(SocialAccountService::class)->findOrCreate($driver, (string) $socialUser->getId(), [
+                'name' => $socialUser->getName() ?: $socialUser->getNickname(),
+                'email' => $socialUser->getEmail(),
+                'avatar' => $socialUser->getAvatar(),
+                'phone' => $this->extractPhoneNumber($driver, $socialUser),
+            ]);
 
             // Login the user
             Auth::login($user);
@@ -104,23 +75,5 @@ class SocialController extends Controller
         }
 
         return null;
-    }
-
-    /**
-     * Create new user with error handling
-     */
-    private function createUser($userData)
-    {
-        try {
-            return User::create($userData);
-        } catch (QueryException $e) {
-            if ($e->getCode() === '23000') {
-                // Duplicate entry error
-                throw new Exception('duplicate_user', 23000);
-            } else {
-                // Other database error, rethrow
-                throw $e;
-            }
-        }
     }
 }

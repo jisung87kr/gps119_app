@@ -391,5 +391,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/account/setup', [\App\Http\Controllers\Auth\AccountSetupController::class, 'store'])->name('account.setup.store');
 });
 
+// Sign in with Apple — iOS 앱의 네이티브 시트 전용 (App Store 심사 4.8). 웹 리다이렉트가 아니라
+// 앱이 받은 identityToken 을 POST 로 넘긴다. {driver} 라우트보다 «먼저» 둔다.
+Route::middleware(['guest', 'throttle:10,1'])->group(function () {
+    Route::post('/auth/apple/nonce', [\App\Http\Controllers\Auth\AppleSignInController::class, 'nonce'])->name('auth.apple.nonce');
+    Route::post('/auth/apple/native', [\App\Http\Controllers\Auth\AppleSignInController::class, 'login'])->name('auth.apple.native');
+});
+
 Route::get('/login/{driver}', [SocialController::class, 'redirect'])->name('login.social');
 Route::get('/auth/{driver}/callback', [SocialController::class, 'callback']);
