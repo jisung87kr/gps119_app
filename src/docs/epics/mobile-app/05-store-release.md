@@ -60,9 +60,11 @@
 ### Play Store
 
 - [ ] `ACCESS_FINE_LOCATION` + `ACCESS_BACKGROUND_LOCATION` + `FOREGROUND_SERVICE_LOCATION` + `POST_NOTIFICATIONS`(13+)
-- [ ] **백그라운드 위치 선언 양식** + 시연 영상
-- [ ] **Data safety** 섹션
-- [ ] **타깃 API 레벨 — `targetSdkVersion` 36 이상**(Android 16). 2026-08-31 부터 **신규 앱·업데이트 모두** 이 기준이고, N4 는 그 이후일 가능성이 높다. 기한 연장(2026-11-01)은 Play Console 신청 사항이지 기본값이 아니다. 매년 상향되므로 **제출 시점에 다시 확인**한다 → <https://developer.android.com/google/play/requirements/target-sdk>
+- [x] **내부 테스트 · 비공개 테스트 트랙 등록 + 테스터 등록** — ✅ 2026-09-08 (사용자 콘솔 작업). 등재 자산(스크린샷 4장·그래픽 이미지·아이콘)은 `docs/store/play/`
+  - ✅ **앱 서명 키 SHA-256(`AD:A8:…:86:06`)을 `assetlinks.json` 에 추가** — 2026-10-13 PR #66, 운영 `b8d1c9a`. Digital Asset Links API 에 두 지문 노출 확인. ☐ 남은 것: 스토어 설치본에서 `adb shell pm get-app-links kr.co.gps119.app` 가 `verified`
+  - ✅ 비공개 테스트 12명 이상 · 14일 요건 충족 → **프로덕션 액세스 신청 2026-10-13**(소유자 계정만 가능 — 사용자가 직접). 승인되면 versionCode 2 를 프로덕션으로 승격, 단계적 출시
+- [x] **백그라운드 위치 선언 양식** · **Data safety** — 2026-10-13 확인 시 앱 콘텐츠 「주의 필요」 0건
+- [x] **타깃 API 레벨 — `targetSdkVersion` 36 이상**(Android 16). 2026-08-31 부터 **신규 앱·업데이트 모두** 이 기준이고, N4 는 그 이후일 가능성이 높다. 기한 연장(2026-11-01)은 Play Console 신청 사항이지 기본값이 아니다. 매년 상향되므로 **제출 시점에 다시 확인**한다 → <https://developer.android.com/google/play/requirements/target-sdk>
 
 ### 한국 특수사항
 
@@ -81,6 +83,13 @@
 > 포그라운드 알림 아이콘, `versionCode 2`). 웹 쪽 `PushMessage` 변경은 같은 날 먼저 배포됐다. 이번엔 Xcode GUI 가 아니라
 > **CLI**(`xcodebuild archive` → `-exportArchive` 업로드)로 올렸고 절차는 셸 `README.md` 에 있다
 > → [`field-feedback-2026-09`](../field-feedback-2026-09/README.md) §6-3.
+
+> 📌 **재심사 제출 (2026-09-08 밤)** — 빌드 2 의 2.1 Information Needed 에 회신하고 **빌드 5** 로 교체 제출. 실기기 녹화(iPhone 16 Pro, iOS 26.6.1),
+> 데모 계정 3종(`review:demo`, 행사 #5), 영문 6문항 답변. 상세는 [`app-review-reply-2026-09-08.md`](../../store/app-review-reply-2026-09-08.md).
+
+> 🔴 **2차 반려 (2026-09-09, 빌드 5)** — **4.8** 제3자 로그인(네이버)만 있고 개인정보 보호형 로그인이 없음 / **5.1.1(v)** 계정 삭제를 못 찾음(실제로는 있었다 — 버튼 문구가 「회원 탈퇴」라 회신의 「계정 삭제」와 안 맞았다).
+> ✅ **3차 제출 (2026-10-13 21:50, 빌드 6)** — Sign in with Apple(네이티브 시트 + `POST /auth/apple/native`, 웹 PR #64 · 셸 PR #12, 운영 `5bd8965`), 버튼 문구를 「계정 삭제」로. 녹화는 다시 찍지 않고 9-08 녹화를 720p 로 압축(10MB 한도)해 회신·Notes 에 첨부, 삭제 장면 1:04 명시.
+> App ID 의 Sign In with Apple capability 는 `xcodebuild -allowProvisioningUpdates` 가 켰다(developer.apple.com 작업 불필요).
 
 데모 계정은 기존 `01012345678` 을 그대로 썼다 — 제출 전에 운영 DB 에서 확인했다:
 비밀번호 일치, **동의 기록 2건**(당일 도입한 동의 게이트에 막히지 않음),

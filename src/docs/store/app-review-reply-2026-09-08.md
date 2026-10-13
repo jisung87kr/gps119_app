@@ -16,7 +16,7 @@ Apple 이 정형으로 보내는 6문항이고, 답변 + 실기기 녹화를 보
 | 2 | **TestFlight 로 빌드 5 를 설치**한다 | 녹화는 심사받을 빌드로. 빌드 5 의 네이버 로그인(R-1)도 이때 실기기 확인이 된다 |
 | 3 | ✅ **배포 + `review:demo` 완료 (09-08 20:19)** (§2) | 데모 계정 3종 + 심사용 행사를 만든다. 지금까지는 참가자 1개(`01012345678`)만 냈다. Apple 이 «계정 종류별» 자격증명을 요구한다 |
 | 4 | **녹화** (§1 대본) | iOS 화면 기록(제어 센터)이면 된다 — 권한 프롬프트·푸시 배너도 찍힌다 |
-| 5 | Notes 갱신 → Resolution Center 회신(녹화 첨부) → **제출 빌드를 2 → 5 로 교체** → 제출 | 빌드를 바꾸면 재제출이 된다. 회신만 하고 빌드 2 를 둘 이유가 없다(사이렌·새로고침·네이버 로그인 전부 빌드 5) |
+| 5 | ✅ 09-08 밤 완료 — Notes 갱신 → Resolution Center 회신(녹화 첨부) → **제출 빌드를 2 → 5 로 교체** → 제출 | 빌드를 바꾸면 재제출이 된다. 회신만 하고 빌드 2 를 둘 이유가 없다(사이렌·새로고침·네이버 로그인 전부 빌드 5) |
 
 ✅ **계정 삭제 결함(§4)은 고쳤다(ADR-0010).** 단, **운영에 배포돼야** 심사자가 밟지 않는다 — 3번 전에 배포가 먼저다.
 
@@ -144,8 +144,6 @@ demo accounts stay available for the rest of the review. Sign-up is open in the 
     payloads never contain phone numbers.
   - Our own server on AWS Lightsail (Seoul region): the web application, a WebSocket server for
     real-time map updates, and a MySQL database. TLS by Let's Encrypt.
-  - An optional Discord webhook can post new-request alerts to the organizer's own channel; it is off
-    unless the operator configures it.
 No payment processor, no in-app purchases, no advertising, no analytics SDK, no AI services and no
 third-party data providers are used.
 
@@ -170,7 +168,7 @@ event's control room.
 - **UGC 없음** — 신고에는 자유 입력 칸이 없다(상황 버튼 3종 + 좌표). `dispatches.reject_reason` 만 자유 텍스트이고 상황실 전용이라 UGC(1.2) 범주가 아니다. `listing-ko.md` 의 연령 등급 답과 일치시켰다.
 - **3.2(특정 조직 전용 앱) 방어** — 참가자는 일반 대중이고 가입이 열려 있다는 문장을 일부러 넣었다. 「주최측 직원용」으로 읽히면 Custom App 배포로 보내진다.
 - **6번(규제 산업)** — «규제 산업 아님, 119 보조» 로 답한다. ⚠️ 국내 **위치기반서비스사업 신고**는 Apple 이 묻는 «규제 산업 인가»와 다른 축(국내법)이고 아직 미완이다. 회신에 끌어들이지 않는다 — 단, Play 는 이 축이 실제로 막고 있으니 별도로 계속 진행한다(`05-store-release.md` §2 한국 특수사항).
-- **디스코드 웹훅** — 운영 설정 여부를 이 세션에서 확인하지 못했다(운영 DB·env 조회 차단). 꺼져 있으면 그 줄을 지운다.
+- **디스코드 웹훅** — 운영에 설정돼 있지 않음을 확인(2026-09-08, `.env` 존재 여부만 조회)하고 회신에서 뺐다. 카카오 로그인도 운영에 미설정이라 외부 서비스 목록에 없다. 네이버 로그인은 설정돼 있다.
 - **Korea storefront only** — 대괄호 문장은 사용자 결정. 제품 성격과 맞고 심사 질문(5번)이 단순해진다.
 
 ---
@@ -197,4 +195,4 @@ event's control room.
 - 2026-09-08 반려 수신 — 빌드 2, 2.1 Information Needed. 기능 지적 없음.
 - 2026-09-08 계정 삭제 익명화(ADR-0010) + `review:demo` 명령 구현 → PR #60 병합 → **운영 배포 `2e2da7f` 20:17 KST** (마이그레이션 실행 확인, `/up` 200).
 - 2026-09-08 20:19 운영에서 `review:demo --days=30` 실행 완료 — 심사용 행사 **#5** (`App Review 데모 행사`, 종료 2026-10-08), 계정 3종 생성. 비밀번호·입장 코드는 콘솔에만(사용자에게 채팅으로 전달).
-- 회신·재제출: [ ] (제출 후 여기와 `05-store-release.md` §2-1 에 날짜·빌드를 적는다)
+- ✅ **2026-09-08 밤 재심사 제출 완료** — 빌드 5, Resolution Center 회신 + Notes(§3 본문을 3,947자로 줄인 판, 디스코드 줄·대괄호 2곳 제거) + 녹화 `앱동작_ios.mp4`(iPhone 16 Pro, iOS 26.6.1). 사용자 콘솔 작업.
